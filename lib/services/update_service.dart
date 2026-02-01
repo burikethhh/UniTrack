@@ -5,6 +5,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:open_file/open_file.dart' as open_file;
+import 'package:http/http.dart' as http;
 import '../models/app_version_model.dart';
 import '../core/constants/app_constants.dart';
 
@@ -123,6 +124,7 @@ class UpdateService {
   }
 
   /// Download and install update
+  /// Supports both Firebase Storage URLs and GitHub/HTTP URLs
   Future<bool> downloadAndInstallUpdate(
     AppVersion version, {
     Function(double)? onProgress,
@@ -153,20 +155,25 @@ class UpdateService {
         return await _installApk(filePath);
       }
 
-      // Download from Firebase Storage
       debugPrint('Downloading APK from: ${version.downloadUrl}');
       
-      final ref = _storage.refFromURL(version.downloadUrl);
-      final downloadTask = ref.writeToFile(file);
+      // Check if URL is Firebase Storage or HTTP (GitHub)
+      if (version.downloadUrl.contains('firebasestorage.googleapis.com')) {
+        // Firebase Storage download
+        final ref = _storage.refFromURL(version.downloadUrl);
+        final downloadTask = ref.writeToFile(file);
 
-      // Track progress
-      downloadTask.snapshotEvents.listen((event) {
-        final progress = event.bytesTransferred / event.totalBytes;
-        onProgress?.call(progress);
-        debugPrint('Download progress: ${(progress * 100).toStringAsFixed(1)}%');
-      });
+        downloadTask.snapshotEvents.listen((event) {
+          final progress = event.bytesTransferred / event.totalBytes;
+          onProgress?.call(progress);
+          debugPrint('Download progress: ${(progress * 100).toStringAsFixed(1)}%');
+        });
 
-      await downloadTask;
+        await downloadTask;
+      } else {
+        // HTTP download (GitHub, etc.)
+        await _downloadFromHttp(version.downloadUrl, file, onProgress);
+      }
 
       // Increment download count
       await _incrementDownloadCount(version.id);
@@ -177,6 +184,34 @@ class UpdateService {
       debugPrint('Error downloading update: $e');
       return false;
     }
+  }
+
+  /// Download file from HTTP URL with progress tracking
+  Future<void> _downloadFromHttp(
+    String url,
+    File file,
+    Function(double)? onProgress,
+  ) async {
+    final request = http.Request('GET', Uri.parse(url));
+    final response = await http.Client().send(request);
+    
+    final contentLength = response.contentLength ?? 0;
+    int downloadedBytes = 0;
+    
+    final sink = file.openWrite();
+    
+    await response.stream.forEach((chunk) {
+      sink.add(chunk);
+      downloadedBytes += chunk.length;
+      if (contentLength > 0) {
+        final progress = downloadedBytes / contentLength;
+        onProgress?.call(progress);
+        debugPrint('Download progress: ${(progress * 100).toStringAsFixed(1)}%');
+      }
+    });
+    
+    await sink.close();
+    debugPrint('Download complete: ${file.path}');
   }
 
   /// Install APK file

@@ -1,7 +1,7 @@
 name: unitrack
 description: "UniTrack - Real-Time Faculty & Staff Locator for SKSU"
 publish_to: 'none'
-version: 1.0.0+1
+version: 2.0.2+3
 
 environment:
   sdk: ^3.10.7
@@ -45,6 +45,7 @@ dependencies:
   
   # Background Service & Notifications
   flutter_local_notifications: ^18.0.1
+  firebase_messaging: ^15.1.6
   
   # Reactive Extensions
   rxdart: ^0.28.0
@@ -54,6 +55,14 @@ dependencies:
   firebase_storage: ^12.4.0
   path_provider: ^2.1.5
   file_picker: ^8.1.7
+  
+  # Offline Storage
+  sqflite: ^2.4.1
+  connectivity_plus: ^6.1.1
+  
+  # Onboarding
+  smooth_page_indicator: ^1.2.0+3
+  introduction_screen: ^3.1.14
 
 dev_dependencies:
   flutter_test:
@@ -77,6 +86,11 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
+
+  # Onboarding assets
+  assets:
+    - assets/
+    - assets/onboarding/
 
   # To add assets to your application, add an assets section, like this:
   # assets:

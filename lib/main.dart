@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'firebase_options.dart';
 import 'core/theme/app_theme.dart';
@@ -11,6 +12,7 @@ import 'providers/providers.dart';
 import 'services/services.dart';
 import 'models/models.dart';
 import 'screens/screens.dart';
+import 'screens/onboarding/onboarding_screen.dart';
 import 'widgets/update_dialog.dart';
 
 // Demo mode flag - set to false to use Firebase
@@ -43,6 +45,20 @@ void main() async {
   // Initialize connectivity monitoring
   ConnectivityService().startMonitoring();
   
+  // Initialize offline cache service (non-blocking)
+  try {
+    await OfflineCacheService().initialize();
+  } catch (e) {
+    debugPrint('⚠️ Offline cache init error (non-fatal): $e');
+  }
+  
+  // Initialize push notifications (non-blocking)
+  try {
+    await PushNotificationService().initialize();
+  } catch (e) {
+    debugPrint('⚠️ Push notification init error (non-fatal): $e');
+  }
+  
   runApp(const UniTrackApp());
 }
 
@@ -65,6 +81,12 @@ class UniTrackApp extends StatelessWidget {
         ),
         Provider<NotificationService>(
           create: (_) => NotificationService(),
+        ),
+        Provider<OfflineCacheService>(
+          create: (_) => OfflineCacheService(),
+        ),
+        Provider<PushNotificationService>(
+          create: (_) => PushNotificationService(),
         ),
         
         // Providers
@@ -108,12 +130,16 @@ class UniTrackApp extends StatelessWidget {
         debugShowCheckedModeBanner: false,
         theme: AppTheme.lightTheme,
         home: kDemoMode ? const DemoModeSelector() : const AppEntry(),
+        routes: {
+          '/login': (context) => const LoginScreen(),
+          '/onboarding': (context) => const OnboardingScreen(),
+        },
       ),
     );
   }
 }
 
-/// App entry point with splash screen
+/// App entry point with splash screen and onboarding check
 class AppEntry extends StatefulWidget {
   const AppEntry({super.key});
   
@@ -123,6 +149,22 @@ class AppEntry extends StatefulWidget {
 
 class _AppEntryState extends State<AppEntry> {
   bool _showSplash = true;
+  bool? _hasSeenOnboarding;
+  
+  @override
+  void initState() {
+    super.initState();
+    _checkOnboardingStatus();
+  }
+  
+  Future<void> _checkOnboardingStatus() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (mounted) {
+      setState(() {
+        _hasSeenOnboarding = prefs.getBool(OnboardingScreen.hasSeenOnboardingKey) ?? false;
+      });
+    }
+  }
   
   @override
   Widget build(BuildContext context) {
@@ -135,6 +177,19 @@ class _AppEntryState extends State<AppEntry> {
         },
       );
     }
+    
+    // Still checking onboarding status
+    if (_hasSeenOnboarding == null) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+    
+    // Show onboarding for first-time users
+    if (!_hasSeenOnboarding!) {
+      return const OnboardingScreen();
+    }
+    
     return const AuthWrapper();
   }
 }

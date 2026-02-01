@@ -80,7 +80,7 @@ class _VersionManagementScreenState extends State<VersionManagementScreen> {
       final firestore = FirebaseFirestore.instance;
       final batch = firestore.batch();
 
-      // Version data
+      // Version data with GitHub release URLs
       final versions = [
         {
           'versionName': '1.0.0',
@@ -121,13 +121,25 @@ class _VersionManagementScreenState extends State<VersionManagementScreen> {
         {
           'versionName': '2.0.0',
           'versionCode': 200,
-          'downloadUrl': '',
+          'downloadUrl': 'https://github.com/burikethhh/UniTrack/releases/download/v2.0.0/unitrack-latest.apk',
           'releaseNotes': 'UniTrack 2.0 - Complete Overhaul!\n\n✨ New Features:\n- Animated splash screen\n- Enhanced location accuracy\n- Network connectivity monitoring\n- Password strength indicator\n\n🔧 Improvements:\n- Faster faculty refresh\n- Adaptive location tracking\n- Improved UI/UX',
+          'isRequired': false,
+          'isActive': true,
+          'releaseDate': Timestamp.fromDate(DateTime(2026, 2, 1)),
+          'downloadCount': 0,
+          'fileSize': 98000000,
+          'minSupportedApiVersion': 2,
+        },
+        {
+          'versionName': '2.0.1',
+          'versionCode': 201,
+          'downloadUrl': 'https://github.com/burikethhh/UniTrack/releases/download/v2.0.1/unitrack-v2.0.1.apk',
+          'releaseNotes': 'UniTrack 2.0.1 - New Features!\n\n✨ New Features:\n- Offline Mode with SQLite caching\n- Faculty Availability Status (Available, Busy, In Meeting, etc.)\n- Onboarding Tutorial for first-time users\n- Skeleton Loading animations\n- Push Notifications (FCM)\n\n🔧 Improvements:\n- Better user experience\n- Smoother loading states',
           'isRequired': true,
           'isActive': true,
           'releaseDate': Timestamp.fromDate(DateTime(2026, 2, 1)),
           'downloadCount': 0,
-          'fileSize': 0,
+          'fileSize': 98000000,
           'minSupportedApiVersion': 2,
         },
       ];
@@ -281,10 +293,10 @@ class _VersionManagementScreenState extends State<VersionManagementScreen> {
                 ),
               ],
             ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _isUploading ? null : _showUploadDialog,
-        icon: _isUploading
-            ? SizedBox(
+      floatingActionButton: _isUploading
+          ? FloatingActionButton.extended(
+              onPressed: null,
+              icon: SizedBox(
                 width: 24,
                 height: 24,
                 child: CircularProgressIndicator(
@@ -292,10 +304,29 @@ class _VersionManagementScreenState extends State<VersionManagementScreen> {
                   value: _uploadProgress,
                   color: Colors.white,
                 ),
-              )
-            : const Icon(Icons.upload),
-        label: Text(_isUploading ? 'Uploading...' : 'Upload New Version'),
-      ),
+              ),
+              label: const Text('Uploading...'),
+            )
+          : Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // GitHub URL option (recommended for free plan)
+                FloatingActionButton.small(
+                  heroTag: 'github',
+                  onPressed: _showGitHubUrlDialog,
+                  backgroundColor: Colors.grey.shade800,
+                  child: const Icon(Icons.link, color: Colors.white),
+                ),
+                const SizedBox(height: 8),
+                // Upload APK option
+                FloatingActionButton.extended(
+                  heroTag: 'upload',
+                  onPressed: _showUploadDialog,
+                  icon: const Icon(Icons.upload),
+                  label: const Text('Add Version'),
+                ),
+              ],
+            ),
     );
   }
 
@@ -466,6 +497,207 @@ class _VersionManagementScreenState extends State<VersionManagementScreen> {
         ),
       ),
     );
+  }
+
+  /// Show dialog to add version from GitHub URL (Free plan friendly!)
+  void _showGitHubUrlDialog() {
+    final versionNameController = TextEditingController();
+    final versionCodeController = TextEditingController();
+    final releaseNotesController = TextEditingController();
+    final downloadUrlController = TextEditingController();
+    bool isRequired = false;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.link, color: Colors.blue),
+              SizedBox(width: 8),
+              Text('Add from GitHub'),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Info banner
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.blue.shade200),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.info, color: Colors.blue, size: 20),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Recommended for Firebase free plan! Host APK on GitHub and link here.',
+                          style: TextStyle(fontSize: 12, color: Colors.blue),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Version Name
+                TextField(
+                  controller: versionNameController,
+                  decoration: const InputDecoration(
+                    labelText: 'Version Name *',
+                    hintText: 'e.g., 2.0.1',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.tag),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Version Code
+                TextField(
+                  controller: versionCodeController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Version Code *',
+                    hintText: 'e.g., 201',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.code),
+                    helperText: 'Must be higher than previous version',
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // GitHub Download URL
+                TextField(
+                  controller: downloadUrlController,
+                  decoration: const InputDecoration(
+                    labelText: 'GitHub Download URL *',
+                    hintText: 'https://github.com/.../releases/download/...',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.download),
+                    helperText: 'Direct APK download link from GitHub Releases',
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Release Notes
+                TextField(
+                  controller: releaseNotesController,
+                  maxLines: 3,
+                  decoration: const InputDecoration(
+                    labelText: 'Release Notes',
+                    hintText: 'What\'s new in this version...',
+                    border: OutlineInputBorder(),
+                    alignLabelWithHint: true,
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Required Update Toggle
+                SwitchListTile(
+                  title: const Text('Required Update'),
+                  subtitle: const Text('Force users to update'),
+                  value: isRequired,
+                  onChanged: (v) => setDialogState(() => isRequired = v),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton.icon(
+              icon: const Icon(Icons.add),
+              label: const Text('Add Version'),
+              onPressed: downloadUrlController.text.isEmpty ||
+                      versionNameController.text.isEmpty ||
+                      versionCodeController.text.isEmpty
+                  ? null
+                  : () async {
+                      Navigator.pop(ctx);
+                      await _addVersionFromUrl(
+                        versionName: versionNameController.text,
+                        versionCode: int.tryParse(versionCodeController.text) ?? 0,
+                        downloadUrl: downloadUrlController.text,
+                        releaseNotes: releaseNotesController.text,
+                        isRequired: isRequired,
+                      );
+                    },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Add version entry with GitHub URL (no upload needed)
+  Future<void> _addVersionFromUrl({
+    required String versionName,
+    required int versionCode,
+    required String downloadUrl,
+    required String releaseNotes,
+    required bool isRequired,
+  }) async {
+    setState(() => _isLoading = true);
+
+    try {
+      final firestore = FirebaseFirestore.instance;
+      
+      // Create version document with GitHub URL
+      await firestore.collection('app_versions').add({
+        'versionName': versionName,
+        'versionCode': versionCode,
+        'downloadUrl': downloadUrl,
+        'releaseNotes': releaseNotes.isNotEmpty ? releaseNotes : null,
+        'isRequired': isRequired,
+        'isActive': true,
+        'releaseDate': FieldValue.serverTimestamp(),
+        'downloadCount': 0,
+        'fileSize': 0, // Unknown for external URLs
+        'minSupportedApiVersion': AppConstants.apiVersion,
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: const [
+                Icon(Icons.check_circle, color: Colors.white),
+                SizedBox(width: 8),
+                Text('Version added successfully!'),
+              ],
+            ),
+            backgroundColor: Colors.green,
+          ),
+        );
+        _loadVersions();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.error, color: Colors.white),
+                const SizedBox(width: 8),
+                Text('Failed to add version: $e'),
+              ],
+            ),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+
+    setState(() => _isLoading = false);
   }
 
   Future<void> _uploadVersion({

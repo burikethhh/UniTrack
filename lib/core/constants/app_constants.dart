@@ -4,8 +4,8 @@
 class AppConstants {
   // App Info
   static const String appName = 'UniTrack';
-  static const String appVersion = '2.0.0'; // Premium multi-campus version
-  static const int versionCode = 200; // Version code for update checks (2.0.0 = 200)
+  static const String appVersion = '2.0.2'; // Fixed login crash
+  static const int versionCode = 202; // Version code for update checks (2.0.2 = 202)
   static const String appTagline = 'Real-Time Faculty & Staff Locator';
   
   // Version Compatibility - for older app versions to update
@@ -13,6 +13,10 @@ class AppConstants {
   static const int minSupportedApiVersion = 1; // Minimum API version we support
   static const int minSupportedVersionCode = 100; // Oldest version that can still use the app
   static const String updateCheckEndpoint = 'app_versions'; // Firestore collection for updates
+  
+  // GitHub Release URLs (for free hosting)
+  static const String githubRepo = 'burikethhh/UniTrack';
+  static const String githubReleasesUrl = 'https://github.com/burikethhh/UniTrack/releases';
   
   // University Info
   static const String universityName = 'Sultan Kudarat State University';

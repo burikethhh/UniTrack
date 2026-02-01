@@ -1,7 +1,79 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
 
 /// User roles enum
 enum UserRole { student, staff, admin }
+
+/// Faculty availability status enum
+enum AvailabilityStatus {
+  available,
+  busy,
+  inMeeting,
+  teaching,
+  onBreak,
+  outOfOffice,
+  doNotDisturb,
+}
+
+/// Extension for availability status display properties
+extension AvailabilityStatusExtension on AvailabilityStatus {
+  String get displayName {
+    switch (this) {
+      case AvailabilityStatus.available:
+        return 'Available';
+      case AvailabilityStatus.busy:
+        return 'Busy';
+      case AvailabilityStatus.inMeeting:
+        return 'In Meeting';
+      case AvailabilityStatus.teaching:
+        return 'Teaching';
+      case AvailabilityStatus.onBreak:
+        return 'On Break';
+      case AvailabilityStatus.outOfOffice:
+        return 'Out of Office';
+      case AvailabilityStatus.doNotDisturb:
+        return 'Do Not Disturb';
+    }
+  }
+  
+  IconData get icon {
+    switch (this) {
+      case AvailabilityStatus.available:
+        return Icons.check_circle;
+      case AvailabilityStatus.busy:
+        return Icons.pending;
+      case AvailabilityStatus.inMeeting:
+        return Icons.groups;
+      case AvailabilityStatus.teaching:
+        return Icons.school;
+      case AvailabilityStatus.onBreak:
+        return Icons.coffee;
+      case AvailabilityStatus.outOfOffice:
+        return Icons.home;
+      case AvailabilityStatus.doNotDisturb:
+        return Icons.do_not_disturb;
+    }
+  }
+  
+  Color get color {
+    switch (this) {
+      case AvailabilityStatus.available:
+        return const Color(0xFF4CAF50); // Green
+      case AvailabilityStatus.busy:
+        return const Color(0xFFFFC107); // Amber
+      case AvailabilityStatus.inMeeting:
+        return const Color(0xFF2196F3); // Blue
+      case AvailabilityStatus.teaching:
+        return const Color(0xFF9C27B0); // Purple
+      case AvailabilityStatus.onBreak:
+        return const Color(0xFF795548); // Brown
+      case AvailabilityStatus.outOfOffice:
+        return const Color(0xFF607D8B); // Blue Grey
+      case AvailabilityStatus.doNotDisturb:
+        return const Color(0xFFF44336); // Red
+    }
+  }
+}
 
 /// User model for UniTrack
 class UserModel {
@@ -27,6 +99,11 @@ class UserModel {
   final String? quickMessage;
   final List<String>? officeHours;
   
+  // Availability status
+  final AvailabilityStatus? availabilityStatus;
+  final String? customStatusMessage;
+  final DateTime? statusUpdatedAt;
+  
   UserModel({
     required this.id,
     required this.email,
@@ -45,6 +122,9 @@ class UserModel {
     this.currentStatus,
     this.quickMessage,
     this.officeHours,
+    this.availabilityStatus,
+    this.customStatusMessage,
+    this.statusUpdatedAt,
   });
   
   /// Full name getter
@@ -99,6 +179,9 @@ class UserModel {
       officeHours: data['officeHours'] != null 
           ? List<String>.from(data['officeHours']) 
           : null,
+      availabilityStatus: _parseAvailabilityStatus(data['availabilityStatus']),
+      customStatusMessage: data['customStatusMessage'],
+      statusUpdatedAt: (data['statusUpdatedAt'] as Timestamp?)?.toDate(),
     );
   }
   
@@ -121,6 +204,9 @@ class UserModel {
       'currentStatus': currentStatus,
       'quickMessage': quickMessage,
       'officeHours': officeHours,
+      'availabilityStatus': availabilityStatus?.name,
+      'customStatusMessage': customStatusMessage,
+      'statusUpdatedAt': statusUpdatedAt != null ? Timestamp.fromDate(statusUpdatedAt!) : null,
     };
   }
   
@@ -143,6 +229,9 @@ class UserModel {
     String? currentStatus,
     String? quickMessage,
     List<String>? officeHours,
+    AvailabilityStatus? availabilityStatus,
+    String? customStatusMessage,
+    DateTime? statusUpdatedAt,
   }) {
     return UserModel(
       id: id ?? this.id,
@@ -162,6 +251,9 @@ class UserModel {
       currentStatus: currentStatus ?? this.currentStatus,
       quickMessage: quickMessage ?? this.quickMessage,
       officeHours: officeHours ?? this.officeHours,
+      availabilityStatus: availabilityStatus ?? this.availabilityStatus,
+      customStatusMessage: customStatusMessage ?? this.customStatusMessage,
+      statusUpdatedAt: statusUpdatedAt ?? this.statusUpdatedAt,
     );
   }
   
@@ -175,6 +267,29 @@ class UserModel {
       case 'student':
       default:
         return UserRole.student;
+    }
+  }
+  
+  /// Parse availability status from string
+  static AvailabilityStatus? _parseAvailabilityStatus(String? statusString) {
+    if (statusString == null) return null;
+    switch (statusString.toLowerCase()) {
+      case 'available':
+        return AvailabilityStatus.available;
+      case 'busy':
+        return AvailabilityStatus.busy;
+      case 'inmeeting':
+        return AvailabilityStatus.inMeeting;
+      case 'teaching':
+        return AvailabilityStatus.teaching;
+      case 'onbreak':
+        return AvailabilityStatus.onBreak;
+      case 'outofoffice':
+        return AvailabilityStatus.outOfOffice;
+      case 'donotdisturb':
+        return AvailabilityStatus.doNotDisturb;
+      default:
+        return null;
     }
   }
   
