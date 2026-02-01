@@ -1,0 +1,31 @@
+{"users": [
+{
+  "localId": "Etd8vDeifuUFX0HdFMgGiI5Zpjw2",
+  "email": "christiankethaguacitoadmin@sksu.edu.ph",
+  "emailVerified": false,
+  "passwordHash": "7TI/z+k6M90IDbC1w9aNxk4nmbI5UiyWGfGoaJdI8OPvoTShQJoSI//j14ftI0bcLGog6DAZ1uKP2A5qJQrCJA==",
+  "salt": "D2gLA2jAjiTlow==",
+  "createdAt": "1769917420071",
+  "disabled": false,
+  "providerUserInfo": []
+},
+{
+  "localId": "g9IT1ZyLf0YS7BcomfSrQz5lrmC3",
+  "email": "christiankethaguacitostaff@sksu.edu.ph",
+  "emailVerified": false,
+  "passwordHash": "Zdnoa1v2/3/HwwQDT/O2WRqD/YcHa6WDunLaQ864kk/zh3tlAvYEBjSRuIh2/LpTMajGTROoFiVFv2nLYOFpBA==",
+  "salt": "t/HNlNR9sWmNEw==",
+  "createdAt": "1769917434898",
+  "disabled": false,
+  "providerUserInfo": []
+},
+{
+  "localId": "vM1dF8FCAENrdjUulydVXrvjJ8z2",
+  "email": "christiankethaguacito@sksu.edu.ph",
+  "emailVerified": false,
+  "passwordHash": "OWeNeGrytAL8+nZnqdfMlH7UeGgmNuKlB9xHqisAoOpLW+mU+2vCje6t9aceBLFkjCNk4I1z+7FZSD4cYFVWQg==",
+  "salt": "lDbrjrZIni5jmA==",
+  "createdAt": "1769917471975",
+  "disabled": false,
+  "providerUserInfo": []
+}]}

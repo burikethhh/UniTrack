@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SKSU Campus Boundary Editor</title>
+    
+    <!-- MapLibre GL JS -->
+    <script src="https://unpkg.com/maplibre-gl@4.1.0/dist/maplibre-gl.js"></script>
+    <link href="https://unpkg.com/maplibre-gl@4.1.0/dist/maplibre-gl.css" rel="stylesheet" />
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+        }
+        
+        #map {
+            width: 100vw;
+            height: 100vh;
+        }
+        
+        /* Control Panel */
+        .control-panel {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.85);
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            z-index: 1000;
+            min-width: 280px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        
+        .control-panel h2 {
+            color: #41B3A3;
+            margin-bottom: 10px;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .control-panel h3 {
+            color: #E8A87C;
+            margin: 15px 0 8px 0;
+            font-size: 13px;
+            border-bottom: 1px solid #444;
+            padding-bottom: 5px;
+        }
+        
+        .instructions {
+            font-size: 12px;
+            color: #aaa;
+            line-height: 1.6;
+            margin-bottom: 15px;
+        }
+        
+        .instructions li {
+            margin: 5px 0;
+        }
+        
+        .btn {
+            display: inline-block;
+            padding: 8px 16px;
+            margin: 4px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+        
+        .btn-primary {
+            background: #41B3A3;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #359788;
+        }
+        
+        .btn-danger {
+            background: #e74c3c;
+            color: white;
+        }
+        
+        .btn-danger:hover {
+            background: #c0392b;
+        }
+        
+        .btn-secondary {
+            background: #666;
+            color: white;
+        }
+        
+        .btn-secondary:hover {
+            background: #555;
+        }
+        
+        .btn-warning {
+            background: #E8A87C;
+            color: #333;
+        }
+        
+        .btn-warning:hover {
+            background: #d4896a;
+        }
+        
+        .stats {
+            background: #222;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            font-size: 12px;
+        }
+        
+        .stats-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 4px 0;
+        }
+        
+        .stats-label {
+            color: #888;
+        }
+        
+        .stats-value {
+            color: #41B3A3;
+            font-weight: bold;
+        }
+        
+        /* Points List */
+        .points-list {
+            max-height: 200px;
+            overflow-y: auto;
+            background: #1a1a1a;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        
+        .point-item {
+            display: flex;
+            align-items: center;
+            padding: 6px 10px;
+            border-bottom: 1px solid #333;
+            font-size: 11px;
+        }
+        
+        .point-item:hover {
+            background: #2a2a2a;
+        }
+        
+        .point-number {
+            width: 22px;
+            height: 22px;
+            background: #41B3A3;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-right: 10px;
+            font-size: 10px;
+        }
+        
+        .point-coords {
+            flex: 1;
+            color: #aaa;
+        }
+        
+        .point-delete {
+            color: #e74c3c;
+            cursor: pointer;
+            padding: 4px;
+        }
+        
+        .point-delete:hover {
+            color: #ff6b6b;
+        }
+        
+        /* Map Style Selector */
+        .style-selector {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 1000;
+        }
+        
+        .style-btn {
+            display: block;
+            width: 80px;
+            padding: 10px;
+            margin: 5px 0;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            border: 2px solid transparent;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 11px;
+            text-align: center;
+            transition: all 0.2s;
+        }
+        
+        .style-btn:hover {
+            border-color: #41B3A3;
+        }
+        
+        .style-btn.active {
+            border-color: #E8A87C;
+            background: rgba(232, 168, 124, 0.2);
+        }
+        
+        /* Crosshair */
+        .crosshair {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            z-index: 500;
+        }
+        
+        .crosshair::before,
+        .crosshair::after {
+            content: '';
+            position: absolute;
+            background: rgba(255, 0, 0, 0.5);
+        }
+        
+        .crosshair::before {
+            width: 20px;
+            height: 2px;
+            top: -1px;
+            left: -10px;
+        }
+        
+        .crosshair::after {
+            width: 2px;
+            height: 20px;
+            top: -10px;
+            left: -1px;
+        }
+        
+        /* Coordinates Display */
+        .coords-display {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-family: monospace;
+            font-size: 12px;
+            z-index: 1000;
+        }
+        
+        /* Export Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 2000;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal.show {
+            display: flex;
+        }
+        
+        .modal-content {
+            background: #1a1a1a;
+            color: white;
+            padding: 25px;
+            border-radius: 15px;
+            max-width: 700px;
+            max-height: 80vh;
+            overflow-y: auto;
+            width: 90%;
+        }
+        
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .modal-header h2 {
+            color: #41B3A3;
+        }
+        
+        .modal-close {
+            background: none;
+            border: none;
+            color: #888;
+            font-size: 24px;
+            cursor: pointer;
+        }
+        
+        .modal-close:hover {
+            color: white;
+        }
+        
+        .code-block {
+            background: #0d0d0d;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 11px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            color: #41B3A3;
+            margin: 10px 0;
+            border: 1px solid #333;
+        }
+        
+        .copy-hint {
+            color: #888;
+            font-size: 11px;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    
+    <!-- Crosshair -->
+    <div class="crosshair"></div>
+    
+    <!-- Coordinates Display -->
+    <div class="coords-display" id="coordsDisplay">
+        Lat: 6.633261 | Lng: 124.609143
+    </div>
+    
+    <!-- Control Panel -->
+    <div class="control-panel">
+        <h2>🏫 SKSU Campus Boundary Editor</h2>
+        
+        <div class="instructions">
+            <ul>
+                <li>🖱️ <strong>Click</strong> on map to add boundary points</li>
+                <li>🔄 Draw points <strong>clockwise</strong></li>
+                <li>📍 Red marker = Campus center</li>
+                <li>🗑️ Click × to delete a point</li>
+            </ul>
+        </div>
+        
+        <div class="stats">
+            <div class="stats-row">
+                <span class="stats-label">Points:</span>
+                <span class="stats-value" id="pointCount">0</span>
+            </div>
+            <div class="stats-row">
+                <span class="stats-label">Zoom:</span>
+                <span class="stats-value" id="zoomLevel">17.0</span>
+            </div>
+            <div class="stats-row">
+                <span class="stats-label">Status:</span>
+                <span class="stats-value" id="status">Ready to draw</span>
+            </div>
+        </div>
+        
+        <div style="margin: 10px 0;">
+            <button class="btn btn-secondary" onclick="undoLastPoint()">↩ Undo</button>
+            <button class="btn btn-danger" onclick="clearAllPoints()">🗑 Clear All</button>
+            <button class="btn btn-warning" onclick="resetView()">🎯 Reset View</button>
+        </div>
+        
+        <h3>📍 Boundary Points</h3>
+        <div class="points-list" id="pointsList">
+            <div style="padding: 20px; text-align: center; color: #666;">
+                Click on map to add points
+            </div>
+        </div>
+        
+        <div style="margin-top: 15px;">
+            <button class="btn btn-primary" onclick="exportCoordinates()" id="exportBtn" disabled>
+                📋 Export Coordinates
+            </button>
+        </div>
+    </div>
+    
+    <!-- Map Style Selector -->
+    <div class="style-selector">
+        <button class="style-btn active" onclick="setMapStyle('satellite')" id="btn-satellite">
+            🛰️ Satellite
+        </button>
+        <button class="style-btn" onclick="setMapStyle('streets')" id="btn-streets">
+            🗺️ Streets
+        </button>
+        <button class="style-btn" onclick="setMapStyle('hybrid')" id="btn-hybrid">
+            🌐 Hybrid
+        </button>
+    </div>
+    
+    <!-- Export Modal -->
+    <div class="modal" id="exportModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>✅ Campus Boundary Coordinates</h2>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            
+            <h3 style="color: #E8A87C; margin-bottom: 10px;">Dart Code (for app_constants.dart)</h3>
+            <div class="code-block" id="dartCode"></div>
+            <button class="btn btn-primary" onclick="copyToClipboard('dartCode')">📋 Copy Dart Code</button>
+            
+            <h3 style="color: #E8A87C; margin: 20px 0 10px 0;">JSON Format</h3>
+            <div class="code-block" id="jsonCode"></div>
+            <button class="btn btn-primary" onclick="copyToClipboard('jsonCode')">📋 Copy JSON</button>
+            
+            <p class="copy-hint">💡 Paste the Dart code into your app_constants.dart file</p>
+        </div>
+    </div>
+
+    <script>
+        // SKSU Isulan Campus Center
+        const CAMPUS_CENTER = [124.6091426890741, 6.63326077657394]; // [lng, lat]
+        
+        // Boundary points array
+        let boundaryPoints = [];
+        
+        // Map styles
+        const mapStyles = {
+            satellite: {
+                version: 8,
+                sources: {
+                    'satellite': {
+                        type: 'raster',
+                        tiles: [
+                            'https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}'
+                        ],
+                        tileSize: 256,
+                        maxzoom: 20
+                    }
+                },
+                layers: [{
+                    id: 'satellite-layer',
+                    type: 'raster',
+                    source: 'satellite'
+                }]
+            },
+            streets: {
+                version: 8,
+                sources: {
+                    'osm': {
+                        type: 'raster',
+                        tiles: [
+                            'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
+                        ],
+                        tileSize: 256,
+                        maxzoom: 19
+                    }
+                },
+                layers: [{
+                    id: 'osm-layer',
+                    type: 'raster',
+                    source: 'osm'
+                }]
+            },
+            hybrid: {
+                version: 8,
+                sources: {
+                    'satellite': {
+                        type: 'raster',
+                        tiles: [
+                            'https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}'
+                        ],
+                        tileSize: 256,
+                        maxzoom: 20
+                    }
+                },
+                layers: [{
+                    id: 'hybrid-layer',
+                    type: 'raster',
+                    source: 'satellite'
+                }]
+            }
+        };
+        
+        // Initialize map
+        const map = new maplibregl.Map({
+            container: 'map',
+            style: mapStyles.satellite,
+            center: CAMPUS_CENTER,
+            zoom: 17,
+            maxZoom: 20,
+            minZoom: 14
+        });
+        
+        // Add navigation controls
+        map.addControl(new maplibregl.NavigationControl(), 'bottom-right');
+        
+        // Add scale
+        map.addControl(new maplibregl.ScaleControl(), 'bottom-left');
+        
+        // Campus center marker
+        const centerMarker = new maplibregl.Marker({ color: '#ff0000' })
+            .setLngLat(CAMPUS_CENTER)
+            .setPopup(new maplibregl.Popup().setHTML('<strong>SKSU Isulan Campus Center</strong><br>6.633261, 124.609143'))
+            .addTo(map);
+        
+        // Boundary markers array
+        let markers = [];
+        
+        // Update coordinates display on mouse move
+        map.on('mousemove', (e) => {
+            const { lat, lng } = e.lngLat;
+            document.getElementById('coordsDisplay').textContent = 
+                `Lat: ${lat.toFixed(6)} | Lng: ${lng.toFixed(6)}`;
+        });
+        
+        // Update zoom level
+        map.on('zoom', () => {
+            document.getElementById('zoomLevel').textContent = map.getZoom().toFixed(1);
+        });
+        
+        // Add point on click
+        map.on('click', (e) => {
+            const { lat, lng } = e.lngLat;
+            addPoint(lat, lng);
+        });
+        
+        // Add sources and layers when map loads
+        map.on('load', () => {
+            // Add boundary polygon source
+            map.addSource('boundary', {
+                type: 'geojson',
+                data: {
+                    type: 'Feature',
+                    geometry: {
+                        type: 'Polygon',
+                        coordinates: [[]]
+                    }
+                }
+            });
+            
+            // Add fill layer
+            map.addLayer({
+                id: 'boundary-fill',
+                type: 'fill',
+                source: 'boundary',
+                paint: {
+                    'fill-color': '#41B3A3',
+                    'fill-opacity': 0.3
+                }
+            });
+            
+            // Add outline layer
+            map.addLayer({
+                id: 'boundary-outline',
+                type: 'line',
+                source: 'boundary',
+                paint: {
+                    'line-color': '#41B3A3',
+                    'line-width': 3
+                }
+            });
+        });
+        
+        function addPoint(lat, lng) {
+            boundaryPoints.push({ lat, lng });
+            
+            // Add marker
+            const markerEl = document.createElement('div');
+            markerEl.className = 'boundary-marker';
+            markerEl.style.cssText = `
+                width: 28px;
+                height: 28px;
+                background: #41B3A3;
+                border: 3px solid white;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: white;
+                font-weight: bold;
+                font-size: 12px;
+                cursor: pointer;
+                box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+            `;
+            markerEl.textContent = boundaryPoints.length;
+            
+            const marker = new maplibregl.Marker({ element: markerEl })
+                .setLngLat([lng, lat])
+                .addTo(map);
+            
+            markers.push(marker);
+            
+            updateBoundaryPolygon();
+            updateUI();
+        }
+        
+        function updateBoundaryPolygon() {
+            if (boundaryPoints.length < 3) {
+                map.getSource('boundary')?.setData({
+                    type: 'Feature',
+                    geometry: {
+                        type: 'Polygon',
+                        coordinates: [[]]
+                    }
+                });
+                return;
+            }
+            
+            // Create closed polygon coordinates
+            const coords = boundaryPoints.map(p => [p.lng, p.lat]);
+            coords.push(coords[0]); // Close the polygon
+            
+            map.getSource('boundary')?.setData({
+                type: 'Feature',
+                geometry: {
+                    type: 'Polygon',
+                    coordinates: [coords]
+                }
+            });
+        }
+        
+        function updateUI() {
+            const count = boundaryPoints.length;
+            document.getElementById('pointCount').textContent = count;
+            document.getElementById('status').textContent = 
+                count < 3 ? `Need ${3 - count} more points` : 'Polygon ready!';
+            document.getElementById('exportBtn').disabled = count < 3;
+            
+            // Update points list
+            const list = document.getElementById('pointsList');
+            if (count === 0) {
+                list.innerHTML = '<div style="padding: 20px; text-align: center; color: #666;">Click on map to add points</div>';
+            } else {
+                list.innerHTML = boundaryPoints.map((p, i) => `
+                    <div class="point-item">
+                        <div class="point-number">${i + 1}</div>
+                        <div class="point-coords">
+                            ${p.lat.toFixed(6)}, ${p.lng.toFixed(6)}
+                        </div>
+                        <div class="point-delete" onclick="deletePoint(${i})">×</div>
+                    </div>
+                `).join('');
+            }
+        }
+        
+        function deletePoint(index) {
+            boundaryPoints.splice(index, 1);
+            markers[index].remove();
+            markers.splice(index, 1);
+            
+            // Renumber remaining markers
+            markers.forEach((marker, i) => {
+                marker.getElement().textContent = i + 1;
+            });
+            
+            updateBoundaryPolygon();
+            updateUI();
+        }
+        
+        function undoLastPoint() {
+            if (boundaryPoints.length > 0) {
+                boundaryPoints.pop();
+                markers.pop().remove();
+                updateBoundaryPolygon();
+                updateUI();
+            }
+        }
+        
+        function clearAllPoints() {
+            if (boundaryPoints.length > 0 && confirm('Clear all boundary points?')) {
+                boundaryPoints = [];
+                markers.forEach(m => m.remove());
+                markers = [];
+                updateBoundaryPolygon();
+                updateUI();
+            }
+        }
+        
+        function resetView() {
+            map.flyTo({
+                center: CAMPUS_CENTER,
+                zoom: 17,
+                duration: 1000
+            });
+        }
+        
+        function setMapStyle(style) {
+            map.setStyle(mapStyles[style]);
+            
+            // Update button states
+            document.querySelectorAll('.style-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            document.getElementById(`btn-${style}`).classList.add('active');
+            
+            // Re-add boundary source and layers after style change
+            map.once('styledata', () => {
+                if (!map.getSource('boundary')) {
+                    map.addSource('boundary', {
+                        type: 'geojson',
+                        data: {
+                            type: 'Feature',
+                            geometry: {
+                                type: 'Polygon',
+                                coordinates: [[]]
+                            }
+                        }
+                    });
+                    
+                    map.addLayer({
+                        id: 'boundary-fill',
+                        type: 'fill',
+                        source: 'boundary',
+                        paint: {
+                            'fill-color': '#41B3A3',
+                            'fill-opacity': 0.3
+                        }
+                    });
+                    
+                    map.addLayer({
+                        id: 'boundary-outline',
+                        type: 'line',
+                        source: 'boundary',
+                        paint: {
+                            'line-color': '#41B3A3',
+                            'line-width': 3
+                        }
+                    });
+                    
+                    updateBoundaryPolygon();
+                }
+            });
+        }
+        
+        function exportCoordinates() {
+            if (boundaryPoints.length < 3) return;
+            
+            // Generate Dart code
+            let dartCode = `// SKSU Isulan Campus Boundary\n`;
+            dartCode += `// Generated: ${new Date().toLocaleString()}\n`;
+            dartCode += `// Points: ${boundaryPoints.length}\n\n`;
+            dartCode += `static const List<List<double>> campusBoundaryPoints = [\n`;
+            boundaryPoints.forEach((p, i) => {
+                const comma = i < boundaryPoints.length - 1 ? ',' : '';
+                dartCode += `  [${p.lat}, ${p.lng}]${comma} // Point ${i + 1}\n`;
+            });
+            dartCode += `];`;
+            
+            // Generate JSON
+            const jsonData = boundaryPoints.map(p => ({
+                lat: parseFloat(p.lat.toFixed(8)),
+                lng: parseFloat(p.lng.toFixed(8))
+            }));
+            const jsonCode = JSON.stringify(jsonData, null, 2);
+            
+            document.getElementById('dartCode').textContent = dartCode;
+            document.getElementById('jsonCode').textContent = jsonCode;
+            document.getElementById('exportModal').classList.add('show');
+        }
+        
+        function closeModal() {
+            document.getElementById('exportModal').classList.remove('show');
+        }
+        
+        function copyToClipboard(elementId) {
+            const text = document.getElementById(elementId).textContent;
+            navigator.clipboard.writeText(text).then(() => {
+                alert('Copied to clipboard!');
+            });
+        }
+        
+        // Close modal on escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') closeModal();
+            if (e.key === 'z' && e.ctrlKey) undoLastPoint();
+        });
+    </script>
+</body>
+</html>

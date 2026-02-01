@@ -1,0 +1,22 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // APK releases - admins can upload, anyone authenticated can download
+    match /apk_releases/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && 
+                      firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+    
+    // User uploads (profile pictures, etc.)
+    match /users/{userId}/{allPaths=**} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Default - deny all other access
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
