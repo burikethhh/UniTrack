@@ -701,6 +701,64 @@
             opacity: 0.8;
         }
         
+        /* What's New Section */
+        .whats-new {
+            margin-top: 2.5rem;
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 1.5rem 2rem;
+            text-align: left;
+            max-width: 500px;
+            margin-left: auto;
+            margin-right: auto;
+            border: 1px solid rgba(255,255,255,0.15);
+        }
+        
+        .whats-new h3 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: #fff;
+        }
+        
+        .whats-new h3 i {
+            color: #FFD700;
+        }
+        
+        .update-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        
+        .update-list li {
+            padding: 0.6rem 0;
+            font-size: 0.9rem;
+            color: rgba(255,255,255,0.9);
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .update-list li:last-child {
+            border-bottom: none;
+        }
+        
+        .update-list li i {
+            width: 20px;
+            color: var(--primary-light);
+            font-size: 0.85rem;
+        }
+        
+        .update-list li strong {
+            color: #fff;
+        }
+        
         /* Installation Guide */
         .installation {
             padding: 6rem 2rem;
@@ -1255,17 +1313,30 @@
                 <p>Get the official SKSU faculty tracking and monitoring application</p>
                 
                 <div class="version-info">
-                    <span class="version-badge">v2.0.0</span>
+                    <span class="version-badge">v2.0.4</span>
                     <span>Latest Release • February 2026</span>
                 </div>
                 
-                <a href="https://github.com/burikethhh/UniTrack/releases/download/v2.0.0/unitrack-latest.apk" class="download-btn" id="downloadBtn">
+                <a href="https://github.com/burikethhh/UniTrack/releases/download/v2.0.4/UniTrack-v2.0.4.apk" class="download-btn" id="downloadBtn">
                     <i class="fab fa-android"></i>
                     <div>
                         <div>Download APK</div>
                         <div style="font-size: 0.8rem; font-weight: 400; opacity: 0.8;">Android 6.0+</div>
                     </div>
                 </a>
+                
+                <!-- What's New Section -->
+                <div class="whats-new">
+                    <h3><i class="fas fa-sparkles"></i> What's New in v2.0.4</h3>
+                    <ul class="update-list">
+                        <li><i class="fas fa-wifi-slash"></i> <strong>Offline Mode</strong> - Use the app without internet using SQLite caching</li>
+                        <li><i class="fas fa-user-clock"></i> <strong>Availability Status</strong> - Faculty can set status (Available, Busy, In Meeting, etc.)</li>
+                        <li><i class="fas fa-graduation-cap"></i> <strong>Onboarding Tutorial</strong> - New users get a guided tour</li>
+                        <li><i class="fas fa-bell"></i> <strong>Push Notifications</strong> - Get notified about important updates</li>
+                        <li><i class="fas fa-download"></i> <strong>In-App Updates</strong> - Update directly from the app</li>
+                        <li><i class="fas fa-spinner"></i> <strong>Better Loading States</strong> - Smooth skeleton loaders</li>
+                    </ul>
+                </div>
             </div>
         </div>
     </section>
