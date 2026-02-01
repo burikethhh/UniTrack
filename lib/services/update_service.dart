@@ -155,7 +155,7 @@ class UpdateService {
         return await _installApk(filePath);
       }
 
-      debugPrint('Downloading APK from: ${version.downloadUrl}');
+      debugPrint('📥 Downloading APK from: ${version.downloadUrl}');
       
       // Check if URL is Firebase Storage or HTTP (GitHub)
       if (version.downloadUrl.contains('firebasestorage.googleapis.com')) {
@@ -166,13 +166,37 @@ class UpdateService {
         downloadTask.snapshotEvents.listen((event) {
           final progress = event.bytesTransferred / event.totalBytes;
           onProgress?.call(progress);
-          debugPrint('Download progress: ${(progress * 100).toStringAsFixed(1)}%');
+          debugPrint('📥 Download progress: ${(progress * 100).toStringAsFixed(1)}%');
         });
 
         await downloadTask;
       } else {
         // HTTP download (GitHub, etc.)
-        await _downloadFromHttp(version.downloadUrl, file, onProgress);
+        try {
+          await _downloadFromHttp(version.downloadUrl, file, onProgress);
+        } catch (e) {
+          debugPrint('❌ HTTP download failed: $e');
+          // Clean up partial file
+          if (await file.exists()) {
+            await file.delete();
+          }
+          rethrow;
+        }
+      }
+      
+      // Verify file was downloaded
+      if (!await file.exists()) {
+        debugPrint('❌ Downloaded file does not exist');
+        return false;
+      }
+      
+      final fileSize = await file.length();
+      debugPrint('✅ APK downloaded: ${(fileSize / 1024 / 1024).toStringAsFixed(2)} MB');
+      
+      if (fileSize < 1024 * 1024) { // Less than 1MB is likely an error
+        debugPrint('❌ Downloaded file too small, likely an error page');
+        await file.delete();
+        return false;
       }
 
       // Increment download count
@@ -181,37 +205,77 @@ class UpdateService {
       // Install APK
       return await _installApk(filePath);
     } catch (e) {
-      debugPrint('Error downloading update: $e');
+      debugPrint('❌ Error downloading update: $e');
       return false;
     }
   }
 
   /// Download file from HTTP URL with progress tracking
+  /// Handles redirects for GitHub releases
   Future<void> _downloadFromHttp(
     String url,
     File file,
     Function(double)? onProgress,
   ) async {
-    final request = http.Request('GET', Uri.parse(url));
-    final response = await http.Client().send(request);
+    debugPrint('📥 Starting HTTP download from: $url');
     
-    final contentLength = response.contentLength ?? 0;
-    int downloadedBytes = 0;
+    // Create HTTP client that follows redirects
+    final client = http.Client();
     
-    final sink = file.openWrite();
-    
-    await response.stream.forEach((chunk) {
-      sink.add(chunk);
-      downloadedBytes += chunk.length;
-      if (contentLength > 0) {
-        final progress = downloadedBytes / contentLength;
-        onProgress?.call(progress);
-        debugPrint('Download progress: ${(progress * 100).toStringAsFixed(1)}%');
+    try {
+      // For GitHub releases, we need to follow redirects
+      // First, get the final URL after redirects
+      var currentUrl = url;
+      http.StreamedResponse? response;
+      int maxRedirects = 5;
+      
+      for (int i = 0; i < maxRedirects; i++) {
+        final request = http.Request('GET', Uri.parse(currentUrl));
+        request.followRedirects = false; // Handle manually to track
+        
+        response = await client.send(request);
+        
+        if (response.statusCode >= 300 && response.statusCode < 400) {
+          // It's a redirect
+          final location = response.headers['location'];
+          if (location != null) {
+            debugPrint('↪️ Redirect $i: $location');
+            currentUrl = location;
+            await response.stream.drain(); // Consume the redirect response
+            continue;
+          }
+        }
+        break; // Not a redirect, proceed with download
       }
-    });
-    
-    await sink.close();
-    debugPrint('Download complete: ${file.path}');
+      
+      if (response == null || response.statusCode != 200) {
+        throw Exception('Download failed with status: ${response?.statusCode}');
+      }
+      
+      final contentLength = response.contentLength ?? 0;
+      debugPrint('📦 Content length: ${(contentLength / 1024 / 1024).toStringAsFixed(2)} MB');
+      
+      int downloadedBytes = 0;
+      final sink = file.openWrite();
+      
+      await for (final chunk in response.stream) {
+        sink.add(chunk);
+        downloadedBytes += chunk.length;
+        if (contentLength > 0) {
+          final progress = downloadedBytes / contentLength;
+          onProgress?.call(progress);
+          if (downloadedBytes % (1024 * 1024) < chunk.length) {
+            // Log every ~1MB
+            debugPrint('📥 Download: ${(progress * 100).toStringAsFixed(1)}%');
+          }
+        }
+      }
+      
+      await sink.close();
+      debugPrint('✅ Download complete: ${file.path} (${(downloadedBytes / 1024 / 1024).toStringAsFixed(2)} MB)');
+    } finally {
+      client.close();
+    }
   }
 
   /// Install APK file
