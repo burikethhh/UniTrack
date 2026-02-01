@@ -28,20 +28,48 @@ class AuthService {
       );
       
       if (credential.user != null) {
-        // Fetch user model first to check if banned
-        final userModel = await getUserById(credential.user!.uid);
+        // Fetch user model first to check if exists and if banned
+        UserModel? userModel = await getUserById(credential.user!.uid);
+        
+        // If user document doesn't exist in Firestore, create it
+        if (userModel == null) {
+          // Create a basic user profile from Firebase Auth data
+          final firebaseUser = credential.user!;
+          final nameParts = (firebaseUser.displayName ?? email.split('@').first).split(' ');
+          final firstName = nameParts.isNotEmpty ? nameParts.first : 'User';
+          final lastName = nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '';
+          
+          userModel = UserModel(
+            id: firebaseUser.uid,
+            email: email,
+            firstName: firstName,
+            lastName: lastName,
+            role: UserRole.student, // Default to student for existing auth users
+            createdAt: DateTime.now(),
+            lastLoginAt: DateTime.now(),
+            campusId: 'isulan',
+          );
+          
+          // Save the new user document
+          await _firestore
+              .collection('users')
+              .doc(firebaseUser.uid)
+              .set(userModel.toFirestore());
+          
+          return userModel;
+        }
         
         // Check if user is banned
-        if (userModel != null && !userModel.isActive) {
+        if (!userModel.isActive) {
           // Sign out the banned user
           await _auth.signOut();
           throw 'Your account has been disabled. Please contact an administrator.';
         }
         
-        // Update last login time
-        await _firestore.collection('users').doc(credential.user!.uid).update({
+        // Update last login time (using set with merge to be safe)
+        await _firestore.collection('users').doc(credential.user!.uid).set({
           'lastLoginAt': Timestamp.now(),
-        });
+        }, SetOptions(merge: true));
         
         // Return updated user model
         return await getUserById(credential.user!.uid);

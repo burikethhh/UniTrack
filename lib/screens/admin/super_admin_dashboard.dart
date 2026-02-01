@@ -44,6 +44,9 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard>
 
   @override
   Widget build(BuildContext context) {
+    final authProvider = context.watch<AuthProvider>();
+    final currentUser = authProvider.user;
+    
     return Scaffold(
       appBar: AppBar(
         title: const Text('Super Admin Dashboard'),
@@ -56,6 +59,20 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard>
             icon: const Icon(Icons.refresh),
             onPressed: () => context.read<AdminProvider>().refresh(),
             tooltip: 'Refresh Data',
+          ),
+          // Logout Button - Clean and Clear
+          Container(
+            margin: const EdgeInsets.only(right: 8),
+            child: OutlinedButton.icon(
+              onPressed: () => _showLogoutDialog(context),
+              icon: const Icon(Icons.logout, size: 18),
+              label: const Text('Sign Out'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.red.shade700,
+                side: BorderSide(color: Colors.red.shade300),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              ),
+            ),
           ),
         ],
         bottom: TabBar(
@@ -96,6 +113,165 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard>
             ],
           );
         },
+      ),
+    );
+  }
+  
+  /// Show profile dialog
+  void _showProfileDialog(BuildContext context, UserModel? user) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.person, color: Colors.blue),
+            SizedBox(width: 8),
+            Text('My Profile'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Avatar
+            Center(
+              child: CircleAvatar(
+                radius: 40,
+                backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                child: Text(
+                  user?.fullName.substring(0, 1).toUpperCase() ?? 'A',
+                  style: TextStyle(
+                    fontSize: 32,
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            // Info
+            _buildProfileRow(Icons.person, 'Name', user?.fullName ?? 'N/A'),
+            _buildProfileRow(Icons.email, 'Email', user?.email ?? 'N/A'),
+            _buildProfileRow(Icons.badge, 'Role', user?.role.name.toUpperCase() ?? 'N/A'),
+            if (user?.department != null)
+              _buildProfileRow(Icons.business, 'Department', user!.department!),
+          ],
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  Widget _buildProfileRow(IconData icon, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: Colors.grey),
+          const SizedBox(width: 12),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+              ),
+              Text(
+                value,
+                style: const TextStyle(fontWeight: FontWeight.w500),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+  
+  /// Show switch account dialog
+  void _showSwitchAccountDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.switch_account, color: Colors.orange),
+            SizedBox(width: 8),
+            Text('Switch Account'),
+          ],
+        ),
+        content: const Text(
+          'To switch to a different account, you need to sign out first and then sign in with the other account.\n\n'
+          'Do you want to sign out now?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              context.read<AuthProvider>().signOut();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.orange,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Sign Out & Switch'),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  /// Show logout confirmation dialog
+  void _showLogoutDialog(BuildContext context) {
+    final authProvider = context.read<AuthProvider>();
+    
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.red.shade50,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(Icons.logout, color: Colors.red.shade700, size: 24),
+            ),
+            const SizedBox(width: 12),
+            const Text('Sign Out'),
+          ],
+        ),
+        content: const Text(
+          'Are you sure you want to sign out?\n\nYou will need to log in again to access the admin dashboard.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton.icon(
+            onPressed: () async {
+              Navigator.pop(ctx); // Close dialog first
+              await authProvider.signOut(); // Then sign out
+            },
+            icon: const Icon(Icons.logout, size: 18),
+            label: const Text('Sign Out'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+          ),
+        ],
       ),
     );
   }
