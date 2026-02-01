@@ -51,12 +51,13 @@ class _VersionManagementScreenState extends State<VersionManagementScreen> {
           ],
         ),
         content: const Text(
-          'This will create version records in Firestore to enable in-app updates for older app versions.\n\n'
+          'This will create version records in Firestore to enable in-app updates.\n\n'
           'Versions to be created:\n'
           '• v1.0.0 (Initial Release)\n'
-          '• v1.1.0 (Bug Fixes)\n'
-          '• v1.5.0 (Multi-campus)\n'
-          '• v2.0.0 (Current - Required)\n\n'
+          '• v2.0.0 (Major Update)\n'
+          '• v2.0.1 (New Features)\n'
+          '• v2.0.2 (Hotfix)\n'
+          '• v2.0.3 (Download Fix)\n\n'
           'Continue?',
         ),
         actions: [
@@ -95,37 +96,13 @@ class _VersionManagementScreenState extends State<VersionManagementScreen> {
           'minSupportedApiVersion': 1,
         },
         {
-          'versionName': '1.1.0',
-          'versionCode': 110,
-          'downloadUrl': '',
-          'releaseNotes': 'Bug fixes and improvements.\n- Fixed location tracking issues\n- Improved UI responsiveness\n- Better error handling',
-          'isRequired': false,
-          'isActive': false,
-          'releaseDate': Timestamp.fromDate(DateTime(2025, 12, 15)),
-          'downloadCount': 0,
-          'fileSize': 0,
-          'minSupportedApiVersion': 1,
-        },
-        {
-          'versionName': '1.5.0',
-          'versionCode': 150,
-          'downloadUrl': '',
-          'releaseNotes': 'Major update!\n- Multi-campus support (Isulan, Tacurong, ACCESS)\n- Enhanced map features\n- Performance improvements',
-          'isRequired': false,
-          'isActive': false,
-          'releaseDate': Timestamp.fromDate(DateTime(2026, 1, 1)),
-          'downloadCount': 0,
-          'fileSize': 0,
-          'minSupportedApiVersion': 1,
-        },
-        {
           'versionName': '2.0.0',
           'versionCode': 200,
           'downloadUrl': 'https://github.com/burikethhh/UniTrack/releases/download/v2.0.0/unitrack-latest.apk',
           'releaseNotes': 'UniTrack 2.0 - Complete Overhaul!\n\n✨ New Features:\n- Animated splash screen\n- Enhanced location accuracy\n- Network connectivity monitoring\n- Password strength indicator\n\n🔧 Improvements:\n- Faster faculty refresh\n- Adaptive location tracking\n- Improved UI/UX',
           'isRequired': false,
-          'isActive': true,
-          'releaseDate': Timestamp.fromDate(DateTime(2026, 2, 1)),
+          'isActive': false,
+          'releaseDate': Timestamp.fromDate(DateTime(2026, 1, 15)),
           'downloadCount': 0,
           'fileSize': 98000000,
           'minSupportedApiVersion': 2,
@@ -133,9 +110,33 @@ class _VersionManagementScreenState extends State<VersionManagementScreen> {
         {
           'versionName': '2.0.1',
           'versionCode': 201,
-          'downloadUrl': 'https://github.com/burikethhh/UniTrack/releases/download/v2.0.1/unitrack-v2.0.1.apk',
-          'releaseNotes': 'UniTrack 2.0.1 - New Features!\n\n✨ New Features:\n- Offline Mode with SQLite caching\n- Faculty Availability Status (Available, Busy, In Meeting, etc.)\n- Onboarding Tutorial for first-time users\n- Skeleton Loading animations\n- Push Notifications (FCM)\n\n🔧 Improvements:\n- Better user experience\n- Smoother loading states',
-          'isRequired': true,
+          'downloadUrl': 'https://github.com/burikethhh/UniTrack/releases/download/v2.0.1/UniTrack-v2.0.1.apk',
+          'releaseNotes': 'UniTrack 2.0.1 - New Features!\n\n✨ New Features:\n- Offline Mode with SQLite caching\n- Faculty Availability Status\n- Onboarding Tutorial\n- Skeleton Loading animations\n- Push Notifications (FCM)',
+          'isRequired': false,
+          'isActive': false,
+          'releaseDate': Timestamp.fromDate(DateTime(2026, 2, 1)),
+          'downloadCount': 0,
+          'fileSize': 98000000,
+          'minSupportedApiVersion': 2,
+        },
+        {
+          'versionName': '2.0.2',
+          'versionCode': 202,
+          'downloadUrl': 'https://github.com/burikethhh/UniTrack/releases/download/v2.0.2/UniTrack-v2.0.2.apk',
+          'releaseNotes': '🔧 Hotfix Release\n\n- Fixed login crash caused by service initialization\n- Services now initialize gracefully with error handling',
+          'isRequired': false,
+          'isActive': false,
+          'releaseDate': Timestamp.fromDate(DateTime(2026, 2, 1)),
+          'downloadCount': 0,
+          'fileSize': 98000000,
+          'minSupportedApiVersion': 2,
+        },
+        {
+          'versionName': '2.0.3',
+          'versionCode': 203,
+          'downloadUrl': 'https://github.com/burikethhh/UniTrack/releases/download/v2.0.3/UniTrack-v2.0.3.apk',
+          'releaseNotes': '🔧 Download Fix Release\n\n- In-app update download now works with GitHub releases\n- Properly handles HTTP redirects\n- Added file validation after download\n- Better error handling and logging',
+          'isRequired': false,
           'isActive': true,
           'releaseDate': Timestamp.fromDate(DateTime(2026, 2, 1)),
           'downloadCount': 0,
@@ -305,28 +306,302 @@ class _VersionManagementScreenState extends State<VersionManagementScreen> {
                   color: Colors.white,
                 ),
               ),
-              label: const Text('Uploading...'),
+              label: const Text('Adding...'),
             )
-          : Column(
+          : FloatingActionButton.extended(
+              heroTag: 'addVersion',
+              onPressed: _showAddVersionDialog,
+              icon: const Icon(Icons.add),
+              label: const Text('Add Version'),
+            ),
+    );
+  }
+
+  /// Show dialog to add a new version
+  /// Primary method: GitHub Release URL (free, scalable)
+  /// Future: Firebase Storage upload option
+  void _showAddVersionDialog() {
+    final versionNameController = TextEditingController();
+    final versionCodeController = TextEditingController();
+    final releaseNotesController = TextEditingController();
+    final downloadUrlController = TextEditingController();
+    bool isRequired = false;
+    String sourceType = 'github'; // 'github' or 'firebase' (future)
+
+    // Pre-fill with next version suggestion
+    if (_versions.isNotEmpty) {
+      final latestCode = _versions.first.versionCode;
+      versionCodeController.text = (latestCode + 1).toString();
+      
+      // Suggest next version name
+      final latestName = _versions.first.versionName;
+      final parts = latestName.split('.');
+      if (parts.length >= 3) {
+        final patch = int.tryParse(parts[2]) ?? 0;
+        versionNameController.text = '${parts[0]}.${parts[1]}.${patch + 1}';
+      }
+    }
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.new_releases, color: Colors.blue),
+              SizedBox(width: 8),
+              Text('Add New Version'),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
               mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // GitHub URL option (recommended for free plan)
-                FloatingActionButton.small(
-                  heroTag: 'github',
-                  onPressed: _showGitHubUrlDialog,
-                  backgroundColor: Colors.grey.shade800,
-                  child: const Icon(Icons.link, color: Colors.white),
+                // Source Type Selector
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Download Source',
+                        style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _SourceOption(
+                              icon: Icons.link,
+                              label: 'GitHub',
+                              sublabel: 'Free & Recommended',
+                              isSelected: sourceType == 'github',
+                              onTap: () => setDialogState(() => sourceType = 'github'),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: _SourceOption(
+                              icon: Icons.cloud_upload,
+                              label: 'Firebase',
+                              sublabel: 'Coming Soon',
+                              isSelected: sourceType == 'firebase',
+                              isDisabled: true, // Disabled for now
+                              onTap: () {
+                                // Show coming soon message
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Firebase Storage upload coming in future update!'),
+                                    duration: Duration(seconds: 2),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 8),
-                // Upload APK option
-                FloatingActionButton.extended(
-                  heroTag: 'upload',
-                  onPressed: _showUploadDialog,
-                  icon: const Icon(Icons.upload),
-                  label: const Text('Add Version'),
+                const SizedBox(height: 16),
+
+                // Version Name
+                TextField(
+                  controller: versionNameController,
+                  decoration: const InputDecoration(
+                    labelText: 'Version Name *',
+                    hintText: 'e.g., 2.0.4',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.tag),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Version Code
+                TextField(
+                  controller: versionCodeController,
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    labelText: 'Version Code *',
+                    hintText: 'e.g., 204',
+                    border: const OutlineInputBorder(),
+                    prefixIcon: const Icon(Icons.code),
+                    helperText: _versions.isNotEmpty 
+                        ? 'Current latest: ${_versions.first.versionCode}'
+                        : 'Must be higher than previous version',
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // GitHub Download URL
+                TextField(
+                  controller: downloadUrlController,
+                  decoration: InputDecoration(
+                    labelText: 'GitHub Release URL *',
+                    hintText: 'https://github.com/.../releases/download/v.../app.apk',
+                    border: const OutlineInputBorder(),
+                    prefixIcon: const Icon(Icons.download),
+                    helperText: 'Direct APK download link from GitHub Releases',
+                    suffixIcon: IconButton(
+                      icon: const Icon(Icons.help_outline, size: 20),
+                      onPressed: () => _showUrlHelpDialog(),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Release Notes
+                TextField(
+                  controller: releaseNotesController,
+                  maxLines: 3,
+                  decoration: const InputDecoration(
+                    labelText: 'Release Notes',
+                    hintText: 'What\'s new in this version...',
+                    border: OutlineInputBorder(),
+                    alignLabelWithHint: true,
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Required Update Toggle
+                SwitchListTile(
+                  title: const Text('Required Update'),
+                  subtitle: const Text('Force users to update before using app'),
+                  value: isRequired,
+                  onChanged: (v) => setDialogState(() => isRequired = v),
+                  contentPadding: EdgeInsets.zero,
                 ),
               ],
             ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton.icon(
+              icon: const Icon(Icons.add),
+              label: const Text('Add Version'),
+              onPressed: downloadUrlController.text.isEmpty ||
+                      versionNameController.text.isEmpty ||
+                      versionCodeController.text.isEmpty
+                  ? null
+                  : () async {
+                      // Validate URL format
+                      final url = downloadUrlController.text.trim();
+                      if (!url.startsWith('http://') && !url.startsWith('https://')) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Please enter a valid URL starting with http:// or https://'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                        return;
+                      }
+                      
+                      // Validate version code
+                      final code = int.tryParse(versionCodeController.text);
+                      if (code == null || (_versions.isNotEmpty && code <= _versions.first.versionCode)) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(_versions.isNotEmpty 
+                                ? 'Version code must be greater than ${_versions.first.versionCode}'
+                                : 'Please enter a valid version code'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                        return;
+                      }
+                      
+                      Navigator.pop(ctx);
+                      await _addVersionFromUrl(
+                        versionName: versionNameController.text.trim(),
+                        versionCode: code,
+                        downloadUrl: url,
+                        releaseNotes: releaseNotesController.text.trim(),
+                        isRequired: isRequired,
+                      );
+                    },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Show help dialog for GitHub URL format
+  void _showUrlHelpDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.help, color: Colors.blue),
+            SizedBox(width: 8),
+            Text('GitHub URL Format'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'To get the direct download URL:',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 12),
+            const Text('1. Go to your GitHub repository'),
+            const Text('2. Click "Releases" on the right'),
+            const Text('3. Create a new release with your APK'),
+            const Text('4. Right-click the APK → Copy link'),
+            const SizedBox(height: 16),
+            const Text(
+              'URL Format:',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const SelectableText(
+                'https://github.com/USER/REPO/releases/download/vX.X.X/app.apk',
+                style: TextStyle(fontFamily: 'monospace', fontSize: 11),
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Example (UniTrack):',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const SelectableText(
+                'https://github.com/burikethhh/UniTrack/releases/download/v2.0.3/UniTrack-v2.0.3.apk',
+                style: TextStyle(fontFamily: 'monospace', fontSize: 10),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Got it'),
+          ),
+        ],
+      ),
     );
   }
 
@@ -1167,6 +1442,77 @@ class _InfoChip extends StatelessWidget {
             style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Source option widget for selecting download source type
+class _SourceOption extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String sublabel;
+  final bool isSelected;
+  final bool isDisabled;
+  final VoidCallback onTap;
+
+  const _SourceOption({
+    required this.icon,
+    required this.label,
+    required this.sublabel,
+    required this.isSelected,
+    this.isDisabled = false,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: isDisabled ? onTap : onTap, // Show message even if disabled
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: isSelected 
+              ? Colors.blue.shade50 
+              : (isDisabled ? Colors.grey.shade50 : Colors.white),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isSelected 
+                ? Colors.blue 
+                : (isDisabled ? Colors.grey.shade300 : Colors.grey.shade400),
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        child: Column(
+          children: [
+            Icon(
+              icon, 
+              color: isSelected 
+                  ? Colors.blue 
+                  : (isDisabled ? Colors.grey.shade400 : Colors.grey.shade600),
+              size: 24,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 12,
+                color: isSelected 
+                    ? Colors.blue.shade700 
+                    : (isDisabled ? Colors.grey.shade500 : Colors.grey.shade700),
+              ),
+            ),
+            Text(
+              sublabel,
+              style: TextStyle(
+                fontSize: 9,
+                color: isDisabled ? Colors.grey.shade400 : Colors.grey.shade500,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
