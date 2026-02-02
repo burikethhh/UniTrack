@@ -13,7 +13,6 @@ import 'services/services.dart';
 import 'models/models.dart';
 import 'screens/screens.dart';
 import 'screens/onboarding/onboarding_screen.dart';
-import 'widgets/update_dialog.dart';
 
 // Demo mode flag - set to false to use Firebase
 const bool kDemoMode = false;

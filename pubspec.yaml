@@ -1,7 +1,7 @@
 name: unitrack
 description: "UniTrack - Real-Time Faculty & Staff Locator for SKSU"
 publish_to: 'none'
-version: 2.0.5+205
+version: 2.0.6+206
 
 environment:
   sdk: ^3.10.7
@@ -59,6 +59,8 @@ dependencies:
   # Offline Storage
   sqflite: ^2.4.1
   connectivity_plus: ^6.1.1
+  path: ^1.9.0
+  http: ^1.2.2
   
   # Onboarding
   smooth_page_indicator: ^1.2.0+3

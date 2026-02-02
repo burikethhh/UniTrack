@@ -343,9 +343,8 @@ class _StaffDirectoryScreenState extends State<StaffDirectoryScreen> {
               
               // Info cards
               _buildInfoRow(Icons.business, 'Department', staff.user.department ?? 'Not specified'),
-              _buildInfoRow(Icons.location_city, 'Campus', staff.user.campusId ?? 'Not specified'),
-              if (staff.user.email != null)
-                _buildInfoRow(Icons.email, 'Email', staff.user.email!),
+              _buildInfoRow(Icons.location_city, 'Campus', staff.user.campusId),
+              _buildInfoRow(Icons.email, 'Email', staff.user.email),
               if (staff.isOnline && staff.location != null)
                 _buildInfoRow(Icons.access_time, 'Last seen', staff.lastSeenText),
               if (staff.isOnline && staff.displayStatus != 'Offline')
