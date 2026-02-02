@@ -25,6 +25,9 @@ UniTrack now supports **3 SKSU Campuses**:
 - 🚶 Get walking directions to faculty locations
 - 📊 See faculty availability status (Available, Busy, In Class, etc.)
 - 🎯 **Focused View** - When searching, only the searched faculty's marker shows on map
+- 📶 **Offline Mode** - Access cached faculty data without internet connection
+- 🔔 **Push Notifications** - Get notified about important updates
+- 🎓 **Onboarding Tutorial** - Guided tour for new users
 
 ### For Faculty/Staff
 - 🔒 Privacy-first location sharing with full control
@@ -33,6 +36,8 @@ UniTrack now supports **3 SKSU Campuses**:
 - ⚙️ Customizable privacy settings
 - 📅 Schedule-based auto-hide
 - 🏫 Campus-based geofencing
+- 🟢 **Availability Status** - Set status (Available, Busy, In Meeting, Teaching, On Break, etc.)
+- 📱 **Real-time Status Updates** - Students see your availability instantly
 
 ### For Administrators
 - 📈 Analytics dashboard
@@ -40,6 +45,23 @@ UniTrack now supports **3 SKSU Campuses**:
 - 🏢 Department management
 - 📊 Usage statistics
 - 🌐 Multi-campus oversight
+
+## 🔮 Future Roadmap
+
+### Kiosk Integration (IoT)
+UniTrack will expand beyond mobile devices with **campus kiosk integration**:
+- 🖥️ **Interactive Kiosk Displays** - Large touchscreen displays at strategic campus locations
+- 📍 **Real-time Faculty Board** - Show all available faculty members on a dedicated screen
+- 🗺️ **Wayfinding Stations** - Help visitors navigate to faculty offices
+- 🔗 **API Integration** - RESTful API for third-party kiosk hardware
+- 📊 **Digital Signage** - Display department-specific faculty availability
+- 🎯 **QR Code Check-in** - Faculty can update their status via kiosk scan
+
+### Planned IoT Features
+- **Bluetooth Beacons** - Automatic indoor location detection
+- **NFC Tags** - Tap to check-in at office doors
+- **Smart Room Sensors** - Detect faculty presence in offices automatically
+- **Integration Hub** - Connect with existing campus management systems
 
 ## 🛠️ Tech Stack
 
@@ -133,5 +155,5 @@ lib/
 
 ---
 
-**Version**: 2.0.0 (Multi-Campus Premium Edition)  
-**Last Updated**: January 2026
+**Version**: 2.0.6  
+**Last Updated**: February 2026

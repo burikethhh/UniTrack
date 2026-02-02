@@ -238,7 +238,7 @@ def create_proposal():
     
     date_para = doc.add_paragraph()
     date_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    run = date_para.add_run("January 2026")
+    run = date_para.add_run("February 2026")
     run.bold = True
     run.font.size = Pt(12)
     run.font.name = 'Times New Roman'
@@ -272,9 +272,10 @@ def create_proposal():
         ("13. Cost Analysis: Zero-Budget Implementation", "19"),
         ("14. Risk Assessment and Mitigation", "20"),
         ("15. Expected Outcomes", "21"),
-        ("16. Evaluation Criteria", "21"),
-        ("17. Conclusion", "22"),
-        ("18. References", "23"),
+        ("16. Evaluation Criteria", "22"),
+        ("17. Future Expansion: IoT & Kiosk Integration", "23"),
+        ("18. Conclusion", "25"),
+        ("19. References", "26"),
     ]
     
     for item, page in toc_items:
@@ -496,10 +497,12 @@ def create_proposal():
     staff_features = [
         ("Privacy Toggle: ", "A master ON/OFF switch for location broadcasting. Staff can instantly enable or disable their visibility with a single tap."),
         ("Status Presets: ", "Manual status updates including: 'Available for Consultation,' 'In a Class,' 'In a Meeting,' 'Break Time,' 'Office Hours,' and 'Do Not Disturb.'"),
+        ("Availability Status: ", "Rich availability indicators (Available, Busy, In Meeting, Teaching, On Break, Out of Office, Do Not Disturb) with color-coded display visible to students in real-time."),
         ("Auto-Kill Timer: ", "Automatically turns off tracking after office hours based on customizable schedule settings."),
         ("Quick Messages: ", "Pre-set messages that can be broadcast to searching students (e.g., 'Back in 10 minutes,' 'See me tomorrow')."),
         ("Location Override: ", "Ability to manually set a static location when GPS signal is weak (e.g., 'Currently at Admin Building')."),
-        ("Schedule Integration: ", "Optional sync with class schedules to automatically update status during teaching hours.")
+        ("Schedule Integration: ", "Optional sync with class schedules to automatically update status during teaching hours."),
+        ("Custom Status Message: ", "Add personalized messages to your status (e.g., 'Available until 3PM', 'In room 201').")
     ]
     
     for title, desc in staff_features:
@@ -521,7 +524,11 @@ def create_proposal():
         ("Favorites List: ", "Save frequently consulted faculty members for quick access."),
         ("Notification Alerts: ", "Opt-in notifications when a specific faculty member comes online or becomes available."),
         ("Estimated Walking Time: ", "Display estimated time to reach the faculty member based on current distance."),
-        ("Office Hours Display: ", "View faculty consultation hours and schedule information.")
+        ("Office Hours Display: ", "View faculty consultation hours and schedule information."),
+        ("Offline Mode: ", "Access cached faculty data and campus maps even without internet connection using SQLite local storage."),
+        ("Push Notifications: ", "Receive important announcements and updates directly on your device."),
+        ("Onboarding Tutorial: ", "Interactive guided tour for new users to learn all app features quickly."),
+        ("In-App Updates: ", "Automatic notification and download of new app versions without visiting external stores.")
     ]
     
     for title, desc in student_features:
@@ -926,8 +933,88 @@ def create_proposal():
     
     doc.add_page_break()
     
-    # ==================== 17. CONCLUSION ====================
-    create_styled_heading(doc, "17. Conclusion", level=1)
+    # ==================== 17. FUTURE EXPANSION: IoT & KIOSK INTEGRATION ====================
+    create_styled_heading(doc, "17. Future Expansion: IoT & Kiosk Integration", level=1)
+    
+    para = doc.add_paragraph()
+    run = para.add_run("UniTrack is designed with scalability in mind, allowing for future integration with Internet of Things (IoT) devices and campus kiosk systems. This expansion will transform the mobile application into a comprehensive campus-wide information ecosystem.")
+    run.font.name = 'Times New Roman'
+    run.font.size = Pt(12)
+    set_paragraph_spacing(para, before=6, after=12, line_spacing=1.5)
+    para.paragraph_format.first_line_indent = Inches(0.5)
+    
+    create_styled_heading(doc, "17.1 Campus Kiosk Integration", level=2)
+    
+    kiosk_features = [
+        ("Interactive Kiosk Displays: ", "Large touchscreen displays strategically placed at campus entrances, lobbies, and common areas showing real-time faculty availability."),
+        ("Digital Faculty Board: ", "Dedicated screens outside department offices displaying all faculty members with their current status, location, and availability."),
+        ("Wayfinding Stations: ", "Touch-enabled maps helping visitors and new students navigate to faculty offices with step-by-step directions."),
+        ("QR Code Check-in: ", "Faculty members can update their status by scanning QR codes at office doors or kiosk stations."),
+        ("Announcement Integration: ", "Kiosks can display campus-wide announcements, schedules, and emergency notifications alongside faculty locator."),
+        ("Visitor Registration: ", "Guests can register at kiosks and notify faculty of their arrival automatically.")
+    ]
+    
+    for title, desc in kiosk_features:
+        add_bullet_point(doc, desc, bold_prefix=title)
+    
+    create_styled_heading(doc, "17.2 IoT Sensor Integration", level=2)
+    
+    iot_features = [
+        ("Bluetooth Beacons: ", "Low-energy Bluetooth beacons installed in buildings for precise indoor location detection, improving accuracy beyond GPS."),
+        ("NFC Door Tags: ", "Near Field Communication tags at office doors allowing faculty to tap their phones to instantly update their status."),
+        ("Smart Room Sensors: ", "Occupancy sensors in offices and meeting rooms that automatically detect faculty presence and update status."),
+        ("Environmental Sensors: ", "Temperature, humidity, and air quality sensors that can indicate if a room is actively in use."),
+        ("Smart Scheduling Displays: ", "E-ink or LCD displays outside offices showing real-time availability synced with UniTrack.")
+    ]
+    
+    for title, desc in iot_features:
+        add_bullet_point(doc, desc, bold_prefix=title)
+    
+    create_styled_heading(doc, "17.3 API & Integration Hub", level=2)
+    
+    para = doc.add_paragraph()
+    run = para.add_run("UniTrack will provide a RESTful API enabling integration with:")
+    run.font.name = 'Times New Roman'
+    run.font.size = Pt(12)
+    set_paragraph_spacing(para, before=6, after=8, line_spacing=1.5)
+    
+    api_features = [
+        ("Third-party Kiosk Hardware: ", "Standard API endpoints for commercial kiosk manufacturers to display UniTrack data."),
+        ("Campus Management Systems: ", "Integration with existing university ERP, class scheduling, and room booking systems."),
+        ("Digital Signage Networks: ", "Push faculty availability data to existing digital signage infrastructure."),
+        ("Mobile Web Portal: ", "Responsive web version accessible from any device without app installation."),
+        ("Analytics Dashboard: ", "Anonymized traffic patterns and consultation trends for campus planning.")
+    ]
+    
+    for title, desc in api_features:
+        add_bullet_point(doc, desc, bold_prefix=title)
+    
+    # Cost estimate for IoT expansion
+    doc.add_paragraph()
+    
+    iot_headers = ['IoT Component', 'Estimated Units', 'Estimated Cost']
+    iot_data = [
+        ('Touchscreen Kiosk (32")', '5-10 units', 'PHP 25,000-50,000 each'),
+        ('Bluetooth Beacons', '50-100 units', 'PHP 500-1,000 each'),
+        ('NFC Door Tags', '100-200 units', 'PHP 50-100 each'),
+        ('Smart Room Sensors', '20-50 units', 'PHP 2,000-5,000 each'),
+        ('API Server Hosting', 'Cloud-based', 'PHP 0-5,000/month'),
+    ]
+    
+    create_styled_table(doc, iot_headers, iot_data, header_color='006400')
+    
+    note = doc.add_paragraph()
+    run = note.add_run("Note: IoT expansion is optional and can be implemented incrementally based on budget availability. The core mobile application remains completely free.")
+    run.font.name = 'Times New Roman'
+    run.font.size = Pt(11)
+    run.italic = True
+    run.font.color.rgb = RGBColor(102, 102, 102)
+    set_paragraph_spacing(note, before=8, after=12)
+    
+    doc.add_page_break()
+    
+    # ==================== 18. CONCLUSION ====================
+    create_styled_heading(doc, "18. Conclusion", level=1)
     
     para1 = doc.add_paragraph()
     run = para1.add_run("UniTrack represents a significant step forward in modernizing campus operations at Sultan Kudarat State University. By leveraging free and open-source technologies, the system addresses student-faculty connectivity challenges while maintaining privacy—all at zero cost.")
@@ -957,18 +1044,20 @@ def create_proposal():
     set_paragraph_spacing(para4, before=0, after=12, line_spacing=1.5)
     para4.paragraph_format.first_line_indent = Inches(0.5)
     
-    # ==================== 18. REFERENCES ====================
-    create_styled_heading(doc, "18. References", level=1)
+    # ==================== 19. REFERENCES ====================
+    create_styled_heading(doc, "19. References", level=1)
     
     references = [
-        "OpenStreetMap Foundation. (2025). OpenStreetMap Documentation. https://wiki.openstreetmap.org",
-        "Flutter Map Package. (2025). https://pub.dev/packages/flutter_map",
-        "Firebase Documentation. (2025). https://firebase.google.com/docs",
-        "Flutter Documentation. (2025). https://docs.flutter.dev",
+        "OpenStreetMap Foundation. (2026). OpenStreetMap Documentation. https://wiki.openstreetmap.org",
+        "Flutter Map Package. (2026). https://pub.dev/packages/flutter_map",
+        "Firebase Documentation. (2026). https://firebase.google.com/docs",
+        "Flutter Documentation. (2026). https://docs.flutter.dev",
         "Republic Act No. 10173 - Data Privacy Act of 2012. Official Gazette of the Philippines.",
         "National Privacy Commission. (2024). Guidelines on Privacy Impact Assessment.",
-        "Sultan Kudarat State University. (2025). SKSU Strategic Development Plan.",
-        "Geolocator Flutter Package. (2025). https://pub.dev/packages/geolocator"
+        "Sultan Kudarat State University. (2026). SKSU Strategic Development Plan.",
+        "Geolocator Flutter Package. (2026). https://pub.dev/packages/geolocator",
+        "Internet of Things in Education: A Review. IEEE Access. (2024).",
+        "Smart Campus Solutions: Best Practices for Digital Transformation. (2025)."
     ]
     
     for i, ref in enumerate(references, 1):
