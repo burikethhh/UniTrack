@@ -1,7 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 /// Campus enum for identifying different SKSU campuses
-enum CampusId { isulan, tacurong, access }
+enum CampusId { isulan, tacurong, access, bagumbayan, palimbang, kalamansig, lutayan }
 
 /// Campus model containing campus information and geofence data
 class CampusModel {

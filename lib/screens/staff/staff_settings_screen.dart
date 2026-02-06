@@ -5,6 +5,9 @@ import '../../core/constants/app_constants.dart';
 import '../../providers/providers.dart';
 import '../../widgets/widgets.dart';
 import '../../services/update_service.dart';
+import '../common/privacy_policy_screen.dart';
+import '../common/help_support_screen.dart';
+import 'edit_profile_screen.dart';
 
 /// Settings screen for staff members
 class StaffSettingsScreen extends StatelessWidget {
@@ -46,7 +49,10 @@ class StaffSettingsScreen extends StatelessWidget {
                         subtitle: Text(user.email),
                         trailing: const Icon(Icons.chevron_right),
                         onTap: () {
-                          // TODO: Navigate to edit profile
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const EditProfileScreen()),
+                          );
                         },
                       ),
                       const Divider(height: 1),
@@ -67,7 +73,12 @@ class StaffSettingsScreen extends StatelessWidget {
                         subtitle: Text(user.department ?? 'Not set'),
                         trailing: const Icon(Icons.chevron_right),
                         onTap: () {
-                          // TODO: Edit department
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const EditProfileScreen(),
+                            ),
+                          );
                         },
                       ),
                       if (user.position != null) ...[
@@ -228,9 +239,12 @@ class StaffSettingsScreen extends StatelessWidget {
                           ),
                         ),
                         title: const Text('Privacy Policy'),
-                        trailing: const Icon(Icons.open_in_new, size: 18),
+                        trailing: const Icon(Icons.chevron_right),
                         onTap: () {
-                          // TODO: Open privacy policy
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const PrivacyPolicyScreen()),
+                          );
                         },
                       ),
                       const Divider(height: 1),
@@ -243,14 +257,17 @@ class StaffSettingsScreen extends StatelessWidget {
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: const Icon(
-                            Icons.description,
+                            Icons.help_outline,
                             color: AppColors.primary,
                           ),
                         ),
-                        title: const Text('Terms of Service'),
-                        trailing: const Icon(Icons.open_in_new, size: 18),
+                        title: const Text('Help & Support'),
+                        trailing: const Icon(Icons.chevron_right),
                         onTap: () {
-                          // TODO: Open terms of service
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const HelpSupportScreen()),
+                          );
                         },
                       ),
                     ],

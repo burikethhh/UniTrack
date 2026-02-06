@@ -26,6 +26,9 @@ class FacultyProvider extends ChangeNotifier {
   // Focused faculty - when searching, only show this faculty on map
   String? _focusedFacultyId;
   
+  // Availability status filter
+  AvailabilityStatus? _selectedAvailabilityStatus;
+  
   StreamSubscription? _facultySubscription;
   Timer? _refreshTimer;
   
@@ -40,9 +43,24 @@ class FacultyProvider extends ChangeNotifier {
   String? get error => _error;
   String? get campusFilter => _campusFilter;
   String? get focusedFacultyId => _focusedFacultyId;
+  AvailabilityStatus? get selectedAvailabilityStatus => _selectedAvailabilityStatus;
   
   int get totalFaculty => _allFaculty.length;
   int get onlineFaculty => _allFaculty.where((f) => f.isOnline).length;
+  
+  /// Count faculty by availability status
+  int countByStatus(AvailabilityStatus status) {
+    return _allFaculty.where((f) => 
+      f.isOnline && f.user.availabilityStatus == status
+    ).length;
+  }
+  
+  /// Count of available faculty (online + Available status)
+  int get availableFacultyCount {
+    return _allFaculty.where((f) => 
+      f.isOnline && f.user.availabilityStatus == AvailabilityStatus.available
+    ).length;
+  }
   
   /// Get faculty to display on map (respects focused faculty)
   List<FacultyWithLocation> get mapFaculty {
@@ -138,11 +156,23 @@ class FacultyProvider extends ChangeNotifier {
     notifyListeners();
   }
   
+  /// Filter by availability status
+  void filterByAvailabilityStatus(AvailabilityStatus? status) {
+    _selectedAvailabilityStatus = status;
+    // If filtering by status, also show online only
+    if (status != null) {
+      _showOnlineOnly = true;
+    }
+    _applyFilters();
+    notifyListeners();
+  }
+  
   /// Clear all filters
   void clearFilters() {
     _searchQuery = '';
     _selectedDepartment = null;
     _showOnlineOnly = false;
+    _selectedAvailabilityStatus = null;
     _focusedFacultyId = null; // Also clear focused faculty
     _applyFilters();
     notifyListeners();
@@ -178,6 +208,13 @@ class FacultyProvider extends ChangeNotifier {
       // Online filter
       if (_showOnlineOnly && !faculty.isOnline) {
         return false;
+      }
+      
+      // Availability status filter
+      if (_selectedAvailabilityStatus != null) {
+        if (faculty.user.availabilityStatus != _selectedAvailabilityStatus) {
+          return false;
+        }
       }
       
       return true;

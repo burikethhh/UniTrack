@@ -5,6 +5,8 @@ import '../../core/constants/app_constants.dart';
 import '../../providers/auth_provider.dart';
 import '../../widgets/widgets.dart';
 import '../../services/update_service.dart';
+import '../common/privacy_policy_screen.dart';
+import '../common/help_support_screen.dart';
 
 /// Profile screen for students
 class StudentProfileScreen extends StatelessWidget {
@@ -133,7 +135,10 @@ class StudentProfileScreen extends StatelessWidget {
                   title: 'Privacy Policy',
                   subtitle: 'How we protect your data',
                   onTap: () {
-                    // TODO: Show privacy policy
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const PrivacyPolicyScreen()),
+                    );
                   },
                 ),
                 _buildMenuItem(
@@ -141,7 +146,10 @@ class StudentProfileScreen extends StatelessWidget {
                   title: 'Help & Support',
                   subtitle: 'Get help with UniTrack',
                   onTap: () {
-                    // TODO: Show help
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const HelpSupportScreen()),
+                    );
                   },
                 ),
                 

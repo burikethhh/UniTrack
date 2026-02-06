@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
+import '../../models/models.dart';
 import '../../providers/providers.dart';
 import '../../widgets/widgets.dart';
 import 'faculty_detail_screen.dart';
@@ -235,6 +236,92 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
                     );
                   },
                 ),
+                
+                const SizedBox(height: 12),
+                
+                // Availability status filter chips
+                Consumer<FacultyProvider>(
+                  builder: (context, provider, _) {
+                    return SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          _buildAvailabilityChip(
+                            context,
+                            label: 'All Status',
+                            icon: Icons.people,
+                            color: AppColors.textSecondary,
+                            isSelected: provider.selectedAvailabilityStatus == null && !provider.showOnlineOnly,
+                            count: provider.totalFaculty,
+                            onSelected: () {
+                              provider.filterByAvailabilityStatus(null);
+                              // Turn off online-only when selecting "All"
+                              if (provider.showOnlineOnly) {
+                                provider.toggleOnlineOnly();
+                              }
+                            },
+                          ),
+                          const SizedBox(width: 8),
+                          _buildAvailabilityChip(
+                            context,
+                            label: 'Available',
+                            icon: AvailabilityStatus.available.icon,
+                            color: AvailabilityStatus.available.color,
+                            isSelected: provider.selectedAvailabilityStatus == AvailabilityStatus.available,
+                            count: provider.countByStatus(AvailabilityStatus.available),
+                            onSelected: () => provider.filterByAvailabilityStatus(
+                              provider.selectedAvailabilityStatus == AvailabilityStatus.available
+                                  ? null
+                                  : AvailabilityStatus.available,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          _buildAvailabilityChip(
+                            context,
+                            label: 'Busy',
+                            icon: AvailabilityStatus.busy.icon,
+                            color: AvailabilityStatus.busy.color,
+                            isSelected: provider.selectedAvailabilityStatus == AvailabilityStatus.busy,
+                            count: provider.countByStatus(AvailabilityStatus.busy),
+                            onSelected: () => provider.filterByAvailabilityStatus(
+                              provider.selectedAvailabilityStatus == AvailabilityStatus.busy
+                                  ? null
+                                  : AvailabilityStatus.busy,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          _buildAvailabilityChip(
+                            context,
+                            label: 'Teaching',
+                            icon: AvailabilityStatus.teaching.icon,
+                            color: AvailabilityStatus.teaching.color,
+                            isSelected: provider.selectedAvailabilityStatus == AvailabilityStatus.teaching,
+                            count: provider.countByStatus(AvailabilityStatus.teaching),
+                            onSelected: () => provider.filterByAvailabilityStatus(
+                              provider.selectedAvailabilityStatus == AvailabilityStatus.teaching
+                                  ? null
+                                  : AvailabilityStatus.teaching,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          _buildAvailabilityChip(
+                            context,
+                            label: 'In Meeting',
+                            icon: AvailabilityStatus.inMeeting.icon,
+                            color: AvailabilityStatus.inMeeting.color,
+                            isSelected: provider.selectedAvailabilityStatus == AvailabilityStatus.inMeeting,
+                            count: provider.countByStatus(AvailabilityStatus.inMeeting),
+                            onSelected: () => provider.filterByAvailabilityStatus(
+                              provider.selectedAvailabilityStatus == AvailabilityStatus.inMeeting
+                                  ? null
+                                  : AvailabilityStatus.inMeeting,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
               ],
             ),
           ),
@@ -362,6 +449,57 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+  
+  /// Build availability filter chip with icon and count
+  Widget _buildAvailabilityChip(
+    BuildContext context, {
+    required String label,
+    required IconData icon,
+    required Color color,
+    required bool isSelected,
+    required int count,
+    required VoidCallback onSelected,
+  }) {
+    return FilterChip(
+      avatar: Icon(
+        icon,
+        size: 16,
+        color: isSelected ? Colors.white : color,
+      ),
+      label: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(label),
+          const SizedBox(width: 4),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+            decoration: BoxDecoration(
+              color: isSelected 
+                  ? Colors.white.withValues(alpha: 0.3)
+                  : color.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Text(
+              count.toString(),
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                color: isSelected ? Colors.white : color,
+              ),
+            ),
+          ),
+        ],
+      ),
+      selected: isSelected,
+      onSelected: (_) => onSelected(),
+      selectedColor: color,
+      checkmarkColor: Colors.white,
+      labelStyle: TextStyle(
+        color: isSelected ? Colors.white : AppColors.textPrimary,
+        fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
       ),
     );
   }

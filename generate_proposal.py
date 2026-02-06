@@ -933,78 +933,82 @@ def create_proposal():
     
     doc.add_page_break()
     
-    # ==================== 17. FUTURE EXPANSION: IoT & KIOSK INTEGRATION ====================
-    create_styled_heading(doc, "17. Future Expansion: IoT & Kiosk Integration", level=1)
+    # ==================== 17. FUTURE EXPANSION: CAMPUS KIOSK INTEGRATION ====================
+    create_styled_heading(doc, "17. Future Expansion: Campus Kiosk Integration", level=1)
     
     para = doc.add_paragraph()
-    run = para.add_run("UniTrack is designed with scalability in mind, allowing for future integration with Internet of Things (IoT) devices and campus kiosk systems. This expansion will transform the mobile application into a comprehensive campus-wide information ecosystem.")
+    run = para.add_run("UniTrack is designed with scalability in mind, allowing for future deployment on campus kiosk displays. This expansion would bring the existing mobile application features to large-screen installations, providing the same functionality accessible to students who may not have their phones readily available.")
     run.font.name = 'Times New Roman'
     run.font.size = Pt(12)
     set_paragraph_spacing(para, before=6, after=12, line_spacing=1.5)
     para.paragraph_format.first_line_indent = Inches(0.5)
     
-    create_styled_heading(doc, "17.1 Campus Kiosk Integration", level=2)
+    create_styled_heading(doc, "17.1 Kiosk Display Features (Mirroring Mobile App)", level=2)
+    
+    para = doc.add_paragraph()
+    run = para.add_run("Campus kiosks would display the same real-time data already available in the UniTrack mobile application:")
+    run.font.name = 'Times New Roman'
+    run.font.size = Pt(12)
+    set_paragraph_spacing(para, before=6, after=8, line_spacing=1.5)
     
     kiosk_features = [
-        ("Interactive Kiosk Displays: ", "Large touchscreen displays strategically placed at campus entrances, lobbies, and common areas showing real-time faculty availability."),
-        ("Digital Faculty Board: ", "Dedicated screens outside department offices displaying all faculty members with their current status, location, and availability."),
-        ("Wayfinding Stations: ", "Touch-enabled maps helping visitors and new students navigate to faculty offices with step-by-step directions."),
-        ("QR Code Check-in: ", "Faculty members can update their status by scanning QR codes at office doors or kiosk stations."),
-        ("Announcement Integration: ", "Kiosks can display campus-wide announcements, schedules, and emergency notifications alongside faculty locator."),
-        ("Visitor Registration: ", "Guests can register at kiosks and notify faculty of their arrival automatically.")
+        ("Faculty Directory: ", "Searchable list of all faculty members with their department, profile photo, and contact information—same as the mobile app's directory screen."),
+        ("Real-Time Availability Status: ", "Display of each faculty member's current status (Available, Busy, In Meeting, Teaching, On Break, Out of Office, Do Not Disturb) as set in the mobile app."),
+        ("Custom Status Messages: ", "Faculty-written status messages explaining their availability, such as 'In consultation until 3PM' or 'Available for walk-ins.'"),
+        ("Live Campus Map: ", "Interactive map showing faculty locations on campus, identical to the mobile app's MapLibre-powered map view."),
+        ("Walking Directions: ", "Step-by-step navigation from the kiosk location to any faculty member's office, using the same routing as the mobile app."),
+        ("Department Filtering: ", "Filter faculty by department to quickly find relevant staff, same functionality as the mobile app."),
+        ("Estimated Walking Time: ", "Display distance and estimated walking time to each faculty member's location.")
     ]
     
     for title, desc in kiosk_features:
         add_bullet_point(doc, desc, bold_prefix=title)
     
-    create_styled_heading(doc, "17.2 IoT Sensor Integration", level=2)
+    create_styled_heading(doc, "17.2 Kiosk Placement Recommendations", level=2)
     
-    iot_features = [
-        ("Bluetooth Beacons: ", "Low-energy Bluetooth beacons installed in buildings for precise indoor location detection, improving accuracy beyond GPS."),
-        ("NFC Door Tags: ", "Near Field Communication tags at office doors allowing faculty to tap their phones to instantly update their status."),
-        ("Smart Room Sensors: ", "Occupancy sensors in offices and meeting rooms that automatically detect faculty presence and update status."),
-        ("Environmental Sensors: ", "Temperature, humidity, and air quality sensors that can indicate if a room is actively in use."),
-        ("Smart Scheduling Displays: ", "E-ink or LCD displays outside offices showing real-time availability synced with UniTrack.")
+    placement_features = [
+        ("Campus Entrances: ", "Main gates and building lobbies where students and visitors first arrive on campus."),
+        ("Department Offices: ", "Common areas outside department clusters for students looking for specific faculty."),
+        ("Student Centers: ", "High-traffic areas like canteens, libraries, and study halls."),
+        ("Administration Building: ", "Near registrar, guidance, and other administrative offices.")
     ]
     
-    for title, desc in iot_features:
+    for title, desc in placement_features:
         add_bullet_point(doc, desc, bold_prefix=title)
     
-    create_styled_heading(doc, "17.3 API & Integration Hub", level=2)
+    create_styled_heading(doc, "17.3 Technical Implementation", level=2)
     
     para = doc.add_paragraph()
-    run = para.add_run("UniTrack will provide a RESTful API enabling integration with:")
+    run = para.add_run("The kiosk system would leverage the existing UniTrack infrastructure:")
     run.font.name = 'Times New Roman'
     run.font.size = Pt(12)
     set_paragraph_spacing(para, before=6, after=8, line_spacing=1.5)
     
-    api_features = [
-        ("Third-party Kiosk Hardware: ", "Standard API endpoints for commercial kiosk manufacturers to display UniTrack data."),
-        ("Campus Management Systems: ", "Integration with existing university ERP, class scheduling, and room booking systems."),
-        ("Digital Signage Networks: ", "Push faculty availability data to existing digital signage infrastructure."),
-        ("Mobile Web Portal: ", "Responsive web version accessible from any device without app installation."),
-        ("Analytics Dashboard: ", "Anonymized traffic patterns and consultation trends for campus planning.")
+    tech_features = [
+        ("Same Firebase Backend: ", "Kiosks connect to the same Firebase Firestore database used by the mobile app, ensuring real-time data synchronization."),
+        ("Web-Based Interface: ", "Kiosks run the Flutter web version of UniTrack, requiring only a browser and internet connection."),
+        ("No Additional Server Costs: ", "Firebase's existing infrastructure handles kiosk requests within the current free tier or minimal usage fees."),
+        ("Offline Mode Support: ", "Kiosks can cache faculty data locally, same as the mobile app's offline functionality.")
     ]
     
-    for title, desc in api_features:
+    for title, desc in tech_features:
         add_bullet_point(doc, desc, bold_prefix=title)
     
-    # Cost estimate for IoT expansion
+    # Cost estimate for kiosk expansion
     doc.add_paragraph()
     
-    iot_headers = ['IoT Component', 'Estimated Units', 'Estimated Cost']
-    iot_data = [
-        ('Touchscreen Kiosk (32")', '5-10 units', 'PHP 25,000-50,000 each'),
-        ('Bluetooth Beacons', '50-100 units', 'PHP 500-1,000 each'),
-        ('NFC Door Tags', '100-200 units', 'PHP 50-100 each'),
-        ('Smart Room Sensors', '20-50 units', 'PHP 2,000-5,000 each'),
-        ('API Server Hosting', 'Cloud-based', 'PHP 0-5,000/month'),
+    kiosk_headers = ['Component', 'Estimated Units', 'Estimated Cost']
+    kiosk_data = [
+        ('Touchscreen Kiosk (32")', '3-5 units', 'PHP 25,000-50,000 each'),
+        ('Kiosk Stand/Enclosure', '3-5 units', 'PHP 5,000-10,000 each'),
+        ('Internet Connection', 'Existing campus WiFi', 'PHP 0 (uses campus network)'),
+        ('Software Development', 'Web deployment', 'PHP 0 (Flutter web already supported)'),
     ]
     
-    create_styled_table(doc, iot_headers, iot_data, header_color='006400')
+    create_styled_table(doc, kiosk_headers, kiosk_data, header_color='006400')
     
     note = doc.add_paragraph()
-    run = note.add_run("Note: IoT expansion is optional and can be implemented incrementally based on budget availability. The core mobile application remains completely free.")
+    run = note.add_run("Note: Kiosk expansion is optional and can be implemented based on budget availability. The kiosks display the same data as the mobile app—no additional features or hardware sensors are required. The core mobile application remains completely free.")
     run.font.name = 'Times New Roman'
     run.font.size = Pt(11)
     run.italic = True

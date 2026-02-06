@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/constants/app_constants.dart';
 import '../../models/models.dart';
@@ -13,6 +14,7 @@ class FacultyCard extends StatelessWidget {
   final VoidCallback? onPing;
   final bool showDistance;
   final String? distanceText;
+  final bool showQuickActions; // Enable call/email buttons
   
   const FacultyCard({
     super.key,
@@ -22,6 +24,7 @@ class FacultyCard extends StatelessWidget {
     this.onPing,
     this.showDistance = false,
     this.distanceText,
+    this.showQuickActions = true,
   });
   
   @override
@@ -147,6 +150,31 @@ class FacultyCard extends StatelessWidget {
                         ),
                       ),
                     ],
+                    
+                    // Quick Actions Row (Call / Email)
+                    if (showQuickActions && (faculty.user.phoneNumber != null || faculty.user.email.isNotEmpty)) ...[
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          if (faculty.user.email.isNotEmpty)
+                            _buildQuickActionChip(
+                              icon: Icons.email_outlined,
+                              label: 'Email',
+                              color: AppColors.primary,
+                              onTap: () => _launchEmail(faculty.user.email),
+                            ),
+                          if (faculty.user.email.isNotEmpty && faculty.user.phoneNumber != null)
+                            const SizedBox(width: 8),
+                          if (faculty.user.phoneNumber != null)
+                            _buildQuickActionChip(
+                              icon: Icons.phone_outlined,
+                              label: 'Call',
+                              color: AppColors.success,
+                              onTap: () => _launchPhone(faculty.user.phoneNumber!),
+                            ),
+                        ],
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -249,5 +277,56 @@ class FacultyCard extends StatelessWidget {
         ),
       ),
     );
+  }
+  
+  /// Build quick action chip (Email/Call)
+  Widget _buildQuickActionChip({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: color.withValues(alpha: 0.1),
+      borderRadius: BorderRadius.circular(20),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(20),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 14, color: color),
+              const SizedBox(width: 4),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: color,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+  
+  /// Launch email app
+  Future<void> _launchEmail(String email) async {
+    final Uri emailUri = Uri(scheme: 'mailto', path: email);
+    if (await canLaunchUrl(emailUri)) {
+      await launchUrl(emailUri);
+    }
+  }
+  
+  /// Launch phone dialer
+  Future<void> _launchPhone(String phone) async {
+    final Uri phoneUri = Uri(scheme: 'tel', path: phone);
+    if (await canLaunchUrl(phoneUri)) {
+      await launchUrl(phoneUri);
+    }
   }
 }

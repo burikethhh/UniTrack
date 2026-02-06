@@ -338,6 +338,134 @@
             font-size: 11px;
             margin-top: 5px;
         }
+        
+        /* Search Box */
+        .search-container {
+            margin-bottom: 15px;
+        }
+        
+        .search-box {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 8px;
+        }
+        
+        .search-input {
+            flex: 1;
+            padding: 10px 12px;
+            border: 2px solid #333;
+            border-radius: 8px;
+            background: #1a1a1a;
+            color: white;
+            font-size: 13px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        
+        .search-input:focus {
+            border-color: #41B3A3;
+        }
+        
+        .search-input::placeholder {
+            color: #666;
+        }
+        
+        .search-btn {
+            padding: 10px 14px;
+            background: #41B3A3;
+            border: none;
+            border-radius: 8px;
+            color: white;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.2s;
+        }
+        
+        .search-btn:hover {
+            background: #359788;
+        }
+        
+        .search-btn:disabled {
+            background: #444;
+            cursor: not-allowed;
+        }
+        
+        .search-results {
+            max-height: 180px;
+            overflow-y: auto;
+            background: #1a1a1a;
+            border-radius: 8px;
+            display: none;
+        }
+        
+        .search-results.show {
+            display: block;
+        }
+        
+        .search-result-item {
+            padding: 10px 12px;
+            border-bottom: 1px solid #333;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        
+        .search-result-item:hover {
+            background: #2a2a2a;
+        }
+        
+        .search-result-item:last-child {
+            border-bottom: none;
+        }
+        
+        .result-name {
+            color: #41B3A3;
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 2px;
+        }
+        
+        .result-address {
+            color: #888;
+            font-size: 11px;
+        }
+        
+        .preset-campuses {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            margin-top: 8px;
+        }
+        
+        .preset-btn {
+            padding: 6px 10px;
+            background: #2a2a2a;
+            border: 1px solid #444;
+            border-radius: 15px;
+            color: #aaa;
+            font-size: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .preset-btn:hover {
+            background: #41B3A3;
+            border-color: #41B3A3;
+            color: white;
+        }
+        
+        .search-loading {
+            text-align: center;
+            padding: 15px;
+            color: #888;
+            font-size: 12px;
+        }
+        
+        .no-results {
+            text-align: center;
+            padding: 15px;
+            color: #e74c3c;
+            font-size: 12px;
+        }
     </style>
 </head>
 <body>
@@ -354,6 +482,27 @@
     <!-- Control Panel -->
     <div class="control-panel">
         <h2>🏫 SKSU Campus Boundary Editor</h2>
+        
+        <!-- Search Section -->
+        <div class="search-container">
+            <div class="search-box">
+                <input type="text" class="search-input" id="searchInput" 
+                       placeholder="Search place or address..." 
+                       onkeypress="handleSearchKeypress(event)">
+                <button class="search-btn" onclick="searchPlace()" id="searchBtn">🔍</button>
+            </div>
+            <div class="search-results" id="searchResults"></div>
+            <div class="preset-campuses">
+                <span style="color: #888; font-size: 10px; width: 100%; margin-bottom: 3px;">Quick Jump:</span>
+                <button class="preset-btn" onclick="goToPreset('isulan')">📍 Isulan</button>
+                <button class="preset-btn" onclick="goToPreset('tacurong')">📍 Tacurong</button>
+                <button class="preset-btn" onclick="goToPreset('access')">📍 ACCESS</button>
+                <button class="preset-btn" onclick="goToPreset('kalamansig')">📍 Kalamansig</button>
+                <button class="preset-btn" onclick="goToPreset('lutayan')">📍 Lutayan</button>
+                <button class="preset-btn" onclick="goToPreset('palimbang')">📍 Palimbang</button>
+                <button class="preset-btn" onclick="goToPreset('bagumbayan')">📍 Bagumbayan</button>
+            </div>
+        </div>
         
         <div class="instructions">
             <ul>
@@ -691,6 +840,120 @@
                 updateUI();
             }
         }
+        
+        // Preset campus locations
+        const presetCampuses = {
+            isulan: { name: 'SKSU Isulan Campus', lat: 6.63326077657394, lng: 124.6091426890741 },
+            tacurong: { name: 'SKSU Tacurong Campus', lat: 6.691763, lng: 124.67835 },
+            access: { name: 'SKSU ACCESS Campus', lat: 6.668761, lng: 124.62971 },
+            bagumbayan: { name: 'SKSU Bagumbayan Campus', lat: 6.532042, lng: 124.55077 },
+            palimbang: { name: 'SKSU Palimbang Campus', lat: 6.220947, lng: 124.19232 },
+            kalamansig: { name: 'SKSU Kalamansig Campus', lat: 6.557669, lng: 124.04801 },
+            lutayan: { name: 'SKSU Lutayan Campus', lat: 6.573177, lng: 124.87645 }
+        };
+        
+        // Go to preset campus location
+        function goToPreset(campusId) {
+            const campus = presetCampuses[campusId];
+            if (campus) {
+                map.flyTo({
+                    center: [campus.lng, campus.lat],
+                    zoom: 17,
+                    duration: 1500
+                });
+                
+                // Update center marker
+                centerMarker.setLngLat([campus.lng, campus.lat]);
+                centerMarker.setPopup(new maplibregl.Popup().setHTML(
+                    `<strong>${campus.name}</strong><br>${campus.lat.toFixed(6)}, ${campus.lng.toFixed(6)}`
+                ));
+            }
+        }
+        
+        // Search place using Nominatim API
+        async function searchPlace() {
+            const query = document.getElementById('searchInput').value.trim();
+            if (!query) return;
+            
+            const resultsEl = document.getElementById('searchResults');
+            const searchBtn = document.getElementById('searchBtn');
+            
+            // Show loading
+            resultsEl.innerHTML = '<div class="search-loading">🔄 Searching...</div>';
+            resultsEl.classList.add('show');
+            searchBtn.disabled = true;
+            
+            try {
+                // Add Sultan Kudarat context to improve results
+                const searchQuery = query.toLowerCase().includes('sultan kudarat') || 
+                                   query.toLowerCase().includes('sksu') ?
+                                   query : `${query}, Sultan Kudarat, Philippines`;
+                
+                const response = await fetch(
+                    `https://nominatim.openstreetmap.org/search?` +
+                    `q=${encodeURIComponent(searchQuery)}&format=json&limit=5&countrycodes=ph`
+                );
+                
+                const results = await response.json();
+                
+                if (results.length === 0) {
+                    resultsEl.innerHTML = '<div class="no-results">No places found. Try a different search.</div>';
+                } else {
+                    resultsEl.innerHTML = results.map(r => `
+                        <div class="search-result-item" onclick="goToSearchResult(${r.lat}, ${r.lon}, '${escapeHtml(r.display_name)}')"> 
+                            <div class="result-name">${escapeHtml(r.display_name.split(',')[0])}</div>
+                            <div class="result-address">${escapeHtml(r.display_name.split(',').slice(1, 4).join(','))}</div>
+                        </div>
+                    `).join('');
+                }
+            } catch (error) {
+                resultsEl.innerHTML = '<div class="no-results">Search failed. Check your connection.</div>';
+                console.error('Search error:', error);
+            }
+            
+            searchBtn.disabled = false;
+        }
+        
+        // Escape HTML for safe display
+        function escapeHtml(str) {
+            return str.replace(/[&<>"']/g, char => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+            })[char]);
+        }
+        
+        // Handle search keypress (Enter to search)
+        function handleSearchKeypress(event) {
+            if (event.key === 'Enter') {
+                searchPlace();
+            }
+        }
+        
+        // Go to search result location
+        function goToSearchResult(lat, lng, name) {
+            map.flyTo({
+                center: [lng, lat],
+                zoom: 17,
+                duration: 1500
+            });
+            
+            // Update center marker
+            centerMarker.setLngLat([lng, lat]);
+            centerMarker.setPopup(new maplibregl.Popup().setHTML(
+                `<strong>${name.split(',')[0]}</strong><br>${parseFloat(lat).toFixed(6)}, ${parseFloat(lng).toFixed(6)}`
+            ));
+            
+            // Hide search results
+            document.getElementById('searchResults').classList.remove('show');
+            document.getElementById('searchInput').value = '';
+        }
+        
+        // Close search results when clicking outside
+        document.addEventListener('click', (e) => {
+            const searchContainer = document.querySelector('.search-container');
+            if (!searchContainer.contains(e.target)) {
+                document.getElementById('searchResults').classList.remove('show');
+            }
+        });
         
         function resetView() {
             map.flyTo({

@@ -82,6 +82,74 @@ class AppConstants {
         [6.667072380341509, 124.63090209696804], // Point 7
       ],
     },
+    // BAGUMBAYAN CAMPUS
+    // Generated: 2/6/2026, 9:53:04 PM - 4 Points
+    {
+      'id': 'bagumbayan',
+      'name': 'Bagumbayan Campus',
+      'shortName': 'Bagumbayan',
+      'location': 'Bagumbayan, Sultan Kudarat',
+      'centerLat': 6.532042,
+      'centerLng': 124.55077,
+      'radiusMeters': 300.0,
+      'boundaryPoints': [
+        [6.53071804227379, 124.5515311944688], // Point 1
+        [6.533366494868773, 124.55161277609346], // Point 2
+        [6.53335067712834, 124.54999497993191], // Point 3
+        [6.530823262261578, 124.54992954735718], // Point 4
+      ],
+    },
+    // PALIMBANG CAMPUS
+    // Generated: 2/6/2026, 9:56:47 PM - 4 Points
+    {
+      'id': 'palimbang',
+      'name': 'Palimbang Campus',
+      'shortName': 'Palimbang',
+      'location': 'Palimbang, Sultan Kudarat',
+      'centerLat': 6.220947,
+      'centerLng': 124.19232,
+      'radiusMeters': 300.0,
+      'boundaryPoints': [
+        [6.221914907563686, 124.1933454945817], // Point 1
+        [6.219998614113081, 124.19329161631686], // Point 2
+        [6.219980760413989, 124.19125621519999], // Point 3
+        [6.221903005141641, 124.19142383646755], // Point 4
+      ],
+    },
+    // KALAMANSIG CAMPUS
+    // Generated: 2/6/2026, 10:01:40 PM - 4 Points
+    {
+      'id': 'kalamansig',
+      'name': 'Kalamansig Campus',
+      'shortName': 'Kalamansig',
+      'location': 'Kalamansig, Sultan Kudarat',
+      'centerLat': 6.557669,
+      'centerLng': 124.04801,
+      'radiusMeters': 300.0,
+      'boundaryPoints': [
+        [6.557066532857306, 124.04901252402834], // Point 1
+        [6.557272844078227, 124.04712093539888], // Point 2
+        [6.558341532702741, 124.04701492861096], // Point 3
+        [6.557997084028955, 124.04888382568726], // Point 4
+      ],
+    },
+    // LUTAYAN CAMPUS
+    // Generated: 2/6/2026, 10:08:49 PM - 4 Points
+    {
+      'id': 'lutayan',
+      'name': 'Lutayan Campus',
+      'shortName': 'Lutayan',
+      'location': 'Lutayan, Sultan Kudarat',
+      'centerLat': 6.573177,
+      'centerLng': 124.87645,
+      'radiusMeters': 350.0,
+      'boundaryPoints': [
+        [6.5708568198500785, 124.87550116160457], // Point 1
+        [6.575638831950215, 124.87560522336327], // Point 2
+        [6.575623514492463, 124.87734294059965], // Point 3
+        [6.5707145257072455, 124.87739753507475], // Point 4
+      ],
+    },
   ];
   
   /// Get campus list for dropdown

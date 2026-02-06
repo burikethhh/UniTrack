@@ -31,11 +31,15 @@ class _RegisterScreenState extends State<RegisterScreen> with SnackBarMixin {
   final _positionController = TextEditingController();
   int _passwordStrength = 0;
   
-  // Campus options
+  // Campus options - All SKSU Campuses
   final List<Map<String, String>> _campuses = [
     {'id': 'isulan', 'name': 'Isulan Campus', 'shortName': 'Isulan'},
     {'id': 'tacurong', 'name': 'Tacurong Campus', 'shortName': 'Tacurong'},
     {'id': 'access', 'name': 'ACCESS Campus', 'shortName': 'ACCESS'},
+    {'id': 'bagumbayan', 'name': 'Bagumbayan Campus', 'shortName': 'Bagumbayan'},
+    {'id': 'palimbang', 'name': 'Palimbang Campus', 'shortName': 'Palimbang'},
+    {'id': 'kalamansig', 'name': 'Kalamansig Campus', 'shortName': 'Kalamansig'},
+    {'id': 'lutayan', 'name': 'Lutayan Campus', 'shortName': 'Lutayan'},
   ];
   
   final List<String> _departments = [

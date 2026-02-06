@@ -11,6 +11,7 @@ class CustomTextField extends StatelessWidget {
   final bool enabled;
   final TextInputType keyboardType;
   final TextInputAction textInputAction;
+  final TextCapitalization textCapitalization;
   final IconData? prefixIcon;
   final Widget? suffixIcon;
   final Function(String)? onChanged;
@@ -29,6 +30,7 @@ class CustomTextField extends StatelessWidget {
     this.enabled = true,
     this.keyboardType = TextInputType.text,
     this.textInputAction = TextInputAction.next,
+    this.textCapitalization = TextCapitalization.none,
     this.prefixIcon,
     this.suffixIcon,
     this.onChanged,
@@ -46,6 +48,7 @@ class CustomTextField extends StatelessWidget {
       enabled: enabled,
       keyboardType: keyboardType,
       textInputAction: textInputAction,
+      textCapitalization: textCapitalization,
       maxLines: maxLines,
       autofocus: autofocus,
       onChanged: onChanged,
