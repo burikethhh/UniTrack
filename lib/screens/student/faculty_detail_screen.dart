@@ -197,38 +197,63 @@ class FacultyDetailScreen extends StatelessWidget {
                   ),
                 ),
                 
-                const SizedBox(height: 24),
-                
-                // Action buttons
+                // Add bottom padding for the floating action bar
                 if (faculty.isOnline)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Row(
-                      children: [
-                        // Ping / Notify button
-                        Expanded(
-                          child: _ActionButton(
-                            icon: Icons.notifications_active_outlined,
-                            label: 'Notify',
-                            color: AppColors.info,
-                            onPressed: () => _pingFaculty(context, faculty),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        // Get Directions button
-                        Expanded(
-                          child: _ActionButton(
-                            icon: Icons.near_me_outlined,
-                            label: 'Directions',
-                            color: AppColors.accent,
-                            onPressed: () => _navigateToMap(context, faculty),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                  const SizedBox(height: 100),
                 
-                const SizedBox(height: 32),
+                const SizedBox(height: 16),
+              ],
+            ),
+          );
+        },
+      ),
+      // Persistent bottom quick-action bar
+      bottomNavigationBar: Consumer<FacultyProvider>(
+        builder: (context, provider, _) {
+          final faculty = provider.getFacultyById(facultyId);
+          
+          if (faculty == null || !faculty.isOnline) {
+            return const SizedBox.shrink();
+          }
+          
+          return Container(
+            padding: EdgeInsets.fromLTRB(
+              16,
+              12,
+              16,
+              MediaQuery.of(context).padding.bottom + 12,
+            ),
+            decoration: BoxDecoration(
+              color: Theme.of(context).scaffoldBackgroundColor,
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.shadow.withValues(alpha: 0.1),
+                  blurRadius: 10,
+                  offset: const Offset(0, -2),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                // Ping / Notify button
+                Expanded(
+                  child: _ActionButton(
+                    icon: Icons.notifications_active_outlined,
+                    label: 'Notify',
+                    color: AppColors.info,
+                    onPressed: () => _pingFaculty(context, faculty),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                // Get Directions button
+                Expanded(
+                  child: _ActionButton(
+                    icon: Icons.near_me_outlined,
+                    label: 'Directions',
+                    color: AppColors.accent,
+                    onPressed: () => _navigateToMap(context, faculty),
+                  ),
+                ),
               ],
             ),
           );

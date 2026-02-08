@@ -1,8 +1,9 @@
 import 'dart:async';
-import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 
 /// Service to monitor network connectivity
+/// Works on both mobile (dart:io) and web (connectivity_plus)
 class ConnectivityService {
   static final ConnectivityService _instance = ConnectivityService._internal();
   factory ConnectivityService() => _instance;
@@ -15,12 +16,25 @@ class ConnectivityService {
   bool get isConnected => _isConnected;
   
   Timer? _checkTimer;
+  final Connectivity _connectivity = Connectivity();
+  StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
   
-  /// Start monitoring connectivity
+  /// Start monitoring connectivity (works on both web and mobile)
   void startMonitoring() {
     _checkConnectivity();
-    // Check connectivity every 10 seconds
-    _checkTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+    
+    // Use connectivity_plus for real-time monitoring (supports web)
+    _connectivitySubscription = _connectivity.onConnectivityChanged.listen((results) {
+      final connected = !results.contains(ConnectivityResult.none);
+      if (_isConnected != connected) {
+        _isConnected = connected;
+        _connectivityController.add(connected);
+        debugPrint('📶 Connectivity changed: ${connected ? "Online" : "Offline"}');
+      }
+    });
+    
+    // Periodic check as backup
+    _checkTimer = Timer.periodic(const Duration(seconds: 30), (_) {
       _checkConnectivity();
     });
   }
@@ -29,32 +43,24 @@ class ConnectivityService {
   void stopMonitoring() {
     _checkTimer?.cancel();
     _checkTimer = null;
+    _connectivitySubscription?.cancel();
+    _connectivitySubscription = null;
   }
   
-  /// Check current connectivity
+  /// Check current connectivity using connectivity_plus (works on web)
   Future<bool> _checkConnectivity() async {
     try {
-      final result = await InternetAddress.lookup('google.com')
-          .timeout(const Duration(seconds: 5));
-      final connected = result.isNotEmpty && result[0].rawAddress.isNotEmpty;
+      final results = await _connectivity.checkConnectivity();
+      final connected = !results.contains(ConnectivityResult.none);
       
       if (_isConnected != connected) {
         _isConnected = connected;
         _connectivityController.add(connected);
       }
       return connected;
-    } on SocketException catch (_) {
-      if (_isConnected) {
-        _isConnected = false;
-        _connectivityController.add(false);
-      }
-      return false;
-    } on TimeoutException catch (_) {
-      if (_isConnected) {
-        _isConnected = false;
-        _connectivityController.add(false);
-      }
-      return false;
+    } catch (e) {
+      debugPrint('⚠️ Connectivity check error: $e');
+      return _isConnected;
     }
   }
   

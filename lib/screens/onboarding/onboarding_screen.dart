@@ -202,8 +202,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
-                  page.color.withOpacity(0.2),
-                  page.color.withOpacity(0.1),
+                  page.color.withValues(alpha: 0.2),
+                  page.color.withValues(alpha: 0.1),
                 ],
               ),
               borderRadius: BorderRadius.circular(90),
@@ -218,13 +218,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     end: Alignment.bottomRight,
                     colors: [
                       page.color,
-                      page.color.withOpacity(0.8),
+                      page.color.withValues(alpha: 0.8),
                     ],
                   ),
                   borderRadius: BorderRadius.circular(60),
                   boxShadow: [
                     BoxShadow(
-                      color: page.color.withOpacity(0.3),
+                      color: page.color.withValues(alpha: 0.3),
                       blurRadius: 20,
                       offset: const Offset(0, 10),
                     ),

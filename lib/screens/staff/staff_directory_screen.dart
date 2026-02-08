@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:provider/provider.dart';
 import 'package:maplibre_gl/maplibre_gl.dart' show LatLng;
+import 'package:latlong2/latlong.dart' as latlong2;
 import '../../core/theme/app_colors.dart';
 import '../../providers/providers.dart';
 import '../../models/models.dart';
@@ -581,16 +583,27 @@ class _StaffLocatorMapScreen extends StatelessWidget {
           
           return Stack(
             children: [
-              // 3D Map
-              CampusMap3D(
-                faculty: [targetStaff],
-                userLocation: userLocation != null
-                    ? LatLng(userLocation.latitude, userLocation.longitude)
-                    : null,
-                selectedFaculty: targetStaff,
-                focusOnSelected: true,
-                showCampusBoundary: true,
-              ),
+              // Use 2D map on web (MapLibre workers don't work on static hosts)
+              if (kIsWeb)
+                CampusMap(
+                  faculty: [targetStaff],
+                  userLocation: userLocation != null
+                      ? latlong2.LatLng(userLocation.latitude, userLocation.longitude)
+                      : null,
+                  selectedLocation: targetStaff.location?.latLng,
+                  selectedFaculty: targetStaff,
+                  showCampusBoundary: true,
+                )
+              else
+                CampusMap3D(
+                  faculty: [targetStaff],
+                  userLocation: userLocation != null
+                      ? LatLng(userLocation.latitude, userLocation.longitude)
+                      : null,
+                  selectedFaculty: targetStaff,
+                  focusOnSelected: true,
+                  showCampusBoundary: true,
+                ),
               
               // Info card at bottom
               Positioned(

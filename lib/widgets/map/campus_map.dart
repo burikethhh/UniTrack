@@ -75,7 +75,7 @@ class _CampusMapState extends State<CampusMap> {
         initialZoom: widget.selectedFaculty != null ? 18.5 : 17.0,
         minZoom: 14.0,
         maxZoom: 19.0,
-        onTap: (_, __) {
+        onTap: (_, _) {
           // Dismiss any popups
         },
       ),

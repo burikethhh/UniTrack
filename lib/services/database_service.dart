@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import 'package:rxdart/rxdart.dart';
 import '../models/models.dart';
 
@@ -21,7 +22,7 @@ class DatabaseService {
           .map((doc) => UserModel.fromFirestore(doc))
           .toList();
     } catch (e) {
-      print('Error getting staff: $e');
+      debugPrint('Error getting staff: $e');
       return [];
     }
   }
@@ -40,7 +41,7 @@ class DatabaseService {
           .map((doc) => UserModel.fromFirestore(doc))
           .toList();
     } catch (e) {
-      print('Error getting staff by department: $e');
+      debugPrint('Error getting staff by department: $e');
       return [];
     }
   }
@@ -76,7 +77,7 @@ class DatabaseService {
               (user.department?.toLowerCase().contains(queryLower) ?? false))
           .toList();
     } catch (e) {
-      print('Error searching staff: $e');
+      debugPrint('Error searching staff: $e');
       return [];
     }
   }
@@ -84,33 +85,33 @@ class DatabaseService {
   /// Update user tracking status
   Future<void> updateTrackingStatus(String oderId, bool isEnabled) async {
     try {
-      await _firestore.collection('users').doc(oderId).update({
+      await _firestore.collection('users').doc(oderId).set({
         'isTrackingEnabled': isEnabled,
-      });
+      }, SetOptions(merge: true));
     } catch (e) {
-      print('Error updating tracking status: $e');
+      debugPrint('Error updating tracking status: $e');
     }
   }
   
   /// Update user status
   Future<void> updateUserStatus(String oderId, String status) async {
     try {
-      await _firestore.collection('users').doc(oderId).update({
+      await _firestore.collection('users').doc(oderId).set({
         'currentStatus': status,
-      });
+      }, SetOptions(merge: true));
     } catch (e) {
-      print('Error updating status: $e');
+      debugPrint('Error updating status: $e');
     }
   }
   
   /// Update quick message
   Future<void> updateQuickMessage(String oderId, String? message) async {
     try {
-      await _firestore.collection('users').doc(oderId).update({
+      await _firestore.collection('users').doc(oderId).set({
         'quickMessage': message,
-      });
+      }, SetOptions(merge: true));
     } catch (e) {
-      print('Error updating quick message: $e');
+      debugPrint('Error updating quick message: $e');
     }
   }
   
@@ -129,7 +130,7 @@ class DatabaseService {
           .map((doc) => DepartmentModel.fromFirestore(doc))
           .toList();
     } catch (e) {
-      print('Error getting departments: $e');
+      debugPrint('Error getting departments: $e');
       return [];
     }
   }
@@ -154,7 +155,7 @@ class DatabaseService {
           .doc(department.id)
           .set(department.toFirestore());
     } catch (e) {
-      print('Error adding department: $e');
+      debugPrint('Error adding department: $e');
     }
   }
   
@@ -206,6 +207,42 @@ class DatabaseService {
         list.where((f) => f.isOnline).toList());
   }
   
+  /// Get ALL users (students + staff + admin) with their locations - Admin Live Monitor
+  /// Unlike getFacultyWithLocationsStream, this includes ALL roles
+  Stream<List<FacultyWithLocation>> getAllUsersWithLocationsStream() {
+    // Stream of ALL active users (no role filter)
+    final usersStream = _firestore
+        .collection('users')
+        .where('isActive', isEqualTo: true)
+        .snapshots(includeMetadataChanges: true);
+    
+    // Stream of all locations
+    final locationsStream = _firestore
+        .collection('locations')
+        .snapshots(includeMetadataChanges: true);
+    
+    return Rx.combineLatest2(
+      usersStream,
+      locationsStream,
+      (QuerySnapshot<Map<String, dynamic>> usersSnapshot,
+       QuerySnapshot<Map<String, dynamic>> locationsSnapshot) {
+        final locationMap = <String, LocationModel>{};
+        for (final locDoc in locationsSnapshot.docs) {
+          locationMap[locDoc.id] = LocationModel.fromFirestore(locDoc);
+        }
+        
+        final List<FacultyWithLocation> result = [];
+        for (final userDoc in usersSnapshot.docs) {
+          final user = UserModel.fromFirestore(userDoc);
+          final location = locationMap[user.id];
+          result.add(FacultyWithLocation(user: user, location: location));
+        }
+        
+        return result;
+      },
+    );
+  }
+  
   // ==================== ANALYTICS (Admin) ====================
   
   /// Get total user counts
@@ -239,7 +276,7 @@ class DatabaseService {
         'total': students + staff + admins,
       };
     } catch (e) {
-      print('Error getting user counts: $e');
+      debugPrint('Error getting user counts: $e');
       return {'students': 0, 'staff': 0, 'admins': 0, 'total': 0};
     }
   }
@@ -254,7 +291,7 @@ class DatabaseService {
       
       return snapshot.docs.length;
     } catch (e) {
-      print('Error getting online count: $e');
+      debugPrint('Error getting online count: $e');
       return 0;
     }
   }

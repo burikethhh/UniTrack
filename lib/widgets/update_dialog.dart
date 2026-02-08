@@ -1,6 +1,8 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import '../models/app_version_model.dart';
 import '../services/update_service.dart';
+import '../core/utils/web_utils.dart';
 
 /// Dialog for showing app update availability
 class UpdateDialog extends StatefulWidget {
@@ -244,8 +246,8 @@ class _UpdateDialogState extends State<UpdateDialog> {
                     child: const Text('Later'),
                   ),
                 ElevatedButton.icon(
-                  icon: const Icon(Icons.download),
-                  label: const Text('Update Now'),
+                  icon: Icon(kIsWeb ? Icons.refresh : Icons.download),
+                  label: Text(kIsWeb ? 'Refresh Now' : 'Update Now'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: theme.colorScheme.primary,
                     foregroundColor: Colors.white,
@@ -287,6 +289,9 @@ class _UpdateDialogState extends State<UpdateDialog> {
 
     if (mounted) {
       if (success) {
+        if (kIsWeb) {
+          reloadWebPage();
+        }
         // Installation started
         Navigator.of(context).pop(true);
         widget.onUpdate?.call();

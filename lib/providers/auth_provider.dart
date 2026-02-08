@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../models/user_model.dart';
 import '../services/auth_service.dart';
@@ -8,6 +9,7 @@ class AuthProvider extends ChangeNotifier {
   final AuthService _authService;
   // ignore: unused_field
   final DatabaseService _databaseService;
+  StreamSubscription? _authStateSubscription;
   
   AuthProvider({
     required AuthService authService,
@@ -31,9 +33,46 @@ class AuthProvider extends ChangeNotifier {
   bool get isAdmin => _user?.isAdmin ?? false;
   UserRole? get role => _user?.role;
   
-  /// Initialize - check if user is already logged in
+  /// Reset loading state (useful for timeout recovery)
+  void resetLoading() {
+    _isLoading = false;
+    notifyListeners();
+  }
+  
+  /// Initialize - check if user is already logged in and listen for auth changes
   void _init() {
     _checkAuthState();
+    _listenToAuthChanges();
+  }
+  
+  /// Listen to Firebase Auth state changes as a safety net
+  /// If signIn() hangs but Firebase Auth succeeds, this picks it up
+  void _listenToAuthChanges() {
+    _authStateSubscription = _authService.authStateChanges.listen((firebaseUser) async {
+      if (firebaseUser != null && _user == null && !_isLoading) {
+        // Firebase says we're authenticated but provider doesn't know yet
+        debugPrint('Auth state listener: Firebase user detected, loading profile...');
+        try {
+          _user = await _authService.getCurrentUserModel().timeout(
+            const Duration(seconds: 8),
+            onTimeout: () {
+              debugPrint('Auth listener: getCurrentUserModel timed out');
+              return null;
+            },
+          );
+          if (_user != null) {
+            debugPrint('Auth listener: Profile loaded for ${_user!.fullName}');
+            notifyListeners();
+          }
+        } catch (e) {
+          debugPrint('Auth listener error: $e');
+        }
+      } else if (firebaseUser == null && _user != null) {
+        // User signed out externally
+        _user = null;
+        notifyListeners();
+      }
+    });
   }
   
   Future<void> _checkAuthState() async {
@@ -41,11 +80,29 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
     
     try {
-      if (_authService.currentUser != null) {
-        _user = await _authService.getCurrentUserModel();
+      final firebaseUser = _authService.currentUser;
+      if (firebaseUser != null) {
+        // Add timeout to prevent hanging in release mode
+        _user = await _authService.getCurrentUserModel().timeout(
+          const Duration(seconds: 10),
+          onTimeout: () {
+            debugPrint('getCurrentUserModel timed out');
+            return null;
+          },
+        );
+        
+        // If user document doesn't exist, create one (legacy user migration)
+        _user ??= await _authService.createUserDocumentForLegacyUser(firebaseUser).timeout(
+            const Duration(seconds: 10),
+            onTimeout: () {
+              debugPrint('createUserDocumentForLegacyUser timed out');
+              return null;
+            },
+          );
       }
     } catch (e) {
       _error = e.toString();
+      debugPrint('Error checking auth state: $e');
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -165,5 +222,11 @@ class AuthProvider extends ChangeNotifier {
       _user = await _authService.getCurrentUserModel();
       notifyListeners();
     }
+  }
+  
+  @override
+  void dispose() {
+    _authStateSubscription?.cancel();
+    super.dispose();
   }
 }

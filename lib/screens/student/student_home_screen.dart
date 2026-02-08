@@ -29,6 +29,14 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
     // Initialize faculty provider
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<FacultyProvider>().initialize();
+      // Initialize location provider for student location sharing
+      final authProvider = context.read<AuthProvider>();
+      if (authProvider.user != null) {
+        context.read<LocationProvider>().initialize(
+          authProvider.user!.id,
+          campusId: authProvider.user!.campusId,
+        );
+      }
     });
   }
   

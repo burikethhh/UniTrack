@@ -1,19 +1,30 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import '../models/notification_model.dart';
 import '../models/user_model.dart';
 
+/// Global navigator key for showing in-app notifications on web
+final GlobalKey<NavigatorState> notificationNavigatorKey = GlobalKey<NavigatorState>();
+
 /// Service for handling notifications between students and staff
 class NotificationService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final FlutterLocalNotificationsPlugin _localNotifications = FlutterLocalNotificationsPlugin();
+  // Lazy init — FlutterLocalNotificationsPlugin has no web implementation
+  late final FlutterLocalNotificationsPlugin _localNotifications = FlutterLocalNotificationsPlugin();
   
   StreamSubscription? _notificationSubscription;
 
   /// Initialize local notifications
   Future<void> initialize() async {
+    // On web, we use in-app overlay notifications instead
+    if (kIsWeb) {
+      debugPrint('📱 Using in-app notifications for web');
+      return;
+    }
+    
     const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
     const iosSettings = DarwinInitializationSettings(
       requestAlertPermission: true,
@@ -70,6 +81,12 @@ class NotificationService {
 
   /// Show a local notification
   Future<void> _showLocalNotification(AppNotification notification) async {
+    // On web, show an in-app overlay notification
+    if (kIsWeb) {
+      _showWebNotification(notification);
+      return;
+    }
+    
     const androidDetails = AndroidNotificationDetails(
       'unitrack_notifications',
       'UniTrack Notifications',
@@ -175,7 +192,7 @@ class NotificationService {
       await _firestore
           .collection('notifications')
           .doc(notificationId)
-          .update({'isRead': true});
+          .set({'isRead': true}, SetOptions(merge: true));
     } catch (e) {
       debugPrint('Error marking notification as read: $e');
     }
@@ -195,7 +212,7 @@ class NotificationService {
       for (final doc in allDocs.docs) {
         final data = doc.data();
         if (data['isRead'] == false) {
-          batch.update(doc.reference, {'isRead': true});
+          batch.set(doc.reference, {'isRead': true}, SetOptions(merge: true));
         }
       }
 
@@ -262,8 +279,135 @@ class NotificationService {
     }
   }
 
+  /// Show in-app overlay notification for web platform
+  void _showWebNotification(AppNotification notification) {
+    // Use an OverlayEntry for a toast-style notification
+    final overlayState = notificationNavigatorKey.currentState
+        ?.overlay;
+    if (overlayState == null) return;
+
+    late OverlayEntry entry;
+    entry = OverlayEntry(
+      builder: (context) => _WebNotificationOverlay(
+        title: notification.title,
+        message: notification.message,
+        onDismiss: () => entry.remove(),
+      ),
+    );
+    overlayState.insert(entry);
+
+    // Auto-dismiss after 4 seconds
+    Future.delayed(const Duration(seconds: 4), () {
+      if (entry.mounted) entry.remove();
+    });
+  }
+
   /// Dispose resources
   void dispose() {
     stopListening();
+  }
+}
+
+/// Web notification overlay widget — shows a Material toast at the top
+class _WebNotificationOverlay extends StatefulWidget {
+  final String title;
+  final String message;
+  final VoidCallback onDismiss;
+
+  const _WebNotificationOverlay({
+    required this.title,
+    required this.message,
+    required this.onDismiss,
+  });
+
+  @override
+  State<_WebNotificationOverlay> createState() => _WebNotificationOverlayState();
+}
+
+class _WebNotificationOverlayState extends State<_WebNotificationOverlay>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<Offset> _slideAnimation;
+  late Animation<double> _fadeAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+    );
+    _slideAnimation = Tween<Offset>(
+      begin: const Offset(0, -1),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
+    _fadeAnimation = Tween<double>(begin: 0, end: 1).animate(_controller);
+    _controller.forward();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned(
+      top: MediaQuery.of(context).padding.top + 8,
+      left: 16,
+      right: 16,
+      child: SlideTransition(
+        position: _slideAnimation,
+        child: FadeTransition(
+          opacity: _fadeAnimation,
+          child: Material(
+            elevation: 8,
+            borderRadius: BorderRadius.circular(12),
+            color: const Color(0xFF2E7D32),
+            child: InkWell(
+              onTap: widget.onDismiss,
+              borderRadius: BorderRadius.circular(12),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                child: Row(
+                  children: [
+                    const Icon(Icons.notifications_active, color: Colors.white, size: 24),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            widget.title,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            widget.message,
+                            style: const TextStyle(
+                              color: Colors.white70,
+                              fontSize: 12,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Icon(Icons.close, color: Colors.white54, size: 18),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }

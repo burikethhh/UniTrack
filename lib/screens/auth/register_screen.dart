@@ -106,6 +106,208 @@ class _RegisterScreenState extends State<RegisterScreen> with SnackBarMixin {
     });
   }
   
+  /// Campus colors for visual distinction
+  static const Map<String, Color> _campusColors = {
+    'isulan': AppColors.primary,
+    'tacurong': Colors.orange,
+    'access': Colors.purple,
+    'bagumbayan': Colors.teal,
+    'palimbang': Colors.indigo,
+    'kalamansig': Colors.pink,
+    'lutayan': Colors.brown,
+  };
+  
+  /// Build campus selector - tappable card that opens bottom sheet
+  Widget _buildCampusSelector() {
+    final selectedCampus = _campuses.firstWhere(
+      (c) => c['id'] == _selectedCampus,
+      orElse: () => _campuses.first,
+    );
+    final color = _campusColors[_selectedCampus] ?? AppColors.primary;
+    
+    return InkWell(
+      onTap: _showCampusBottomSheet,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.05),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: color, width: 2),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(Icons.location_city, color: color, size: 24),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    selectedCampus['name']!,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: color,
+                      fontSize: 15,
+                    ),
+                  ),
+                  Text(
+                    'Tap to change campus',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.unfold_more, color: color),
+          ],
+        ),
+      ),
+    );
+  }
+  
+  /// Show campus selection bottom sheet
+  void _showCampusBottomSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Handle
+              Container(
+                margin: const EdgeInsets.only(top: 12),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppColors.border,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              // Header
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.school, color: AppColors.primary),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Select Your Campus',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          Text(
+                            'Choose your SKSU campus',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              // Campus list
+              ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: _campuses.length,
+                itemBuilder: (context, index) {
+                  final campus = _campuses[index];
+                  final isSelected = _selectedCampus == campus['id'];
+                  final color = _campusColors[campus['id']] ?? AppColors.primary;
+                  
+                  return ListTile(
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 4,
+                    ),
+                    leading: Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: isSelected 
+                            ? color.withValues(alpha: 0.15)
+                            : AppColors.surface,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: isSelected ? color : AppColors.border,
+                          width: isSelected ? 2 : 1,
+                        ),
+                      ),
+                      child: Icon(
+                        Icons.location_city,
+                        color: isSelected ? color : AppColors.textSecondary,
+                        size: 22,
+                      ),
+                    ),
+                    title: Text(
+                      campus['name']!,
+                      style: TextStyle(
+                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                        color: isSelected ? color : AppColors.textPrimary,
+                      ),
+                    ),
+                    subtitle: Text(
+                      campus['shortName']!,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    trailing: isSelected
+                        ? Icon(Icons.check_circle, color: color)
+                        : null,
+                    onTap: () {
+                      setState(() {
+                        _selectedCampus = campus['id']!;
+                      });
+                      Navigator.pop(context);
+                    },
+                  );
+                },
+              ),
+              SizedBox(height: MediaQuery.of(context).padding.bottom + 16),
+            ],
+          ),
+        );
+      },
+    );
+  }
+  
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -181,75 +383,13 @@ class _RegisterScreenState extends State<RegisterScreen> with SnackBarMixin {
                     
                     const SizedBox(height: 24),
                     
-                    // Campus selection
+                    // Campus selection (tap to open selector)
                     Text(
                       'My Campus:',
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
                     const SizedBox(height: 12),
-                    Row(
-                      children: _campuses.map((campus) {
-                        final isSelected = _selectedCampus == campus['id'];
-                        return Expanded(
-                          child: Padding(
-                            padding: EdgeInsets.only(
-                              right: campus != _campuses.last ? 8 : 0,
-                            ),
-                            child: GestureDetector(
-                              onTap: () {
-                                setState(() {
-                                  _selectedCampus = campus['id']!;
-                                });
-                              },
-                              child: AnimatedContainer(
-                                duration: const Duration(milliseconds: 200),
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 12,
-                                  horizontal: 8,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: isSelected 
-                                      ? AppColors.primary.withValues(alpha: 0.1)
-                                      : AppColors.surface,
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(
-                                    color: isSelected 
-                                        ? AppColors.primary 
-                                        : AppColors.border,
-                                    width: isSelected ? 2 : 1,
-                                  ),
-                                ),
-                                child: Column(
-                                  children: [
-                                    Icon(
-                                      Icons.location_city,
-                                      size: 24,
-                                      color: isSelected 
-                                          ? AppColors.primary 
-                                          : AppColors.textSecondary,
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      campus['shortName']!,
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: isSelected 
-                                            ? FontWeight.w600 
-                                            : FontWeight.normal,
-                                        color: isSelected 
-                                            ? AppColors.primary 
-                                            : AppColors.textPrimary,
-                                      ),
-                                      textAlign: TextAlign.center,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                        );
-                      }).toList(),
-                    ),
+                    _buildCampusSelector(),
                     
                     const SizedBox(height: 24),
                     
@@ -294,7 +434,7 @@ class _RegisterScreenState extends State<RegisterScreen> with SnackBarMixin {
                     
                     // Department dropdown (for both roles)
                     DropdownButtonFormField<String>(
-                      value: _selectedDepartment,
+                      value: _selectedDepartment, // ignore: deprecated_member_use
                       decoration: const InputDecoration(
                         labelText: 'Department/College',
                         prefixIcon: Icon(Icons.business),

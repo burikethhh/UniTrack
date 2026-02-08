@@ -163,36 +163,74 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
         children: [
           // Search and filter section
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
             decoration: BoxDecoration(
               color: AppColors.surface,
               boxShadow: [
                 BoxShadow(
-                  color: AppColors.shadow,
-                  blurRadius: 4,
-                  offset: const Offset(0, 2),
+                  color: AppColors.shadow.withValues(alpha: 0.05),
+                  blurRadius: 8,
+                  offset: const Offset(0, 4),
                 ),
               ],
             ),
             child: Column(
               children: [
-                // Search bar
-                CustomTextField(
-                  controller: _searchController,
-                  hint: 'Search by name or department...',
-                  prefixIcon: Icons.search,
-                  onChanged: (value) {
-                    context.read<FacultyProvider>().search(value);
-                  },
-                  suffixIcon: _searchController.text.isNotEmpty
-                      ? IconButton(
-                          icon: const Icon(Icons.clear),
-                          onPressed: () {
-                            _searchController.clear();
-                            context.read<FacultyProvider>().search('');
-                          },
-                        )
-                      : null,
+                // Modern search bar
+                Container(
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                    borderRadius: BorderRadius.circular(28),
+                    border: Border.all(
+                      color: AppColors.border.withValues(alpha: 0.5),
+                    ),
+                  ),
+                  child: TextField(
+                    controller: _searchController,
+                    onChanged: (value) {
+                      context.read<FacultyProvider>().search(value);
+                      setState(() {});
+                    },
+                    style: const TextStyle(fontSize: 15),
+                    decoration: InputDecoration(
+                      hintText: 'Search faculty...',
+                      hintStyle: TextStyle(
+                        color: AppColors.textSecondary.withValues(alpha: 0.7),
+                        fontWeight: FontWeight.normal,
+                      ),
+                      prefixIcon: Padding(
+                        padding: const EdgeInsets.only(left: 16, right: 12),
+                        child: Icon(
+                          Icons.search,
+                          color: AppColors.textSecondary,
+                          size: 22,
+                        ),
+                      ),
+                      prefixIconConstraints: const BoxConstraints(minWidth: 0),
+                      suffixIcon: _searchController.text.isNotEmpty
+                          ? Padding(
+                              padding: const EdgeInsets.only(right: 8),
+                              child: IconButton(
+                                icon: Icon(
+                                  Icons.close,
+                                  color: AppColors.textSecondary,
+                                  size: 20,
+                                ),
+                                onPressed: () {
+                                  _searchController.clear();
+                                  context.read<FacultyProvider>().search('');
+                                  setState(() {});
+                                },
+                              ),
+                            )
+                          : null,
+                      border: InputBorder.none,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 0,
+                        vertical: 14,
+                      ),
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 12),
                 

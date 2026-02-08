@@ -17,10 +17,7 @@ import 'package:flutter/foundation.dart'
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
     if (kIsWeb) {
-      throw UnsupportedError(
-        'DefaultFirebaseOptions have not been configured for web - '
-        'you can reconfigure this by running the FlutterFire CLI again.',
-      );
+      return web;
     }
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
@@ -51,6 +48,15 @@ class DefaultFirebaseOptions {
         );
     }
   }
+
+  static const FirebaseOptions web = FirebaseOptions(
+    apiKey: 'AIzaSyAY4CRN5-oadBrBfZ1mxHY36Y51AB3msCE',
+    appId: '1:142302004772:web:03dad372375e7d67103ab1',
+    messagingSenderId: '142302004772',
+    projectId: 'unitrack-sksu-app',
+    authDomain: 'unitrack-sksu-app.firebaseapp.com',
+    storageBucket: 'unitrack-sksu-app.firebasestorage.app',
+  );
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyAGQYoFwe5W7WbNEyPlyH2PeSUU4sFdfFc',

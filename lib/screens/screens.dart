@@ -26,3 +26,4 @@ export 'admin/super_admin_dashboard.dart';
 export 'admin/user_management_screen.dart';
 export 'admin/user_detail_screen.dart';
 export 'admin/version_management_screen.dart';
+export 'admin/live_monitor_screen.dart';

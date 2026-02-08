@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:provider/provider.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:maplibre_gl/maplibre_gl.dart' as maplibre;
 import '../../core/theme/app_colors.dart';
+import '../../core/constants/app_constants.dart';
 import '../../providers/providers.dart';
 import '../../models/models.dart';
 import '../../widgets/widgets.dart';
@@ -23,15 +25,29 @@ class StudentMapScreen extends StatefulWidget {
 class _StudentMapScreenState extends State<StudentMapScreen> {
   FacultyWithLocation? _selectedFaculty;
   LatLng? _userLocation;
-  bool _use3DMap = true; // Default to 3D map
+  bool _use3DMap = !kIsWeb; // Default to 2D on web (MapLibre workers unsupported on static hosts)
   final TextEditingController _searchController = TextEditingController();
   bool _isSearching = false;
+  String? _selectedCampusId; // Currently viewed campus
+  bool _showLegend = false; // Collapsed legend by default
+  
+  // Key to force map recreation when campus changes
+  Key _mapKey = UniqueKey();
   
   @override
   void initState() {
     super.initState();
     _getCurrentLocation();
-    // No campus filter - show ALL faculty from all SKSU campuses
+    
+    // Set initial campus from user's profile and recreate map
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final authProvider = context.read<AuthProvider>();
+      final userCampusId = authProvider.user?.campusId ?? AppConstants.defaultCampusId;
+      setState(() {
+        _selectedCampusId = userCampusId;
+        _mapKey = UniqueKey(); // Force map recreation with user's campus
+      });
+    });
     
     // If initialFacultyId is provided, select that faculty after build
     if (widget.initialFacultyId != null) {
@@ -69,20 +85,23 @@ class _StudentMapScreenState extends State<StudentMapScreen> {
   
   @override
   Widget build(BuildContext context) {
+    final currentCampusId = _selectedCampusId ?? AppConstants.defaultCampusId;
+    
     return Scaffold(
       appBar: AppBar(
         title: Text(_use3DMap ? '3D Campus Map' : 'Campus Map'),
         actions: [
-          // Toggle 2D/3D
-          IconButton(
-            icon: Icon(_use3DMap ? Icons.map : Icons.threed_rotation),
-            onPressed: () {
-              setState(() {
-                _use3DMap = !_use3DMap;
-              });
-            },
-            tooltip: _use3DMap ? 'Switch to 2D' : 'Switch to 3D',
-          ),
+          // Toggle 2D/3D (only on native, MapLibre workers don't work on web static hosts)
+          if (!kIsWeb)
+            IconButton(
+              icon: Icon(_use3DMap ? Icons.map : Icons.threed_rotation),
+              onPressed: () {
+                setState(() {
+                  _use3DMap = !_use3DMap;
+                });
+              },
+              tooltip: _use3DMap ? 'Switch to 2D' : 'Switch to 3D',
+            ),
           IconButton(
             icon: const Icon(Icons.my_location),
             onPressed: _getCurrentLocation,
@@ -107,17 +126,15 @@ class _StudentMapScreenState extends State<StudentMapScreen> {
                   .where((f) => f.isOnline)
                   .toList();
               
-              // Get user's campus for map center
-              final userCampusId = authProvider.user?.campusId ?? 'isulan';
-              
               if (_use3DMap) {
                 // 3D MapLibre GL Map
                 return CampusMap3D(
+                  key: _mapKey,
                   faculty: displayFaculty,
                   userLocation: _userLocation != null 
                       ? maplibre.LatLng(_userLocation!.latitude, _userLocation!.longitude)
                       : null,
-                  selectedFaculty: _selectedFaculty, // Pass selected faculty to focus on
+                  selectedFaculty: _selectedFaculty,
                   onMarkerTap: (faculty) {
                     setState(() {
                       _selectedFaculty = faculty;
@@ -125,59 +142,66 @@ class _StudentMapScreenState extends State<StudentMapScreen> {
                   },
                   showCampusBoundary: true,
                   enable3DBuildings: true,
-                  campusId: userCampusId,
+                  campusId: currentCampusId,
                 );
               } else {
                 // 2D Flutter Map (OpenStreetMap)
                 return CampusMap(
+                  key: _mapKey,
                   faculty: displayFaculty,
                   userLocation: _userLocation,
                   selectedLocation: _selectedFaculty?.location?.latLng,
-                  selectedFaculty: _selectedFaculty, // Pass selected faculty to focus on
+                  selectedFaculty: _selectedFaculty,
                   onMarkerTap: (faculty) {
                     setState(() {
                       _selectedFaculty = faculty;
                     });
                   },
                   showCampusBoundary: true,
-                  campusId: userCampusId,
+                  campusId: currentCampusId,
                 );
               }
             },
           ),
           
-          // Search bar for specific faculty
+          // Top controls row: Search + Campus selector
           Positioned(
-            top: 16,
-            left: 16,
-            right: 16,
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(24),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.shadow,
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  Expanded(
+            top: 12,
+            left: 12,
+            right: 12,
+            child: Row(
+              children: [
+                // Search bar (expandable)
+                Expanded(
+                  child: Container(
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(24),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.shadow,
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
                     child: TextField(
                       controller: _searchController,
                       decoration: InputDecoration(
-                        hintText: 'Search for a specific faculty...',
-                        hintStyle: TextStyle(color: AppColors.textSecondary),
+                        hintText: 'Search faculty...',
+                        hintStyle: TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 14,
+                        ),
                         prefixIcon: Icon(
                           Icons.search,
                           color: AppColors.textSecondary,
+                          size: 22,
                         ),
                         suffixIcon: _isSearching
                             ? IconButton(
-                                icon: const Icon(Icons.clear),
+                                icon: const Icon(Icons.clear, size: 20),
                                 onPressed: () {
                                   _searchController.clear();
                                   setState(() {
@@ -193,6 +217,7 @@ class _StudentMapScreenState extends State<StudentMapScreen> {
                           vertical: 14,
                         ),
                       ),
+                      style: const TextStyle(fontSize: 14),
                       onChanged: (value) {
                         setState(() {
                           _isSearching = value.isNotEmpty;
@@ -200,7 +225,6 @@ class _StudentMapScreenState extends State<StudentMapScreen> {
                         context.read<FacultyProvider>().search(value);
                       },
                       onSubmitted: (value) {
-                        // When user searches and submits, focus on the first result
                         if (value.isNotEmpty) {
                           final provider = context.read<FacultyProvider>();
                           if (provider.filteredFaculty.isNotEmpty) {
@@ -214,92 +238,41 @@ class _StudentMapScreenState extends State<StudentMapScreen> {
                       },
                     ),
                   ),
-                ],
-              ),
+                ),
+                const SizedBox(width: 8),
+                // Campus selector dropdown
+                CampusSelector(
+                  selectedCampusId: currentCampusId,
+                  onCampusSelected: (campusId) {
+                    setState(() {
+                      _selectedCampusId = campusId;
+                      _mapKey = UniqueKey(); // Force map recreation
+                    });
+                  },
+                  compact: true,
+                ),
+              ],
             ),
           ),
           
-          // Online count indicator (moved below search)
+          // Bottom left: Campus legend with navigation
           Positioned(
-            top: 80,
-            left: 16,
-            child: Consumer<FacultyProvider>(
-              builder: (context, provider, _) {
-                final isFocused = provider.focusedFacultyId != null;
-                return Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(20),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.shadow,
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 10,
-                        height: 10,
-                        decoration: BoxDecoration(
-                          color: isFocused 
-                              ? AppColors.primary 
-                              : AppColors.statusAvailable,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        isFocused 
-                            ? 'Showing 1 Faculty' 
-                            : '${provider.onlineFaculty} Online',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                    ],
-                  ),
-                );
+            bottom: _selectedFaculty != null ? 180 : 16,
+            left: 12,
+            child: CampusLegend(
+              expanded: _showLegend,
+              selectedCampusId: currentCampusId,
+              onToggle: () {
+                setState(() {
+                  _showLegend = !_showLegend;
+                });
               },
-            ),
-          ),
-          
-          // Legend
-          Positioned(
-            top: 16,
-            right: 16,
-            child: Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.shadow,
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _buildLegendItem(AppColors.statusAvailable, 'Available'),
-                  const SizedBox(height: 6),
-                  _buildLegendItem(AppColors.statusBusy, 'Busy'),
-                  const SizedBox(height: 6),
-                  _buildLegendItem(AppColors.statusInClass, 'In Class'),
-                ],
-              ),
+              onCampusSelected: (campusId) {
+                setState(() {
+                  _selectedCampusId = campusId;
+                  _mapKey = UniqueKey(); // Force map recreation
+                });
+              },
             ),
           ),
           
@@ -327,7 +300,6 @@ class _StudentMapScreenState extends State<StudentMapScreen> {
       floatingActionButton: _selectedFaculty == null
           ? FloatingActionButton.extended(
               onPressed: () {
-                // Show faculty list overlay
                 _showFacultyListSheet();
               },
               icon: const Icon(Icons.list),
@@ -336,30 +308,6 @@ class _StudentMapScreenState extends State<StudentMapScreen> {
               foregroundColor: Colors.white,
             )
           : null,
-    );
-  }
-  
-  Widget _buildLegendItem(Color color, String label) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 12,
-          height: 12,
-          decoration: BoxDecoration(
-            color: color,
-            shape: BoxShape.circle,
-          ),
-        ),
-        const SizedBox(width: 6),
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 11,
-            color: AppColors.textSecondary,
-          ),
-        ),
-      ],
     );
   }
   

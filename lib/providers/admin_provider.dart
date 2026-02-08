@@ -309,11 +309,11 @@ class AdminProvider extends ChangeNotifier {
   /// Ban a user (disable account)
   Future<bool> banUser(String userId, {String? reason}) async {
     try {
-      await _firestore.collection('users').doc(userId).update({
+      await _firestore.collection('users').doc(userId).set({
         'isActive': false,
         'bannedAt': FieldValue.serverTimestamp(),
         'banReason': reason,
-      });
+      }, SetOptions(merge: true));
 
       // Log activity
       await _logActivity(
@@ -342,11 +342,11 @@ class AdminProvider extends ChangeNotifier {
   /// Unban a user (re-enable account)
   Future<bool> unbanUser(String userId) async {
     try {
-      await _firestore.collection('users').doc(userId).update({
+      await _firestore.collection('users').doc(userId).set({
         'isActive': true,
         'bannedAt': null,
         'banReason': null,
-      });
+      }, SetOptions(merge: true));
 
       // Log activity
       await _logActivity(
@@ -414,9 +414,9 @@ class AdminProvider extends ChangeNotifier {
   /// Update user role
   Future<bool> updateUserRole(String userId, UserRole newRole) async {
     try {
-      await _firestore.collection('users').doc(userId).update({
+      await _firestore.collection('users').doc(userId).set({
         'role': newRole.name,
-      });
+      }, SetOptions(merge: true));
 
       // Log activity
       await _logActivity(
@@ -445,7 +445,7 @@ class AdminProvider extends ChangeNotifier {
   /// Update user details
   Future<bool> updateUser(String userId, Map<String, dynamic> data) async {
     try {
-      await _firestore.collection('users').doc(userId).update(data);
+      await _firestore.collection('users').doc(userId).set(data, SetOptions(merge: true));
 
       // Reload users
       await loadAllUsers();

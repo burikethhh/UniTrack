@@ -123,12 +123,12 @@ class Validators {
     
     int strength = 0;
     
-    if (password.length >= 6) strength++;
-    if (password.length >= 8) strength++;
+    if (password.length >= 6) { strength++; }
+    if (password.length >= 8) { strength++; }
     if (password.contains(RegExp(r'[A-Z]')) && 
-        password.contains(RegExp(r'[a-z]'))) strength++;
-    if (password.contains(RegExp(r'[0-9]'))) strength++;
-    if (password.contains(RegExp(r'[!@#$%^&*(),.?":{}|<>]'))) strength++;
+        password.contains(RegExp(r'[a-z]'))) { strength++; }
+    if (password.contains(RegExp(r'[0-9]'))) { strength++; }
+    if (password.contains(RegExp(r'[!@#$%^&*(),.?":{}|<>]'))) { strength++; }
     
     return strength.clamp(0, 4);
   }

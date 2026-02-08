@@ -103,7 +103,7 @@ class _StatusChip extends StatelessWidget {
             boxShadow: isSelected
                 ? [
                     BoxShadow(
-                      color: status.color.withOpacity(0.3),
+                      color: status.color.withValues(alpha: 0.3),
                       blurRadius: 8,
                       offset: const Offset(0, 2),
                     ),
@@ -165,7 +165,7 @@ class AvailabilityStatusBadge extends StatelessWidget {
             shape: BoxShape.circle,
             boxShadow: [
               BoxShadow(
-                color: status!.color.withOpacity(0.4),
+                color: status!.color.withValues(alpha: 0.4),
                 blurRadius: 4,
                 offset: const Offset(0, 1),
               ),
@@ -218,10 +218,10 @@ class AvailabilityStatusIndicator extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: status!.color.withOpacity(0.15),
+          color: status!.color.withValues(alpha: 0.15),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: status!.color.withOpacity(0.3),
+            color: status!.color.withValues(alpha: 0.3),
           ),
         ),
         child: Row(
@@ -260,7 +260,7 @@ class AvailabilityStatusIndicator extends StatelessWidget {
               Icon(
                 Icons.edit,
                 size: 14,
-                color: status!.color.withOpacity(0.7),
+                color: status!.color.withValues(alpha: 0.7),
               ),
             ],
           ],
@@ -490,7 +490,7 @@ class _StatusOption extends StatelessWidget {
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: isSelected
-                  ? status.color.withOpacity(0.1)
+                  ? status.color.withValues(alpha: 0.1)
                   : Colors.grey[50],
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
@@ -504,7 +504,7 @@ class _StatusOption extends StatelessWidget {
                   width: 40,
                   height: 40,
                   decoration: BoxDecoration(
-                    color: status.color.withOpacity(0.2),
+                    color: status.color.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Icon(

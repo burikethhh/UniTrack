@@ -67,7 +67,7 @@ class LocationProvider extends ChangeNotifier {
     // Auto-restore tracking if it was active before app closed (including background tracking)
     if (wasTracking && _userId != null) {
       await startTracking();
-      print('📍 Restored tracking for user (background=${_isBackgroundTrackingEnabled})');
+      debugPrint('📍 Restored tracking for user (background=$_isBackgroundTrackingEnabled)');
     }
     // No need to clean up existing locations - they are valid if fresh
   }
@@ -107,7 +107,7 @@ class LocationProvider extends ChangeNotifier {
       await startTracking();
     }
     
-    print('📍 Background tracking ENABLED');
+    debugPrint('📍 Background tracking ENABLED');
     notifyListeners();
   }
   
@@ -116,7 +116,7 @@ class LocationProvider extends ChangeNotifier {
     _isBackgroundTrackingEnabled = false;
     await _saveBackgroundTrackingState(false);
     
-    print('📍 Background tracking DISABLED');
+    debugPrint('📍 Background tracking DISABLED');
     notifyListeners();
   }
   
@@ -181,7 +181,7 @@ class LocationProvider extends ChangeNotifier {
         await _locationService.updateLocation(_userId!, location);
       }
     } catch (e) {
-      print('Error getting initial position: $e');
+      debugPrint('Error getting initial position: $e');
     }
     
     // Start location updates
@@ -218,7 +218,7 @@ class LocationProvider extends ChangeNotifier {
     
     _currentLocation = null;
     _trackingStartTime = null;
-    print('📍 Tracking STOPPED');
+    debugPrint('📍 Tracking STOPPED');
     notifyListeners();
   }
   
@@ -341,7 +341,7 @@ class LocationProvider extends ChangeNotifier {
           await _locationService.updateLocation(_userId!, location);
         }
       } catch (e) {
-        print('Error switching to auto tracking: $e');
+        debugPrint('Error switching to auto tracking: $e');
       }
     }
     

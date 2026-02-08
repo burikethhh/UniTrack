@@ -48,7 +48,7 @@ class UserAvatar extends StatelessWidget {
                   child: Image.network(
                     imageUrl!,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => _buildInitials(),
+                    errorBuilder: (_, _, _) => _buildInitials(),
                     loadingBuilder: (_, child, loadingProgress) {
                       if (loadingProgress == null) return child;
                       return _buildInitials();

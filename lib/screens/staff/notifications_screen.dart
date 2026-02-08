@@ -93,19 +93,119 @@ class NotificationsScreen extends StatelessWidget {
             );
           }
 
-          return ListView.builder(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            itemCount: provider.notifications.length,
-            itemBuilder: (context, index) {
-              final notification = provider.notifications[index];
-              return _NotificationTile(
-                notification: notification,
-                onTap: () => _handleNotificationTap(context, notification, provider),
-                onDismiss: () => provider.deleteNotification(notification.id),
-              );
-            },
-          );
+          return _buildGroupedNotificationList(context, provider);
         },
+      ),
+    );
+  }
+  
+  /// Groups notifications by date and returns a ListView with date headers
+  Widget _buildGroupedNotificationList(
+    BuildContext context,
+    NotificationProvider provider,
+  ) {
+    final notifications = provider.notifications;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final yesterday = today.subtract(const Duration(days: 1));
+    
+    // Group notifications by date category
+    final Map<String, List<AppNotification>> grouped = {};
+    
+    for (final notification in notifications) {
+      final notifDate = DateTime(
+        notification.createdAt.year,
+        notification.createdAt.month,
+        notification.createdAt.day,
+      );
+      
+      String key;
+      if (notifDate == today) {
+        key = 'Today';
+      } else if (notifDate == yesterday) {
+        key = 'Yesterday';
+      } else if (notifDate.isAfter(today.subtract(const Duration(days: 7)))) {
+        key = 'This Week';
+      } else {
+        key = 'Earlier';
+      }
+      
+      grouped.putIfAbsent(key, () => []);
+      grouped[key]!.add(notification);
+    }
+    
+    // Order of date sections
+    final sectionOrder = ['Today', 'Yesterday', 'This Week', 'Earlier'];
+    
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      itemCount: sectionOrder.fold<int>(
+        0, 
+        (count, section) => count + (grouped[section]?.isNotEmpty == true 
+            ? grouped[section]!.length + 1 // +1 for header
+            : 0),
+      ),
+      itemBuilder: (context, index) {
+        // Calculate which section and item this index represents
+        int currentIndex = 0;
+        for (final section in sectionOrder) {
+          final items = grouped[section];
+          if (items == null || items.isEmpty) continue;
+          
+          // Header
+          if (index == currentIndex) {
+            return _buildDateHeader(section);
+          }
+          currentIndex++;
+          
+          // Items in this section
+          final itemIndex = index - currentIndex;
+          if (itemIndex < items.length) {
+            final notification = items[itemIndex];
+            return _NotificationTile(
+              notification: notification,
+              onTap: () => _handleNotificationTap(context, notification, provider),
+              onDismiss: () => provider.deleteNotification(notification.id),
+            );
+          }
+          currentIndex += items.length;
+        }
+        
+        return const SizedBox.shrink();
+      },
+    );
+  }
+  
+  /// Builds a date section header
+  Widget _buildDateHeader(String title) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Text(
+              title,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: AppColors.primary,
+                letterSpacing: 0.5,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Container(
+              height: 1,
+              color: AppColors.border.withValues(alpha: 0.5),
+            ),
+          ),
+        ],
       ),
     );
   }

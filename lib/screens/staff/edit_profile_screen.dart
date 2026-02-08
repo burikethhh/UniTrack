@@ -1,4 +1,4 @@
-import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
@@ -28,7 +28,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   
   String? _selectedDepartment;
   String? _photoUrl;
-  File? _selectedPhoto;
+  Uint8List? _selectedPhotoBytes;
   bool _isLoading = false;
   bool _isUploadingPhoto = false;
   List<DepartmentModel> _departments = [];
@@ -36,28 +36,34 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   @override
   void initState() {
     super.initState();
-    _loadUserData();
-    _loadDepartments();
+    // Load departments first, then user data in callback
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadDepartments().then((_) => _loadUserData());
+    });
   }
 
   void _loadUserData() {
     final user = context.read<AuthProvider>().user;
-    if (user != null) {
-      _firstNameController.text = user.firstName;
-      _lastNameController.text = user.lastName;
-      _positionController.text = user.position ?? '';
-      _phoneController.text = user.phoneNumber ?? '';
-      _selectedDepartment = user.department;
-      _photoUrl = user.photoUrl;
+    if (user != null && mounted) {
+      setState(() {
+        _firstNameController.text = user.firstName;
+        _lastNameController.text = user.lastName;
+        _positionController.text = user.position ?? '';
+        _phoneController.text = user.phoneNumber ?? '';
+        _selectedDepartment = user.department;
+        _photoUrl = user.photoUrl;
+      });
     }
   }
 
   Future<void> _loadDepartments() async {
     final databaseService = context.read<DatabaseService>();
     final departments = await databaseService.getAllDepartments();
-    setState(() {
-      _departments = departments;
-    });
+    if (mounted) {
+      setState(() {
+        _departments = departments;
+      });
+    }
   }
 
   @override
@@ -74,11 +80,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.image,
         allowMultiple: false,
+        withData: true, // Get bytes for cross-platform support
       );
 
-      if (result != null && result.files.single.path != null) {
+      if (result != null && result.files.single.bytes != null) {
         setState(() {
-          _selectedPhoto = File(result.files.single.path!);
+          _selectedPhotoBytes = result.files.single.bytes;
         });
       }
     } catch (e) {
@@ -94,7 +101,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   }
 
   Future<String?> _uploadPhoto(String userId) async {
-    if (_selectedPhoto == null) return _photoUrl;
+    if (_selectedPhotoBytes == null) return _photoUrl;
 
     setState(() => _isUploadingPhoto = true);
 
@@ -103,9 +110,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       final fileName = 'profile_$userId.jpg';
       final ref = storage.ref().child('profile_photos/$fileName');
 
-      // Upload file
-      final uploadTask = await ref.putFile(
-        _selectedPhoto!,
+      // Upload bytes (works on both web and mobile)
+      final TaskSnapshot uploadTask = await ref.putData(
+        _selectedPhotoBytes!,
         SettableMetadata(contentType: 'image/jpeg'),
       );
 
@@ -142,7 +149,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     try {
       // Upload photo if changed
       String? newPhotoUrl = _photoUrl;
-      if (_selectedPhoto != null) {
+      if (_selectedPhotoBytes != null) {
         newPhotoUrl = await _uploadPhoto(user.id);
       }
 
@@ -178,7 +185,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       await FirebaseFirestore.instance
           .collection('users')
           .doc(user.id)
-          .update(updatedUser.toFirestore());
+          .set(updatedUser.toFirestore(), SetOptions(merge: true));
 
       // Update auth provider
       await authProvider.updateProfile(updatedUser);
@@ -264,11 +271,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             color: AppColors.primary,
                             width: 3,
                           ),
-                          image: _selectedPhoto != null
-                              ? DecorationImage(
-                                  image: FileImage(_selectedPhoto!),
-                                  fit: BoxFit.cover,
-                                )
+                          image: _selectedPhotoBytes != null
+                                  ? DecorationImage(
+                                      image: MemoryImage(_selectedPhotoBytes!),
+                                      fit: BoxFit.cover,
+                                    )
                               : _photoUrl != null
                                   ? DecorationImage(
                                       image: NetworkImage(_photoUrl!),
@@ -276,7 +283,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                                     )
                                   : null,
                         ),
-                        child: _selectedPhoto == null && _photoUrl == null
+                        child: _selectedPhotoBytes == null && _photoUrl == null
                             ? Icon(
                                 Icons.person,
                                 size: 60,
@@ -369,8 +376,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               const SizedBox(height: 12),
 
               // Department Dropdown
-              DropdownButtonFormField<String>( // ignore: deprecated_member_use
-                value: _selectedDepartment,
+              DropdownButtonFormField<String>(
+                // Only use _selectedDepartment if it exists in the department list
+                value: _departments.any((d) => d.name == _selectedDepartment) // ignore: deprecated_member_use
+                    ? _selectedDepartment 
+                    : null,
                 decoration: InputDecoration(
                   labelText: 'Department',
                   prefixIcon: const Icon(Icons.business),

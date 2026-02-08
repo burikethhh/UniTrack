@@ -4,8 +4,8 @@
 class AppConstants {
   // App Info
   static const String appName = 'UniTrack';
-  static const String appVersion = '2.0.7'; // Multi-campus support & edit profile
-  static const int versionCode = 207; // Version code for update checks (2.0.7 = 207)
+  static const String appVersion = '2.2.0'; // Feature upgrades: charts, map avatars, offline queue, profile editing, functional settings
+  static const int versionCode = 211; // Version code for update checks (2.1.1 = 211)
   static const String appTagline = 'Real-Time Faculty & Staff Locator';
   
   // Version Compatibility - for older app versions to update

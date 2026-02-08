@@ -2,10 +2,11 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart' show Color;
+import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'notification_service.dart' show notificationNavigatorKey;
 
 /// Background message handler - must be top-level function
 @pragma('vm:entry-point')
@@ -20,8 +21,9 @@ class PushNotificationService {
   factory PushNotificationService() => _instance;
   PushNotificationService._internal();
 
-  final FirebaseMessaging _fcm = FirebaseMessaging.instance;
-  final FlutterLocalNotificationsPlugin _localNotifications = FlutterLocalNotificationsPlugin();
+  // Lazy init — avoid accessing platform-specific instances on web
+  late final FirebaseMessaging _fcm = FirebaseMessaging.instance;
+  late final FlutterLocalNotificationsPlugin _localNotifications = FlutterLocalNotificationsPlugin();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   
   StreamSubscription<RemoteMessage>? _foregroundSubscription;
@@ -30,8 +32,8 @@ class PushNotificationService {
   String? _fcmToken;
   String? get fcmToken => _fcmToken;
   
-  // Notification channel for Android
-  static const AndroidNotificationChannel _channel = AndroidNotificationChannel(
+  // Notification channel for Android (lazy to avoid web crash)
+  static AndroidNotificationChannel get _channel => const AndroidNotificationChannel(
     'unitrack_notifications',
     'UniTrack Notifications',
     description: 'Notifications for faculty updates and alerts',
@@ -43,7 +45,7 @@ class PushNotificationService {
   /// Initialize the push notification service
   Future<void> initialize() async {
     try {
-      // Request permissions
+      // Request permissions (works on both web and mobile)
       final settings = await _fcm.requestPermission(
         alert: true,
         badge: true,
@@ -59,7 +61,10 @@ class PushNotificationService {
       if (settings.authorizationStatus == AuthorizationStatus.authorized ||
           settings.authorizationStatus == AuthorizationStatus.provisional) {
         await _setupFCM();
-        await _initializeLocalNotifications();
+        // Only init local notifications on mobile — web uses in-app overlays
+        if (!kIsWeb) {
+          await _initializeLocalNotifications();
+        }
         _setupMessageHandlers();
       }
     } catch (e) {
@@ -68,9 +73,20 @@ class PushNotificationService {
   }
 
   Future<void> _setupFCM() async {
-    // Get FCM token
-    _fcmToken = await _fcm.getToken();
-    debugPrint('🔑 FCM Token: $_fcmToken');
+    // Get FCM token (web uses VAPID key)
+    try {
+      if (kIsWeb) {
+        // For web, getToken can work without VAPID key if Firebase config is correct
+        _fcmToken = await _fcm.getToken(
+          vapidKey: null, // Uses Firebase project's default VAPID key
+        );
+      } else {
+        _fcmToken = await _fcm.getToken();
+      }
+      debugPrint('🔑 FCM Token: $_fcmToken');
+    } catch (e) {
+      debugPrint('⚠️ FCM getToken error (non-fatal): $e');
+    }
 
     // Listen for token refresh
     _fcm.onTokenRefresh.listen((newToken) {
@@ -79,8 +95,10 @@ class PushNotificationService {
       _saveTokenToFirestore(newToken);
     });
 
-    // Set background message handler
-    FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+    // Set background message handler (mobile only — web uses service worker)
+    if (!kIsWeb) {
+      FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+    }
   }
 
   Future<void> _initializeLocalNotifications() async {
@@ -133,11 +151,22 @@ class PushNotificationService {
     debugPrint('📬 Foreground message: ${message.notification?.title}');
     
     final notification = message.notification;
+
+    if (notification == null) return;
+
+    // On web, show in-app overlay notification
+    if (kIsWeb) {
+      _showWebOverlayNotification(
+        title: notification.title ?? 'UniTrack',
+        body: notification.body ?? '',
+      );
+      return;
+    }
+    
     final android = message.notification?.android;
 
-    // Show local notification when app is in foreground
-    if (notification != null) {
-      _localNotifications.show(
+    // Show local notification when app is in foreground (mobile)
+    _localNotifications.show(
         notification.hashCode,
         notification.title,
         notification.body,
@@ -159,7 +188,6 @@ class PushNotificationService {
         ),
         payload: jsonEncode(message.data),
       );
-    }
   }
 
   void _handleMessageOpenedApp(RemoteMessage message) {
@@ -197,10 +225,10 @@ class PushNotificationService {
     if (_fcmToken == null) return;
     
     try {
-      await _firestore.collection('users').doc(userId).update({
+      await _firestore.collection('users').doc(userId).set({
         'fcmTokens': FieldValue.arrayUnion([_fcmToken]),
         'lastTokenUpdate': FieldValue.serverTimestamp(),
-      });
+      }, SetOptions(merge: true));
       
       // Also save locally
       final prefs = await SharedPreferences.getInstance();
@@ -226,9 +254,9 @@ class PushNotificationService {
     if (_fcmToken == null) return;
     
     try {
-      await _firestore.collection('users').doc(userId).update({
+      await _firestore.collection('users').doc(userId).set({
         'fcmTokens': FieldValue.arrayRemove([_fcmToken]),
-      });
+      }, SetOptions(merge: true));
       debugPrint('✅ FCM token removed for user: $userId');
     } catch (e) {
       debugPrint('❌ Error removing FCM token: $e');
@@ -237,6 +265,7 @@ class PushNotificationService {
 
   /// Subscribe to a topic for receiving group notifications
   Future<void> subscribeToTopic(String topic) async {
+    if (kIsWeb) return; // Topics not supported on web
     try {
       await _fcm.subscribeToTopic(topic);
       debugPrint('✅ Subscribed to topic: $topic');
@@ -247,6 +276,7 @@ class PushNotificationService {
 
   /// Unsubscribe from a topic
   Future<void> unsubscribeFromTopic(String topic) async {
+    if (kIsWeb) return; // Topics not supported on web
     try {
       await _fcm.unsubscribeFromTopic(topic);
       debugPrint('✅ Unsubscribed from topic: $topic');
@@ -283,6 +313,10 @@ class PushNotificationService {
     required String body,
     Map<String, dynamic>? data,
   }) async {
+    if (kIsWeb) {
+      _showWebOverlayNotification(title: title, body: body);
+      return;
+    }
     await _localNotifications.show(
       DateTime.now().millisecondsSinceEpoch.remainder(100000),
       title,
@@ -321,7 +355,61 @@ class PushNotificationService {
 
   /// Clear all pending notifications
   Future<void> clearAllNotifications() async {
+    if (kIsWeb) return;
     await _localNotifications.cancelAll();
+  }
+
+  /// Show an in-app overlay notification for web
+  void _showWebOverlayNotification({required String title, required String body}) {
+    // Import the navigator key from notification_service.dart
+    final overlayState = notificationNavigatorKey.currentState?.overlay;
+    if (overlayState == null) {
+      debugPrint('📱 Web notification (no overlay): $title - $body');
+      return;
+    }
+
+    late OverlayEntry entry;
+    entry = OverlayEntry(
+      builder: (context) => Positioned(
+        top: MediaQuery.of(context).padding.top + 8,
+        left: 16,
+        right: 16,
+        child: Material(
+          elevation: 8,
+          borderRadius: BorderRadius.circular(12),
+          color: const Color(0xFF1565C0),
+          child: InkWell(
+            onTap: () { if (entry.mounted) entry.remove(); },
+            borderRadius: BorderRadius.circular(12),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Row(
+                children: [
+                  const Icon(Icons.notifications, color: Colors.white, size: 24),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+                        const SizedBox(height: 2),
+                        Text(body, style: const TextStyle(color: Colors.white70, fontSize: 12), maxLines: 2, overflow: TextOverflow.ellipsis),
+                      ],
+                    ),
+                  ),
+                  const Icon(Icons.close, color: Colors.white54, size: 18),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    overlayState.insert(entry);
+    Future.delayed(const Duration(seconds: 4), () {
+      if (entry.mounted) entry.remove();
+    });
   }
 
   /// Dispose resources

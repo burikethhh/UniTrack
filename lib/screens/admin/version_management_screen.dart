@@ -1,4 +1,4 @@
-import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -626,11 +626,13 @@ class _VersionManagementScreenState extends State<VersionManagementScreen> {
     );
   }
 
+  // ignore: unused_element
   void _showUploadDialog() {
     final versionNameController = TextEditingController();
     final versionCodeController = TextEditingController();
     final releaseNotesController = TextEditingController();
-    File? selectedFile;
+    Uint8List? selectedBytes;
+    String? selectedFileName;
     bool isRequired = false;
 
     showDialog(
@@ -688,16 +690,18 @@ class _VersionManagementScreenState extends State<VersionManagementScreen> {
                 ),
                 const SizedBox(height: 16),
 
-                // APK File Picker
+                // APK File Picker (works on both web and mobile)
                 InkWell(
                   onTap: () async {
                     final result = await FilePicker.platform.pickFiles(
                       type: FileType.custom,
                       allowedExtensions: ['apk'],
+                      withData: true, // Get bytes for web compatibility
                     );
-                    if (result != null && result.files.single.path != null) {
+                    if (result != null && result.files.single.bytes != null) {
                       setDialogState(() {
-                        selectedFile = File(result.files.single.path!);
+                        selectedBytes = result.files.single.bytes;
+                        selectedFileName = result.files.single.name;
                       });
                     }
                   },
@@ -705,25 +709,25 @@ class _VersionManagementScreenState extends State<VersionManagementScreen> {
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
                       border: Border.all(
-                        color: selectedFile != null ? Colors.green : Colors.grey,
-                        width: selectedFile != null ? 2 : 1,
+                        color: selectedBytes != null ? Colors.green : Colors.grey,
+                        width: selectedBytes != null ? 2 : 1,
                       ),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Row(
                       children: [
                         Icon(
-                          selectedFile != null ? Icons.check_circle : Icons.android,
-                          color: selectedFile != null ? Colors.green : Colors.grey,
+                          selectedBytes != null ? Icons.check_circle : Icons.android,
+                          color: selectedBytes != null ? Colors.green : Colors.grey,
                         ),
                         const SizedBox(width: 12),
                         Expanded(
                           child: Text(
-                            selectedFile != null
-                                ? selectedFile!.path.split('/').last
+                            selectedBytes != null
+                                ? '${selectedFileName ?? "APK"} (${(selectedBytes!.length / 1024 / 1024).toStringAsFixed(1)} MB)'
                                 : 'Select APK file',
                             style: TextStyle(
-                              color: selectedFile != null ? Colors.green : Colors.grey,
+                              color: selectedBytes != null ? Colors.green : Colors.grey,
                             ),
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -753,17 +757,18 @@ class _VersionManagementScreenState extends State<VersionManagementScreen> {
             ElevatedButton.icon(
               icon: const Icon(Icons.cloud_upload),
               label: const Text('Upload'),
-              onPressed: selectedFile == null ||
+              onPressed: selectedBytes == null ||
                       versionNameController.text.isEmpty ||
                       versionCodeController.text.isEmpty
                   ? null
                   : () async {
                       Navigator.pop(ctx);
-                      await _uploadVersion(
+                      await _uploadVersionFromBytes(
                         versionName: versionNameController.text,
                         versionCode: int.tryParse(versionCodeController.text) ?? 0,
                         releaseNotes: releaseNotesController.text,
-                        apkFile: selectedFile!,
+                        fileBytes: selectedBytes!,
+                        fileName: selectedFileName ?? 'UniTrack.apk',
                         isRequired: isRequired,
                       );
                     },
@@ -775,6 +780,7 @@ class _VersionManagementScreenState extends State<VersionManagementScreen> {
   }
 
   /// Show dialog to add version from GitHub URL (Free plan friendly!)
+  // ignore: unused_element
   void _showGitHubUrlDialog() {
     final versionNameController = TextEditingController();
     final versionCodeController = TextEditingController();
@@ -975,11 +981,12 @@ class _VersionManagementScreenState extends State<VersionManagementScreen> {
     setState(() => _isLoading = false);
   }
 
-  Future<void> _uploadVersion({
+  Future<void> _uploadVersionFromBytes({
     required String versionName,
     required int versionCode,
     required String releaseNotes,
-    required File apkFile,
+    required Uint8List fileBytes,
+    required String fileName,
     required bool isRequired,
   }) async {
     setState(() {
@@ -987,10 +994,11 @@ class _VersionManagementScreenState extends State<VersionManagementScreen> {
       _uploadProgress = 0;
     });
 
-    final result = await _updateService.uploadNewVersion(
+    final result = await _updateService.uploadNewVersionFromBytes(
       versionName: versionName,
       versionCode: versionCode,
-      apkFile: apkFile,
+      fileBytes: fileBytes,
+      fileName: 'UniTrack_v$versionName.apk',
       releaseNotes: releaseNotes.isNotEmpty ? releaseNotes : null,
       isRequired: isRequired,
       onProgress: (progress) {

@@ -689,20 +689,21 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   }
   
   void _showSignOutDialog(BuildContext context) {
+    final authProvider = context.read<AuthProvider>();
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('Sign Out'),
         content: const Text('Are you sure you want to sign out?'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text('Cancel'),
           ),
           ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              context.read<AuthProvider>().signOut();
+            onPressed: () async {
+              Navigator.pop(dialogContext);
+              await authProvider.signOut();
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.error,

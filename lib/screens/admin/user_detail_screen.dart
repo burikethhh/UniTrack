@@ -23,10 +23,15 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
   @override
   void initState() {
     super.initState();
-    _loadUserDetails();
+    // Use postFrameCallback to safely access context
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadUserDetails();
+    });
   }
 
   Future<void> _loadUserDetails() async {
+    if (!mounted) return;
+    
     setState(() {
       _isLoading = true;
       _error = null;
@@ -58,10 +63,12 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
         _additionalData = doc.data();
       }
 
+      if (!mounted) return;
       setState(() {
         _isLoading = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _error = e.toString();
         _isLoading = false;
@@ -214,7 +221,7 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
                                     width: 100,
                                     height: 100,
                                     fit: BoxFit.cover,
-                                    errorBuilder: (_, __, ___) => _buildInitials(user),
+                                    errorBuilder: (_, _, _) => _buildInitials(user),
                                   ),
                                 )
                               : _buildInitials(user),
@@ -577,8 +584,8 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
                 .map((role) => RadioListTile<UserRole>(
                       title: Text(role.name.toUpperCase()),
                       value: role,
-                      groupValue: selectedRole,
-                      onChanged: (value) {
+                      groupValue: selectedRole, // ignore: deprecated_member_use
+                      onChanged: (value) { // ignore: deprecated_member_use
                         if (value != null) {
                           setState(() => selectedRole = value);
                         }
@@ -600,6 +607,7 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
                         _user!.id,
                         selectedRole,
                       );
+                      if (!mounted) return;
                       if (success) {
                         await _loadUserDetails();
                       }
@@ -651,6 +659,7 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
                     ? reasonController.text
                     : null,
               );
+              if (!mounted) return;
               if (success) {
                 await _loadUserDetails();
               }
@@ -680,6 +689,7 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
             onPressed: () async {
               Navigator.pop(ctx);
               final success = await adminProvider.unbanUser(_user!.id);
+              if (!mounted) return;
               if (success) {
                 await _loadUserDetails();
               }

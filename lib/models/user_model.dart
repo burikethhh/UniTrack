@@ -156,31 +156,45 @@ class UserModel {
     }
   }
   
-  /// Create from Firestore document
+  /// Create from Firestore document (handles legacy/old user documents)
   factory UserModel.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
+    final data = doc.data() as Map<String, dynamic>? ?? {};
+    
+    // Handle email - required field, fallback to empty string
+    final email = (data['email'] as String?) ?? '';
+    
+    // Handle names - extract from email if not present
+    String firstName = (data['firstName'] as String?) ?? '';
+    String lastName = (data['lastName'] as String?) ?? '';
+    if (firstName.isEmpty && email.isNotEmpty) {
+      firstName = email.split('@').first;
+    }
+    if (firstName.isEmpty) {
+      firstName = 'User';
+    }
+    
     return UserModel(
       id: doc.id,
-      email: data['email'] ?? '',
-      firstName: data['firstName'] ?? '',
-      lastName: data['lastName'] ?? '',
+      email: email,
+      firstName: firstName,
+      lastName: lastName,
       role: _parseRole(data['role']),
-      department: data['department'],
-      position: data['position'],
-      photoUrl: data['photoUrl'],
-      phoneNumber: data['phoneNumber'],
-      isActive: data['isActive'] ?? true,
+      department: data['department'] as String?,
+      position: data['position'] as String?,
+      photoUrl: data['photoUrl'] as String?,
+      phoneNumber: data['phoneNumber'] as String?,
+      isActive: (data['isActive'] as bool?) ?? true,
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       lastLoginAt: (data['lastLoginAt'] as Timestamp?)?.toDate(),
-      campusId: data['campusId'] ?? 'isulan', // Default to Isulan if not set
-      isTrackingEnabled: data['isTrackingEnabled'],
-      currentStatus: data['currentStatus'],
-      quickMessage: data['quickMessage'],
+      campusId: (data['campusId'] as String?) ?? 'isulan', // Default to Isulan if not set
+      isTrackingEnabled: data['isTrackingEnabled'] as bool?,
+      currentStatus: data['currentStatus'] as String?,
+      quickMessage: data['quickMessage'] as String?,
       officeHours: data['officeHours'] != null 
-          ? List<String>.from(data['officeHours']) 
+          ? List<String>.from(data['officeHours'] as List) 
           : null,
-      availabilityStatus: _parseAvailabilityStatus(data['availabilityStatus']),
-      customStatusMessage: data['customStatusMessage'],
+      availabilityStatus: _parseAvailabilityStatus(data['availabilityStatus'] as String?),
+      customStatusMessage: data['customStatusMessage'] as String?,
       statusUpdatedAt: (data['statusUpdatedAt'] as Timestamp?)?.toDate(),
     );
   }

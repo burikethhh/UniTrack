@@ -10,5 +10,6 @@ export 'common/offline_banner.dart';
 export 'map/campus_map.dart';
 export 'map/campus_map_3d.dart';
 export 'map/faculty_map_sheet.dart';
+export 'map/campus_selector.dart';
 export 'faculty/availability_status_widget.dart';
 export 'update_dialog.dart';

@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
 import '../../core/constants/app_constants.dart';
@@ -39,6 +40,7 @@ class _CampusMap3DState extends State<CampusMap3D> with AutomaticKeepAliveClient
   Circle? _userLocationCircle;
   bool _mapReady = false;
   bool _isDisposed = false; // Track disposal state
+  // ignore: prefer_final_fields
   Key _mapKey = UniqueKey(); // Unique key for map recreation
   
   @override
@@ -57,27 +59,96 @@ class _CampusMap3DState extends State<CampusMap3D> with AutomaticKeepAliveClient
   
   // Satellite map style using raster tiles
   // Custom style JSON for satellite view with hybrid labels
-  static const String _mapStyle = '''
-{
-  "version": 8,
-  "name": "SKSU Campus Satellite",
-  "sources": {
-    "satellite": {
-      "type": "raster",
-      "tiles": ["https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}"],
-      "tileSize": 256,
-      "maxzoom": 20
+  // Build map style dynamically with campus boundaries baked in
+  // This is more reliable on web than calling addSource/addLayer at runtime
+  static String _buildMapStyle({bool includeBoundaries = true}) {
+    final sources = <String, dynamic>{
+      'satellite': {
+        'type': 'raster',
+        'tiles': ['https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}'],
+        'tileSize': 256,
+        'maxzoom': 20,
+      },
+    };
+
+    final layers = <Map<String, dynamic>>[
+      {
+        'id': 'satellite-layer',
+        'type': 'raster',
+        'source': 'satellite',
+      },
+    ];
+
+    if (includeBoundaries) {
+      const campusColors = {
+        'isulan': '#E8A87C',
+        'tacurong': '#FF9800',
+        'access': '#9C27B0',
+        'bagumbayan': '#009688',
+        'palimbang': '#3F51B5',
+        'kalamansig': '#E91E63',
+        'lutayan': '#795548',
+      };
+
+      for (final campus in AppConstants.campusesData) {
+        final campusId = campus['id'] as String;
+        final boundary = campus['boundaryPoints'] as List;
+        final color = campusColors[campusId] ?? '#E8A87C';
+
+        final coordinates = boundary
+            .map<List<double>>((point) => [
+                  (point as List)[1] as double,
+                  point[0] as double,
+                ])
+            .toList();
+
+        if (coordinates.isNotEmpty) {
+          coordinates.add(List<double>.from(coordinates.first));
+        }
+
+        final sourceId = 'campus-boundary-$campusId';
+        sources[sourceId] = {
+          'type': 'geojson',
+          'data': {
+            'type': 'Feature',
+            'geometry': {
+              'type': 'Polygon',
+              'coordinates': [coordinates],
+            },
+          },
+        };
+
+        layers.add({
+          'id': 'campus-fill-$campusId',
+          'type': 'fill',
+          'source': sourceId,
+          'paint': {
+            'fill-color': color,
+            'fill-opacity': 0.15,
+          },
+        });
+
+        layers.add({
+          'id': 'campus-line-$campusId',
+          'type': 'line',
+          'source': sourceId,
+          'paint': {
+            'line-color': color,
+            'line-width': 3.0,
+            'line-opacity': 0.9,
+          },
+        });
+      }
     }
-  },
-  "layers": [
-    {
-      "id": "satellite-layer",
-      "type": "raster",
-      "source": "satellite"
-    }
-  ]
-}
-''';
+
+    return jsonEncode({
+      'version': 8,
+      'name': 'SKSU Campus Satellite',
+      'glyphs': 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
+      'sources': sources,
+      'layers': layers,
+    });
+  }
   
   @override
   void dispose() {
@@ -115,15 +186,10 @@ class _CampusMap3DState extends State<CampusMap3D> with AutomaticKeepAliveClient
       _mapReady = true;
     });
     
-    // Enable 3D buildings if supported
-    if (widget.enable3DBuildings) {
-      _enable3DBuildings();
-    }
+    // Note: 3D buildings are not supported with the satellite raster style
+    // (no vector "building" source exists). Skipping _enable3DBuildings().
     
-    // Add campus boundary
-    if (widget.showCampusBoundary) {
-      _addCampusBoundary();
-    }
+    // Campus boundaries are embedded in the style JSON — no runtime calls needed.
     
     // Add markers
     _updateFacultyMarkers();
@@ -167,66 +233,36 @@ class _CampusMap3DState extends State<CampusMap3D> with AutomaticKeepAliveClient
     );
   }
   
+  // ignore: unused_element
   void _enable3DBuildings() {
     // Add 3D building extrusion layer if the style supports it
-    // This works with styles that have building data
-    _mapController?.addLayer(
-      'building',
-      'building-3d',
-      const FillExtrusionLayerProperties(
-        fillExtrusionColor: '#E8A87C', // Peach color matching theme
-        fillExtrusionHeight: [
-          'interpolate',
-          ['linear'],
-          ['zoom'],
-          15, 0,
-          16, ['get', 'height'],
-        ],
-        fillExtrusionBase: [
-          'interpolate',
-          ['linear'],
-          ['zoom'],
-          15, 0,
-          16, ['get', 'min_height'],
-        ],
-        fillExtrusionOpacity: 0.8,
-      ),
-    );
-  }
-  
-  void _addCampusBoundary() {
-    // Add boundaries for ALL 3 campuses
-    final campusColors = {
-      'isulan': '#E8A87C',    // Peach (primary)
-      'tacurong': '#FF9800',  // Orange
-      'access': '#9C27B0',    // Purple
-    };
-    
-    for (final campus in AppConstants.campusesData) {
-      final campusId = campus['id'] as String;
-      final boundary = campus['boundaryPoints'] as List;
-      final color = campusColors[campusId] ?? '#E8A87C';
-      
-      final boundaryPoints = boundary
-          .map<LatLng>((point) => LatLng(
-                (point as List)[0] as double,
-                point[1] as double,
-              ))
-          .toList();
-      
-      // Close the polygon
-      if (boundaryPoints.isNotEmpty) {
-        boundaryPoints.add(boundaryPoints.first);
-      }
-      
-      _mapController?.addLine(
-        LineOptions(
-          geometry: boundaryPoints,
-          lineColor: color,
-          lineWidth: 3.0,
-          lineOpacity: 0.9,
+    // Only works with vector tile styles that include a "building" source
+    // Our satellite raster style does not have building data, so wrap in try-catch
+    try {
+      _mapController?.addLayer(
+        'building',
+        'building-3d',
+        const FillExtrusionLayerProperties(
+          fillExtrusionColor: '#E8A87C', // Peach color matching theme
+          fillExtrusionHeight: [
+            'interpolate',
+            ['linear'],
+            ['zoom'],
+            15, 0,
+            16, ['get', 'height'],
+          ],
+          fillExtrusionBase: [
+            'interpolate',
+            ['linear'],
+            ['zoom'],
+            15, 0,
+            16, ['get', 'min_height'],
+          ],
+          fillExtrusionOpacity: 0.8,
         ),
       );
+    } catch (e) {
+      debugPrint('3D buildings not available with current map style: $e');
     }
   }
   
@@ -399,7 +435,7 @@ class _CampusMap3DState extends State<CampusMap3D> with AutomaticKeepAliveClient
               zoom: 17.0,
               tilt: 45.0,
             ),
-            styleString: _mapStyle,
+            styleString: _buildMapStyle(includeBoundaries: widget.showCampusBoundary),
             myLocationEnabled: true,
             myLocationTrackingMode: MyLocationTrackingMode.none,
             trackCameraPosition: true,

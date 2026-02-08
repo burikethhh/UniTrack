@@ -12,7 +12,20 @@
           "package_name": "com.sksu.unitrack"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "142302004772-ohda51sq2jmko01inrqlp3v6rephvi3h.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.sksu.unitrack",
+            "certificate_hash": "96c35479591c4ac2aadae17f7983c688b42a1561"
+          }
+        },
+        {
+          "client_id": "142302004772-mdp9vlrv60knlrbobp9a9fj1ittr1f72.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyAGQYoFwe5W7WbNEyPlyH2PeSUU4sFdfFc"
@@ -20,7 +33,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "142302004772-mdp9vlrv60knlrbobp9a9fj1ittr1f72.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

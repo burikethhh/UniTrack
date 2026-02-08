@@ -66,7 +66,7 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> with Widget
       // Refresh location data
       if (locationProvider.isTracking) {
         // Location is still tracking in background
-        print('📍 App resumed - location tracking active');
+        debugPrint('📍 App resumed - location tracking active');
       }
     }
   }
@@ -1080,23 +1080,25 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> with Widget
   }
   
   void _showSignOutDialog(BuildContext context) {
+    final authProvider = context.read<AuthProvider>();
+    final locationProvider = context.read<LocationProvider>();
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('Sign Out'),
         content: const Text(
           'Are you sure you want to sign out? Your location sharing will be stopped.',
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text('Cancel'),
           ),
           ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              context.read<LocationProvider>().stopTracking();
-              context.read<AuthProvider>().signOut();
+            onPressed: () async {
+              Navigator.pop(dialogContext);
+              locationProvider.stopTracking();
+              await authProvider.signOut();
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.error,

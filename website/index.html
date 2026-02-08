@@ -7,6 +7,12 @@
     <meta name="description" content="UniTrack is the official real-time faculty location tracking and monitoring system for Sultan Kudarat State University. Track faculty members across campus, monitor office hours, and ensure accountability with GPS-verified location data.">
     <meta name="keywords" content="UniTrack, SKSU, Sultan Kudarat State University, faculty tracking, location monitoring, GPS tracking, campus management">
     <meta name="author" content="SKSU IT Department">
+
+    <!-- Security Headers (meta-tag equivalents for static hosting) -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com; font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data: blob: https://github.com https://raw.githubusercontent.com; connect-src 'self' https://github.com; frame-src 'none'; frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self';">
+    <meta http-equiv="X-Content-Type-Options" content="nosniff">
+    <meta http-equiv="X-Frame-Options" content="DENY">
+    <meta name="referrer" content="strict-origin-when-cross-origin">
     
     <!-- Favicon -->
     <link rel="icon" type="image/png" sizes="192x192" href="assets/icon.png">
@@ -1313,11 +1319,11 @@
                 <p>Get the official SKSU faculty tracking and monitoring application</p>
                 
                 <div class="version-info">
-                    <span class="version-badge">v2.0.7</span>
+                    <span class="version-badge">v2.1.1</span>
                     <span>Latest Release • February 2026</span>
                 </div>
                 
-                <a href="https://github.com/burikethhh/UniTrack/releases/download/v2.0.7/UniTrack-v2.0.7.apk" class="download-btn" id="downloadBtn">
+                <a href="https://github.com/burikethhh/UniTrack/releases/download/v2.1.1/UniTrack-v2.1.1.apk" class="download-btn" id="downloadBtn">
                     <i class="fab fa-android"></i>
                     <div>
                         <div>Download APK</div>
@@ -1325,16 +1331,24 @@
                     </div>
                 </a>
                 
+                <a href="https://unitrack-sksu-app.surge.sh" class="download-btn" style="background: linear-gradient(135deg, #007AFF, #5856D6); margin-top: 12px;" target="_blank">
+                    <i class="fab fa-apple"></i>
+                    <div>
+                        <div>Open Web App</div>
+                        <div style="font-size: 0.8rem; font-weight: 400; opacity: 0.8;">iOS / Any Browser</div>
+                    </div>
+                </a>
+                
                 <!-- What's New Section -->
                 <div class="whats-new">
-                    <h3><i class="fas fa-sparkles"></i> What's New in v2.0.7</h3>
+                    <h3><i class="fas fa-sparkles"></i> What's New in v2.1.1</h3>
                     <ul class="update-list">
-                        <li><i class="fas fa-university"></i> <strong>Multi-Campus Support</strong> - 4 new campuses: Bagumbayan, Palimbang, Kalamansig, Lutayan</li>
-                        <li><i class="fas fa-user-edit"></i> <strong>Edit Profile</strong> - Staff can update photo, department & details</li>
-                        <li><i class="fas fa-shield-alt"></i> <strong>Privacy Policy</strong> - Comprehensive data handling policy</li>
-                        <li><i class="fas fa-question-circle"></i> <strong>Help & Support</strong> - FAQ section with answers</li>
-                        <li><i class="fas fa-phone-alt"></i> <strong>Quick Actions</strong> - Call/Email chips on faculty cards</li>
-                        <li><i class="fas fa-filter"></i> <strong>Availability Filter</strong> - Filter faculty by status with counts</li>
+                        <li><i class="fas fa-satellite-dish"></i> <strong>Live Monitor</strong> - Admin real-time map showing all users with location sharing</li>
+                        <li><i class="fas fa-map-pin"></i> <strong>Student Location Sharing</strong> - Students can toggle location visibility in profile</li>
+                        <li><i class="fas fa-lock-open"></i> <strong>Login Fix</strong> - Faster sign-in with timeout safeguards, no more stuck loading</li>
+                        <li><i class="fas fa-university"></i> <strong>Multi-Campus Support</strong> - 7 campuses: ACCESS, Tacurong, Isulan, Kalamansig, Lutayan, Palimbang, Bagumbayan</li>
+                        <li><i class="fas fa-map-marked-alt"></i> <strong>Campus Selector</strong> - Switch between campus maps seamlessly</li>
+                        <li><i class="fas fa-user-edit"></i> <strong>Edit Profile</strong> - Staff can update photos, department & details</li>
                     </ul>
                 </div>
             </div>
@@ -1500,6 +1514,47 @@
         document.getElementById('downloadBtn').addEventListener('click', function() {
             console.log('Download initiated');
         });
+
+        // === Security: Anti-theft protections ===
+        (function() {
+            'use strict';
+            // Prevent iframe embedding (clickjacking)
+            if (window.self !== window.top) {
+                document.body.innerHTML = '<h1 style="color:red;text-align:center;margin-top:40vh">Access Denied: This page cannot be embedded.</h1>';
+                return;
+            }
+            // Disable right-click context menu
+            document.addEventListener('contextmenu', function(e) { e.preventDefault(); });
+            // Disable common copy/inspect shortcuts
+            document.addEventListener('keydown', function(e) {
+                if ((e.ctrlKey && e.key === 'u') || (e.ctrlKey && e.key === 's') ||
+                    (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'i')) ||
+                    (e.ctrlKey && e.shiftKey && (e.key === 'J' || e.key === 'j')) ||
+                    (e.ctrlKey && e.shiftKey && (e.key === 'C' || e.key === 'c')) ||
+                    e.key === 'F12') {
+                    e.preventDefault(); e.stopPropagation();
+                }
+            });
+            // Disable text selection & image drag
+            document.body.style.userSelect = 'none';
+            document.body.style.webkitUserSelect = 'none';
+            document.addEventListener('dragstart', function(e) { e.preventDefault(); });
+            document.addEventListener('selectstart', function(e) {
+                if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+                e.preventDefault();
+            });
+            // Disable copy
+            document.addEventListener('copy', function(e) { e.preventDefault(); });
+            // Clear console periodically
+            setInterval(function() {
+                try { console.clear(); } catch(e) {}
+            }, 3000);
+            // Console warning
+            console.log('%cSTOP!', 'color:red;font-size:60px;font-weight:bold');
+            console.log('%cThis is a protected website. Unauthorized copying or reverse engineering is prohibited.', 'font-size:16px;color:#333');
+            // Disable page save via Ctrl+S
+            window.addEventListener('beforeunload', function() {});
+        })();
     </script>
 </body>
 </html>

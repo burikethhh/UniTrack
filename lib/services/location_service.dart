@@ -1,8 +1,11 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'package:flutter/foundation.dart' show debugPrint, kIsWeb;
 import 'package:geolocator/geolocator.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:permission_handler/permission_handler.dart' as ph;
+// permission_handler has no web support — only import on non-web
+import 'package:permission_handler/permission_handler.dart' as ph
+    if (dart.library.html) 'package:permission_handler/permission_handler.dart';
 import '../models/location_model.dart';
 import '../core/constants/app_constants.dart';
 
@@ -56,6 +59,16 @@ class LocationService {
   
   /// Force request location permission - will open settings if denied
   Future<bool> checkAndRequestPermission() async {
+    // On web, use geolocator's built-in permission (permission_handler has no web support)
+    if (kIsWeb) {
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      return permission == LocationPermission.whileInUse ||
+             permission == LocationPermission.always;
+    }
+    
     // First check if location services are enabled
     bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
@@ -104,7 +117,7 @@ class LocationService {
         ),
       );
     } catch (e) {
-      print('Error getting position: $e');
+      debugPrint('Error getting position: $e');
       return null;
     }
   }
@@ -137,7 +150,7 @@ class LocationService {
     }
     
     final isInside = intersections.isOdd;
-    print('📍 Campus check (${campusId ?? 'default'}): ($latitude, $longitude) -> inside=$isInside');
+    debugPrint('📍 Campus check (${campusId ?? 'default'}): ($latitude, $longitude) -> inside=$isInside');
     return isInside;
   }
   
@@ -169,7 +182,7 @@ class LocationService {
   /// Set manual pin mode - when true, GPS updates won't overwrite the manual location
   void setManualPinMode(bool enabled) {
     _isManualPinMode = enabled;
-    print('📍 Manual Pin Mode: ${enabled ? "ENABLED" : "DISABLED"}');
+    debugPrint('📍 Manual Pin Mode: ${enabled ? "ENABLED" : "DISABLED"}');
   }
   
   /// Set manual location (bypasses GPS tracking)
@@ -179,7 +192,7 @@ class LocationService {
     _currentUserId = userId;
     await updateLocation(userId, location);
     _onLocationUpdate?.call(location);
-    print('📍 Manual pin set at (${location.latitude}, ${location.longitude}) - GPS updates paused');
+    debugPrint('📍 Manual pin set at (${location.latitude}, ${location.longitude}) - GPS updates paused');
   }
   
   /// Calculate distance between two positions in meters
@@ -217,22 +230,34 @@ class LocationService {
     _isMoving = false;
     
     // GPS stream for position updates with optimized settings
-    _positionSubscription = Geolocator.getPositionStream(
-      locationSettings: AndroidSettings(
-        accuracy: LocationAccuracy.bestForNavigation, // Best possible accuracy
+    final LocationSettings locationSettings;
+    if (kIsWeb) {
+      // Web uses browser Geolocation API — no foreground notification needed
+      locationSettings = const LocationSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 5,
+      );
+    } else {
+      // Android uses fused location provider with foreground notification
+      locationSettings = AndroidSettings(
+        accuracy: LocationAccuracy.bestForNavigation,
         distanceFilter: LocationConfig.distanceFilterMeters.toInt(),
         intervalDuration: Duration(seconds: LocationConfig.movingUpdateIntervalSec),
-        forceLocationManager: false, // Use fused location provider
+        forceLocationManager: false,
         foregroundNotificationConfig: const ForegroundNotificationConfig(
           notificationTitle: 'UniTrack Location Sharing',
           notificationText: 'Sharing your location with students',
           enableWakeLock: true,
         ),
-      ),
+      );
+    }
+    
+    _positionSubscription = Geolocator.getPositionStream(
+      locationSettings: locationSettings,
     ).listen((Position position) async {
       await _processGpsPosition(position);
     }, onError: (e) {
-      print('📍 GPS Stream Error: $e');
+      debugPrint('📍 GPS Stream Error: $e');
     });
     
     // Start adaptive movement detection timer
@@ -248,7 +273,7 @@ class LocationService {
           );
           _lastLocation = refreshedLocation;
           await updateLocation(_currentUserId!, refreshedLocation);
-          print('📍 Heartbeat: Location refreshed (withinCampus=${_lastLocation!.isWithinCampus})');
+          debugPrint('📍 Heartbeat: Location refreshed (withinCampus=${_lastLocation!.isWithinCampus})');
         }
       },
     );
@@ -275,7 +300,7 @@ class LocationService {
         await _processGpsPosition(position);
       } catch (e) {
         _consecutiveBadReadings++;
-        print('📍 Position request failed: $e (bad readings: $_consecutiveBadReadings)');
+        debugPrint('📍 Position request failed: $e (bad readings: $_consecutiveBadReadings)');
         
         // If too many failures, try to refresh with last known position
         if (_consecutiveBadReadings >= _maxBadReadings && _lastLocation != null) {
@@ -342,20 +367,20 @@ class LocationService {
     
     // IMPORTANT: Skip GPS updates if user has manually pinned their location
     if (_isManualPinMode) {
-      print('📍 GPS Update SKIPPED - Manual Pin Mode is active');
+      debugPrint('📍 GPS Update SKIPPED - Manual Pin Mode is active');
       return;
     }
     
     // Filter out inaccurate readings (but still accept if no better option)
     if (position.accuracy > LocationConfig.minAccuracyMeters) {
-      print('📍 Low accuracy reading: ${position.accuracy}m (threshold: ${LocationConfig.minAccuracyMeters}m)');
+      debugPrint('📍 Low accuracy reading: ${position.accuracy}m (threshold: ${LocationConfig.minAccuracyMeters}m)');
       // If we have a recent good location, skip this bad reading
       if (_lastLocation != null && 
           _lastLocation!.accuracy != null &&
           _lastLocation!.accuracy! < position.accuracy) {
         final timeSinceLastUpdate = DateTime.now().difference(_lastLocation!.timestamp);
         if (timeSinceLastUpdate.inSeconds < LocationConfig.staleThresholdSeconds) {
-          print('📍 Skipping low accuracy reading, using cached location');
+          debugPrint('📍 Skipping low accuracy reading, using cached location');
           return;
         }
       }
@@ -381,7 +406,7 @@ class LocationService {
       
       // Restart adaptive timer if movement state changed
       if (wasMoving != _isMoving) {
-        print('📍 Movement state changed: ${_isMoving ? "MOVING" : "STATIONARY"}');
+        debugPrint('📍 Movement state changed: ${_isMoving ? "MOVING" : "STATIONARY"}');
         _startAdaptiveTimer();
       }
     }
@@ -411,7 +436,7 @@ class LocationService {
     if (shouldUpdate) {
       await updateLocation(_currentUserId!, location);
       _lastFirestoreUpdate = now;
-      print('📍 Location UPDATED: accuracy=${smoothedPosition.accuracy.toStringAsFixed(1)}m, campus=$currentCampusLocation, moving=$_isMoving');
+      debugPrint('📍 Location UPDATED: accuracy=${smoothedPosition.accuracy.toStringAsFixed(1)}m, campus=$currentCampusLocation, moving=$_isMoving');
     }
     
     _onLocationUpdate?.call(location);
@@ -445,7 +470,7 @@ class LocationService {
   /// Switch from manual pin to automatic GPS tracking
   void switchToAutoTracking() {
     _isManualPinMode = false;
-    print('📍 Switched to automatic GPS tracking');
+    debugPrint('📍 Switched to automatic GPS tracking');
   }
   
   /// Legacy method - no longer needed but kept for compatibility
@@ -461,18 +486,18 @@ class LocationService {
           .doc(userId)
           .set(location.toFirestore());
     } catch (e) {
-      print('Error updating location: $e');
+      debugPrint('Error updating location: $e');
     }
   }
   
   /// Remove location from Firestore (when tracking is disabled or outside campus)
   Future<void> removeLocation(String userId) async {
     try {
-      print('🗑️ Removing location for user: $userId');
+      debugPrint('🗑️ Removing location for user: $userId');
       await _firestore.collection('locations').doc(userId).delete();
-      print('🗑️ Location successfully removed from Firestore');
+      debugPrint('🗑️ Location successfully removed from Firestore');
     } catch (e) {
-      print('Error removing location: $e');
+      debugPrint('Error removing location: $e');
     }
   }
   
@@ -485,7 +510,7 @@ class LocationService {
       }
       return null;
     } catch (e) {
-      print('Error getting location: $e');
+      debugPrint('Error getting location: $e');
       return null;
     }
   }

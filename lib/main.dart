@@ -1,13 +1,17 @@
+import 'dart:ui' show PointerDeviceKind;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'firebase_options.dart';
 import 'core/theme/app_theme.dart';
 import 'core/constants/app_constants.dart';
 import 'core/utils/connectivity_service.dart';
+import 'core/utils/web_utils.dart';
 import 'providers/providers.dart';
 import 'services/services.dart';
 import 'models/models.dart';
@@ -20,45 +24,95 @@ const bool kDemoMode = false;
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Set preferred orientations
-  await SystemChrome.setPreferredOrientations([
-    DeviceOrientation.portraitUp,
-    DeviceOrientation.portraitDown,
-  ]);
+  // Catch and log all initialization errors (helpful for web debugging)
+  try {
+    await _initializeApp();
+  } catch (e, stack) {
+    debugPrint('💥 FATAL initialization error: $e');
+    debugPrint('$stack');
+    // On web, show a visible error instead of white screen
+    if (kIsWeb) {
+      runApp(MaterialApp(
+        home: Scaffold(
+          body: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(32),
+              child: Text(
+                'App initialization error:\n$e',
+                style: const TextStyle(color: Colors.red, fontSize: 16),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
+        ),
+      ));
+      return;
+    }
+    rethrow;
+  }
   
-  // Set system UI overlay style
-  SystemChrome.setSystemUIOverlayStyle(
-    const SystemUiOverlayStyle(
-      statusBarColor: Colors.transparent,
-      statusBarIconBrightness: Brightness.dark,
-      systemNavigationBarColor: Colors.white,
-      systemNavigationBarIconBrightness: Brightness.dark,
-    ),
-  );
+  runApp(const UniTrackApp());
+}
+
+Future<void> _initializeApp() async {
+  // Set preferred orientations (mobile only)
+  if (!kIsWeb) {
+    await SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+    ]);
+    
+    // Set system UI overlay style
+    SystemChrome.setSystemUIOverlayStyle(
+      const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.dark,
+        systemNavigationBarColor: Colors.white,
+        systemNavigationBarIconBrightness: Brightness.dark,
+      ),
+    );
+  }
   
   // Initialize Firebase
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
   
-  // Initialize connectivity monitoring
+  // Configure Firestore settings for web to avoid SDK internal errors
+  if (kIsWeb) {
+    FirebaseFirestore.instance.settings = const Settings(
+      persistenceEnabled: true,
+      cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
+    );
+  }
+  
+  // Initialize connectivity monitoring (works on all platforms)
   ConnectivityService().startMonitoring();
   
-  // Initialize offline cache service (non-blocking)
+  // Initialize offline cache service (SharedPreferences on web, sqflite on mobile)
   try {
     await OfflineCacheService().initialize();
   } catch (e) {
     debugPrint('⚠️ Offline cache init error (non-fatal): $e');
   }
   
-  // Initialize push notifications (non-blocking)
+  // Initialize push notifications (FCM on web, local notifications on mobile)
   try {
     await PushNotificationService().initialize();
   } catch (e) {
     debugPrint('⚠️ Push notification init error (non-fatal): $e');
   }
-  
-  runApp(const UniTrackApp());
+}
+
+/// Custom scroll behavior that enables drag scrolling on all devices (web + touch)
+class AppScrollBehavior extends MaterialScrollBehavior {
+  @override
+  Set<PointerDeviceKind> get dragDevices => {
+    PointerDeviceKind.touch,
+    PointerDeviceKind.mouse,
+    PointerDeviceKind.trackpad,
+    PointerDeviceKind.stylus,
+  };
 }
 
 class UniTrackApp extends StatelessWidget {
@@ -128,10 +182,21 @@ class UniTrackApp extends StatelessWidget {
         title: AppConstants.appName,
         debugShowCheckedModeBanner: false,
         theme: AppTheme.lightTheme,
+        scrollBehavior: AppScrollBehavior(),
+        navigatorKey: notificationNavigatorKey,
         home: kDemoMode ? const DemoModeSelector() : const AppEntry(),
         routes: {
           '/login': (context) => const LoginScreen(),
           '/onboarding': (context) => const OnboardingScreen(),
+        },
+        // Responsive wrapper: constrain max width on tablets/desktops
+        builder: (context, child) {
+          return Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 480),
+              child: child,
+            ),
+          );
         },
       ),
     );
@@ -167,7 +232,8 @@ class _AppEntryState extends State<AppEntry> {
   
   @override
   Widget build(BuildContext context) {
-    if (_showSplash) {
+    // Skip Flutter splash on web — HTML splash already handles loading UX
+    if (_showSplash && !kIsWeb) {
       return SplashScreen(
         onComplete: () {
           if (mounted) {
@@ -423,8 +489,13 @@ class _AuthWrapperState extends State<AuthWrapper> {
   Widget build(BuildContext context) {
     return Consumer<AuthProvider>(
       builder: (context, authProvider, _) {
+        if (kDebugMode) {
+          debugPrint('🔄 AuthWrapper: isLoading=${authProvider.isLoading}, isAuth=${authProvider.isAuthenticated}, user=${authProvider.user?.email}');
+        }
+        
         // Show loading while checking auth state
         if (authProvider.isLoading) {
+          if (kDebugMode) debugPrint('🔄 AuthWrapper: Showing LOADING screen');
           return const Scaffold(
             body: Center(
               child: Column(
@@ -441,14 +512,18 @@ class _AuthWrapperState extends State<AuthWrapper> {
         
         // Not authenticated - show login
         if (!authProvider.isAuthenticated) {
+          if (kDebugMode) debugPrint('🔄 AuthWrapper: Showing LOGIN screen');
           return const LoginScreen();
         }
         
         // Authenticated - route based on role
         final user = authProvider.user;
         if (user == null) {
+          if (kDebugMode) debugPrint('🔄 AuthWrapper: user is null, showing LOGIN');
           return const LoginScreen();
         }
+        
+        if (kDebugMode) debugPrint('🔄 AuthWrapper: Showing HOME for ${user.role}');
         
         // Check for updates on first authenticated build
         if (!_hasCheckedForUpdates) {
@@ -719,8 +794,8 @@ class _StartupUpdateDialogState extends State<_StartupUpdateDialog> {
                     child: const Text('Later'),
                   ),
                 ElevatedButton.icon(
-                  icon: const Icon(Icons.download),
-                  label: const Text('Update Now'),
+                  icon: Icon(kIsWeb ? Icons.refresh : Icons.download),
+                  label: Text(kIsWeb ? 'Refresh Now' : 'Update Now'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: theme.colorScheme.primary,
                     foregroundColor: Colors.white,
@@ -762,6 +837,9 @@ class _StartupUpdateDialogState extends State<_StartupUpdateDialog> {
 
     if (mounted) {
       if (success) {
+        if (kIsWeb) {
+          reloadWebPage();
+        }
         Navigator.of(context).pop();
       } else {
         setState(() {

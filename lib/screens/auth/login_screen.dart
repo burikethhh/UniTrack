@@ -21,6 +21,7 @@ class _LoginScreenState extends State<LoginScreen> with SnackBarMixin {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  bool _isLoading = false; // Local loading state
   
   @override
   void dispose() {
@@ -41,14 +42,41 @@ class _LoginScreenState extends State<LoginScreen> with SnackBarMixin {
     final email = _emailController.text.trim();
     final authProvider = context.read<AuthProvider>();
     
-    final success = await authProvider.signIn(
-      email: email,
-      password: _passwordController.text,
-    );
+    // Set local loading state
+    setState(() => _isLoading = true);
     
-    if (!success && mounted) {
-      final errorMsg = ErrorMessages.loginError(authProvider.error);
-      showErrorSnackBar(context, errorMsg);
+    try {
+      final success = await authProvider.signIn(
+        email: email,
+        password: _passwordController.text,
+      ).timeout(
+        const Duration(seconds: 30),
+        onTimeout: () {
+          authProvider.resetLoading();
+          if (mounted) {
+            setState(() => _isLoading = false);
+            showErrorSnackBar(context, 'Login timed out. Please check your internet connection and try again.');
+          }
+          return false;
+        },
+      );
+      
+      // Always reset loading state
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+      
+      if (!success && mounted) {
+        final errorMsg = ErrorMessages.loginError(authProvider.error);
+        showErrorSnackBar(context, errorMsg);
+      }
+      // If success, AuthWrapper will navigate to home screen
+    } catch (e) {
+      authProvider.resetLoading();
+      if (mounted) {
+        setState(() => _isLoading = false);
+        showErrorSnackBar(context, 'Login failed: ${e.toString()}');
+      }
     }
   }
   
@@ -59,7 +87,7 @@ class _LoginScreenState extends State<LoginScreen> with SnackBarMixin {
         child: Consumer<AuthProvider>(
           builder: (context, authProvider, _) {
             return LoadingOverlay(
-              isLoading: authProvider.isLoading,
+              isLoading: _isLoading, // Use local loading state
               message: 'Signing in...',
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(24),
@@ -178,8 +206,8 @@ class _LoginScreenState extends State<LoginScreen> with SnackBarMixin {
                       // Login button
                       PrimaryButton(
                         text: 'Sign In',
-                        onPressed: _handleLogin,
-                        isLoading: authProvider.isLoading,
+                        onPressed: _isLoading ? null : _handleLogin,
+                        isLoading: _isLoading,
                       ),
                       
                       const SizedBox(height: 24),

@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:provider/provider.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -6,6 +8,7 @@ import 'package:maplibre_gl/maplibre_gl.dart' as maplibre;
 import '../../core/theme/app_colors.dart';
 import '../../core/constants/app_constants.dart';
 import '../../providers/providers.dart';
+import '../../widgets/map/campus_selector.dart';
 
 /// Staff map screen with manual location pinning and 3D support
 class StaffMapScreen extends StatefulWidget {
@@ -31,11 +34,16 @@ class _StaffMapScreenState extends State<StaffMapScreen> {
   late bool _use3D;
   bool _map3DReady = false;
   maplibre.Circle? _locationCircle;
+  String? _selectedCampusId; // For navigation to different campuses
+  bool _showLegend = false; // Collapsed legend by default
+  // ignore: unused_field
+  Key _mapKey = UniqueKey(); // Force map recreation on campus change
   
-  // Get campus center based on user's campus
+  // Get campus center based on selected campus or user's campus
   LatLng get _campusCenter {
-    final authProvider = context.read<AuthProvider>();
-    final campusId = authProvider.user?.campusId ?? AppConstants.defaultCampusId;
+    final campusId = _selectedCampusId ?? 
+        context.read<AuthProvider>().user?.campusId ?? 
+        AppConstants.defaultCampusId;
     final center = AppConstants.getCampusCenter(campusId);
     if (center != null) {
       return LatLng(center[0], center[1]);
@@ -43,35 +51,110 @@ class _StaffMapScreenState extends State<StaffMapScreen> {
     return LatLng(AppConstants.campusCenterLat, AppConstants.campusCenterLng);
   }
   
-  // Satellite map style for 3D view
-  static const String _mapStyle = '''
-{
-  "version": 8,
-  "name": "SKSU Campus Satellite",
-  "sources": {
-    "satellite": {
-      "type": "raster",
-      "tiles": ["https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}"],
-      "tileSize": 256,
-      "maxzoom": 20
+  // Build map style dynamically with campus boundaries baked in
+  static String _buildMapStyle() {
+    final sources = <String, dynamic>{
+      'satellite': {
+        'type': 'raster',
+        'tiles': ['https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}'],
+        'tileSize': 256,
+        'maxzoom': 20,
+      },
+    };
+
+    final layers = <Map<String, dynamic>>[
+      {
+        'id': 'satellite-layer',
+        'type': 'raster',
+        'source': 'satellite',
+      },
+    ];
+
+    const campusColors = {
+      'isulan': '#41B3A3',
+      'tacurong': '#FF9800',
+      'access': '#9C27B0',
+      'bagumbayan': '#009688',
+      'palimbang': '#3F51B5',
+      'kalamansig': '#E91E63',
+      'lutayan': '#795548',
+    };
+
+    for (final campus in AppConstants.campusesData) {
+      final campusId = campus['id'] as String;
+      final boundary = campus['boundaryPoints'] as List;
+      final color = campusColors[campusId] ?? '#41B3A3';
+
+      final coordinates = boundary
+          .map<List<double>>((point) => [
+                (point as List)[1] as double,
+                point[0] as double,
+              ])
+          .toList();
+
+      if (coordinates.isNotEmpty) {
+        coordinates.add(List<double>.from(coordinates.first));
+      }
+
+      final sourceId = 'campus-boundary-$campusId';
+      sources[sourceId] = {
+        'type': 'geojson',
+        'data': {
+          'type': 'Feature',
+          'geometry': {
+            'type': 'Polygon',
+            'coordinates': [coordinates],
+          },
+        },
+      };
+
+      layers.add({
+        'id': 'campus-fill-$campusId',
+        'type': 'fill',
+        'source': sourceId,
+        'paint': {
+          'fill-color': color,
+          'fill-opacity': 0.15,
+        },
+      });
+
+      layers.add({
+        'id': 'campus-line-$campusId',
+        'type': 'line',
+        'source': sourceId,
+        'paint': {
+          'line-color': color,
+          'line-width': 3.0,
+          'line-opacity': 0.9,
+        },
+      });
     }
-  },
-  "layers": [
-    {
-      "id": "satellite-layer",
-      "type": "raster",
-      "source": "satellite"
-    }
-  ]
-}
-''';
+
+    return jsonEncode({
+      'version': 8,
+      'name': 'SKSU Campus Satellite',
+      'glyphs': 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
+      'sources': sources,
+      'layers': layers,
+    });
+  }
   
   @override
   void initState() {
     super.initState();
     _useManualPin = widget.useManualPin;
-    _use3D = widget.use3D;
+    _use3D = kIsWeb ? false : widget.use3D; // Force 2D on web (MapLibre workers unsupported on static hosts)
     _getCurrentLocation();
+    
+    // Set initial campus from user's profile and recreate map
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final authProvider = context.read<AuthProvider>();
+      final userCampusId = authProvider.user?.campusId ?? AppConstants.defaultCampusId;
+      setState(() {
+        _selectedCampusId = userCampusId;
+        _mapKey = UniqueKey(); // Force map recreation with user's campus
+      });
+    });
   }
   
   Future<void> _getCurrentLocation() async {
@@ -94,17 +177,18 @@ class _StaffMapScreenState extends State<StaffMapScreen> {
       appBar: AppBar(
         title: Text(_use3D ? '3D Campus View' : 'My Location'),
         actions: [
-          // Toggle 2D/3D
-          IconButton(
-            icon: Icon(_use3D ? Icons.map : Icons.view_in_ar),
-            onPressed: () {
-              setState(() {
-                _use3D = !_use3D;
-                _map3DReady = false;
-              });
-            },
-            tooltip: _use3D ? 'Switch to 2D Map' : 'Switch to 3D View',
-          ),
+          // Toggle 2D/3D (only on native, MapLibre workers don't work on web static hosts)
+          if (!kIsWeb)
+            IconButton(
+              icon: Icon(_use3D ? Icons.map : Icons.view_in_ar),
+              onPressed: () {
+                setState(() {
+                  _use3D = !_use3D;
+                  _map3DReady = false;
+                });
+              },
+              tooltip: _use3D ? 'Switch to 2D Map' : 'Switch to 3D View',
+            ),
           // Toggle between GPS and Manual (only for 2D)
           if (!_use3D)
             IconButton(
@@ -133,6 +217,40 @@ class _StaffMapScreenState extends State<StaffMapScreen> {
             _build3DMap()
           else
             _build2DMap(),
+          
+          // Top controls: Campus selector
+          Positioned(
+            top: 12,
+            right: 12,
+            child: CampusSelector(
+              selectedCampusId: _selectedCampusId ?? AppConstants.defaultCampusId,
+              onCampusSelected: (campusId) {
+                setState(() {
+                  _selectedCampusId = campusId;
+                  _mapKey = UniqueKey();
+                  _map3DReady = false;
+                });
+                // Animate to the selected campus
+                final center = AppConstants.getCampusCenter(campusId);
+                if (center != null) {
+                  if (!_use3D) {
+                    _mapController.move(LatLng(center[0], center[1]), 17.0);
+                  } else if (_maplibreController != null) {
+                    _maplibreController?.animateCamera(
+                      maplibre.CameraUpdate.newCameraPosition(
+                        maplibre.CameraPosition(
+                          target: maplibre.LatLng(center[0], center[1]),
+                          zoom: 17.0,
+                          tilt: 45.0,
+                        ),
+                      ),
+                    );
+                  }
+                }
+              },
+              compact: true,
+            ),
+          ),
           
           // Mode indicator (top info card)
           _buildModeIndicator(),
@@ -171,66 +289,43 @@ class _StaffMapScreenState extends State<StaffMapScreen> {
     );
   }
   
-  /// Build campus legend overlay
+  /// Build campus legend overlay with navigation
   Widget _buildCampusLegend() {
     return Positioned(
       left: 12,
       bottom: 16,
-      child: Container(
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.95),
-          borderRadius: BorderRadius.circular(8),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.1),
-              blurRadius: 4,
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-              'SKSU Campuses',
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.bold,
-                color: AppColors.textSecondary,
-              ),
-            ),
-            const SizedBox(height: 4),
-            _buildLegendItem(AppColors.primary, 'Isulan'),
-            _buildLegendItem(Colors.orange, 'Tacurong'),
-            _buildLegendItem(Colors.purple, 'ACCESS'),
-          ],
-        ),
-      ),
-    );
-  }
-  
-  Widget _buildLegendItem(Color color, String label) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 10,
-            height: 10,
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.3),
-              border: Border.all(color: color, width: 1.5),
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: const TextStyle(fontSize: 11, color: AppColors.textPrimary),
-          ),
-        ],
+      child: CampusLegend(
+        expanded: _showLegend,
+        selectedCampusId: _selectedCampusId ?? AppConstants.defaultCampusId,
+        onToggle: () {
+          setState(() {
+            _showLegend = !_showLegend;
+          });
+        },
+        onCampusSelected: (campusId) {
+          setState(() {
+            _selectedCampusId = campusId;
+            _mapKey = UniqueKey();
+            _map3DReady = false;
+          });
+          // Animate to the selected campus
+          final center = AppConstants.getCampusCenter(campusId);
+          if (center != null) {
+            if (!_use3D) {
+              _mapController.move(LatLng(center[0], center[1]), 17.0);
+            } else if (_maplibreController != null) {
+              _maplibreController?.animateCamera(
+                maplibre.CameraUpdate.newCameraPosition(
+                  maplibre.CameraPosition(
+                    target: maplibre.LatLng(center[0], center[1]),
+                    zoom: 17.0,
+                    tilt: 45.0,
+                  ),
+                ),
+              );
+            }
+          }
+        },
       ),
     );
   }
@@ -258,7 +353,7 @@ class _StaffMapScreenState extends State<StaffMapScreen> {
           maxZoom: 20,
         ),
         
-        // All campus boundaries (show all 3 SKSU campuses)
+        // All campus boundaries (show all 7 SKSU campuses)
         PolygonLayer(
           polygons: _buildAllCampusBoundaries(),
         ),
@@ -326,8 +421,7 @@ class _StaffMapScreenState extends State<StaffMapScreen> {
         });
         // Add location marker
         await _update3DLocationMarker();
-        // Add campus boundary
-        await _add3DCampusBoundary();
+        // Campus boundaries are baked into the style JSON — no runtime calls needed.
         // Animate to tilted view
         _maplibreController?.animateCamera(
           maplibre.CameraUpdate.newCameraPosition(
@@ -351,7 +445,7 @@ class _StaffMapScreenState extends State<StaffMapScreen> {
         zoom: 17.0,
         tilt: 45.0,
       ),
-      styleString: _mapStyle,
+      styleString: _buildMapStyle(),
       myLocationEnabled: true,
       myLocationTrackingMode: maplibre.MyLocationTrackingMode.none,
       compassEnabled: true,
@@ -396,49 +490,6 @@ class _StaffMapScreenState extends State<StaffMapScreen> {
     }
   }
   
-  /// Add ALL campus boundaries to 3D map (all 3 SKSU campuses)
-  Future<void> _add3DCampusBoundary() async {
-    if (_maplibreController == null) return;
-    
-    // Campus colors for distinction
-    final campusColors = {
-      'isulan': '#E8A87C',    // Peach (primary)
-      'tacurong': '#FF9800',  // Orange
-      'access': '#9C27B0',    // Purple
-    };
-    
-    for (final campus in AppConstants.campusesData) {
-      final campusId = campus['id'] as String;
-      final boundary = campus['boundaryPoints'] as List;
-      final color = campusColors[campusId] ?? '#E8A87C';
-      
-      final boundaryPoints = boundary
-          .map<maplibre.LatLng>((point) => maplibre.LatLng(
-                (point as List)[0] as double,
-                point[1] as double,
-              ))
-          .toList();
-      
-      // Close the polygon
-      if (boundaryPoints.isNotEmpty) {
-        boundaryPoints.add(boundaryPoints.first);
-      }
-      
-      try {
-        await _maplibreController?.addLine(
-          maplibre.LineOptions(
-            geometry: boundaryPoints,
-            lineColor: color,
-            lineWidth: 3.0,
-            lineOpacity: 0.9,
-          ),
-        );
-      } catch (e) {
-        debugPrint('Error adding boundary for $campusId: $e');
-      }
-    }
-  }
-  
   /// Build mode indicator card
   Widget _buildModeIndicator() {
     final locationProvider = context.watch<LocationProvider>();
@@ -475,9 +526,9 @@ class _StaffMapScreenState extends State<StaffMapScreen> {
     return Positioned(
       top: 16,
       left: 16,
-      right: 16,
+      right: 140, // Leave room for campus selector
       child: Container(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
@@ -492,14 +543,14 @@ class _StaffMapScreenState extends State<StaffMapScreen> {
         child: Row(
           children: [
             Container(
-              padding: const EdgeInsets.all(8),
+              padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
                 color: color.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Icon(icon, color: color, size: 24),
+              child: Icon(icon, color: color, size: 20),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 10),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -509,15 +560,17 @@ class _StaffMapScreenState extends State<StaffMapScreen> {
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       color: color,
-                      fontSize: 14,
+                      fontSize: 13,
                     ),
                   ),
                   Text(
                     subtitle,
                     style: const TextStyle(
-                      fontSize: 12,
+                      fontSize: 11,
                       color: AppColors.textSecondary,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),
@@ -678,7 +731,7 @@ class _StaffMapScreenState extends State<StaffMapScreen> {
                 onPressed: () async {
                   await locationProvider.switchToAutoTracking();
                   if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
+                    ScaffoldMessenger.of(context).showSnackBar( // ignore: use_build_context_synchronously
                       const SnackBar(
                         content: Text('Switched to automatic GPS tracking'),
                         backgroundColor: AppColors.primary,
@@ -733,7 +786,7 @@ class _StaffMapScreenState extends State<StaffMapScreen> {
     );
   }
   
-  /// Zoom out to show all 3 SKSU campuses
+  /// Zoom out to show all 7 SKSU campuses
   void _showAllCampuses() {
     // Center point between all 3 campuses (roughly in the middle)
     // Isulan: 6.6333, 124.6091
@@ -782,15 +835,19 @@ class _StaffMapScreenState extends State<StaffMapScreen> {
     );
   }
   
-  /// Build polygon boundaries for ALL 3 campuses
+  /// Build polygon boundaries for ALL 7 campuses
   List<Polygon> _buildAllCampusBoundaries() {
     final List<Polygon> polygons = [];
     
-    // Campus colors for distinction
+    // Campus colors for distinction (all 7 campuses)
     final campusColors = {
       'isulan': AppColors.primary,
       'tacurong': Colors.orange,
       'access': Colors.purple,
+      'bagumbayan': Colors.teal,
+      'palimbang': Colors.indigo,
+      'kalamansig': Colors.pink,
+      'lutayan': Colors.brown,
     };
     
     for (final campus in AppConstants.campusesData) {
@@ -816,12 +873,12 @@ class _StaffMapScreenState extends State<StaffMapScreen> {
     return polygons;
   }
 
-  /// Check if location is within ANY of the 3 SKSU campuses
+  /// Check if location is within ANY of the 7 SKSU campuses
   bool _isWithinCampus(LatLng location) {
     return _isWithinAnyCampus(location.latitude, location.longitude);
   }
   
-  /// Check if position is within ANY SKSU campus (Isulan, Tacurong, or ACCESS)
+  /// Check if position is within ANY SKSU campus
   bool _isWithinAnyCampus(double latitude, double longitude) {
     for (final campus in AppConstants.campusesData) {
       final boundary = campus['boundaryPoints'] as List;

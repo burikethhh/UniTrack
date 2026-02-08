@@ -460,8 +460,8 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                     title: Text(role.name.toUpperCase()),
                     subtitle: Text(_getRoleDescription(role)),
                     value: role,
-                    groupValue: selectedRole,
-                    onChanged: (value) {
+                    groupValue: selectedRole, // ignore: deprecated_member_use
+                    onChanged: (value) { // ignore: deprecated_member_use
                       if (value != null) {
                         setState(() => selectedRole = value);
                       }
@@ -484,7 +484,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                       _showLoadingDialog();
                       final success = await adminProvider.updateUserRole(
                           user.id, selectedRole);
-                      if (mounted) Navigator.pop(context);
+                      if (mounted) Navigator.pop(context); // ignore: use_build_context_synchronously
                       _showResultSnackbar(
                           success, 'Role updated', 'Failed to update role');
                     },
@@ -643,7 +643,7 @@ class _UserCard extends StatelessWidget {
                               width: 56,
                               height: 56,
                               fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) =>
+                              errorBuilder: (_, _, _) =>
                                   _buildInitials(),
                             ),
                           )

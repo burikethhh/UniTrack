@@ -1,14 +1,42 @@
 import 'package:flutter/material.dart';
 import '../../services/offline_cache_service.dart';
 
-/// A banner that shows when the app is offline
-class OfflineModeBanner extends StatelessWidget {
+/// A banner that shows when the app is offline with pulsing animation
+class OfflineModeBanner extends StatefulWidget {
   final Widget child;
 
   const OfflineModeBanner({
     super.key,
     required this.child,
   });
+
+  @override
+  State<OfflineModeBanner> createState() => _OfflineModeBannerState();
+}
+
+class _OfflineModeBannerState extends State<OfflineModeBanner>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _pulseController;
+  late Animation<double> _pulseAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulseController = AnimationController(
+      duration: const Duration(milliseconds: 1200),
+      vsync: this,
+    )..repeat(reverse: true);
+    
+    _pulseAnimation = Tween<double>(begin: 0.7, end: 1.0).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _pulseController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -20,42 +48,83 @@ class OfflineModeBanner extends StatelessWidget {
 
         return Column(
           children: [
-            // Offline banner
-            AnimatedContainer(
+            // Offline banner with slide animation
+            AnimatedSlide(
+              offset: isOnline ? const Offset(0, -1) : Offset.zero,
               duration: const Duration(milliseconds: 300),
-              height: isOnline ? 0 : 48,
-              child: Material(
-                color: Colors.orange[700],
-                child: SafeArea(
-                  bottom: false,
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(
-                          Icons.cloud_off,
-                          color: Colors.white,
-                          size: 18,
+              curve: Curves.easeOut,
+              child: AnimatedOpacity(
+                opacity: isOnline ? 0 : 1,
+                duration: const Duration(milliseconds: 200),
+                child: Material(
+                  color: Colors.orange[700],
+                  child: SafeArea(
+                    bottom: false,
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            Colors.orange[800]!,
+                            Colors.orange[600]!,
+                          ],
                         ),
-                        const SizedBox(width: 8),
-                        const Text(
-                          'You\'re offline - Showing cached data',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w500,
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          // Pulsing icon
+                          AnimatedBuilder(
+                            animation: _pulseAnimation,
+                            builder: (context, child) {
+                              return Transform.scale(
+                                scale: isOnline ? 1.0 : _pulseAnimation.value,
+                                child: Icon(
+                                  Icons.cloud_off,
+                                  color: Colors.white.withValues(
+                                    alpha: isOnline ? 1.0 : 0.7 + (_pulseAnimation.value * 0.3),
+                                  ),
+                                  size: 18,
+                                ),
+                              );
+                            },
                           ),
-                        ),
-                      ],
+                          const SizedBox(width: 10),
+                          const Text(
+                            'You\'re offline',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Container(
+                            width: 4,
+                            height: 4,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.5),
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          const Text(
+                            'Showing cached data',
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
               ),
             ),
             // Main content
-            Expanded(child: child),
+            Expanded(child: widget.child),
           ],
         );
       },
@@ -195,7 +264,7 @@ class ConnectivityIndicator extends StatelessWidget {
             shape: BoxShape.circle,
             boxShadow: [
               BoxShadow(
-                color: (isOnline ? Colors.green : Colors.orange).withOpacity(0.4),
+                color: (isOnline ? Colors.green : Colors.orange).withValues(alpha: 0.4),
                 blurRadius: 4,
                 offset: const Offset(0, 1),
               ),

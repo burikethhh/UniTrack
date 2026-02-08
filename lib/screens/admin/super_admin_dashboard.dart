@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:fl_chart/fl_chart.dart';
 import '../../models/models.dart';
 import '../../providers/providers.dart';
+import '../../core/constants/app_constants.dart';
 import 'user_management_screen.dart';
 import 'user_detail_screen.dart';
 import 'version_management_screen.dart';
+import 'live_monitor_screen.dart';
 
 /// Super Admin Dashboard with comprehensive user management and statistics
 class SuperAdminDashboard extends StatefulWidget {
@@ -22,7 +26,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 5, vsync: this);
     _initializeData();
   }
 
@@ -79,11 +83,13 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard>
           indicatorColor: Theme.of(context).colorScheme.primary,
           labelColor: Theme.of(context).colorScheme.onPrimaryContainer,
           unselectedLabelColor: Theme.of(context).colorScheme.onPrimaryContainer.withAlpha(153),
+          isScrollable: true,
           tabs: const [
             Tab(icon: Icon(Icons.dashboard), text: 'Overview'),
             Tab(icon: Icon(Icons.people), text: 'Users'),
             Tab(icon: Icon(Icons.analytics), text: 'Analytics'),
             Tab(icon: Icon(Icons.history), text: 'Activity'),
+            Tab(icon: Icon(Icons.settings), text: 'System'),
           ],
         ),
       ),
@@ -109,6 +115,7 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard>
               _UsersTab(adminProvider: adminProvider),
               _AnalyticsTab(adminProvider: adminProvider),
               _ActivityTab(adminProvider: adminProvider),
+              const _SystemTab(),
             ],
           );
         },
@@ -372,7 +379,19 @@ class _OverviewTab extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 12),
-                const Expanded(child: SizedBox()), // Placeholder for future action
+                Expanded(
+                  child: _ActionCard(
+                    title: 'Live Monitor',
+                    icon: Icons.radar,
+                    color: Colors.teal,
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const LiveMonitorScreen(),
+                      ),
+                    ),
+                  ),
+                ), // Live Monitor action
               ],
             ),
 
@@ -547,7 +566,7 @@ class _AnalyticsTab extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // User Distribution Card
+          // User Distribution Pie Chart
           Card(
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -561,25 +580,63 @@ class _AnalyticsTab extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  _DistributionBar(
-                    label: 'Students',
-                    value: stats.totalStudents,
-                    total: stats.totalUsers,
-                    color: Colors.green,
+                  SizedBox(
+                    height: 200,
+                    child: stats.totalUsers == 0
+                        ? const Center(child: Text('No users yet'))
+                        : PieChart(
+                            PieChartData(
+                              sectionsSpace: 3,
+                              centerSpaceRadius: 40,
+                              sections: [
+                                PieChartSectionData(
+                                  value: stats.totalStudents.toDouble(),
+                                  title: '${stats.totalStudents}',
+                                  color: Colors.blue,
+                                  radius: 55,
+                                  titleStyle: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                PieChartSectionData(
+                                  value: stats.totalStaff.toDouble(),
+                                  title: '${stats.totalStaff}',
+                                  color: Colors.orange,
+                                  radius: 55,
+                                  titleStyle: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                PieChartSectionData(
+                                  value: stats.totalAdmins.toDouble(),
+                                  title: '${stats.totalAdmins}',
+                                  color: Colors.purple,
+                                  radius: 55,
+                                  titleStyle: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                   ),
                   const SizedBox(height: 12),
-                  _DistributionBar(
-                    label: 'Staff',
-                    value: stats.totalStaff,
-                    total: stats.totalUsers,
-                    color: Colors.orange,
-                  ),
-                  const SizedBox(height: 12),
-                  _DistributionBar(
-                    label: 'Admins',
-                    value: stats.totalAdmins,
-                    total: stats.totalUsers,
-                    color: Colors.purple,
+                  // Legend
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      _ChartLegend(color: Colors.blue, label: 'Students'),
+                      const SizedBox(width: 16),
+                      _ChartLegend(color: Colors.orange, label: 'Staff'),
+                      const SizedBox(width: 16),
+                      _ChartLegend(color: Colors.purple, label: 'Admins'),
+                    ],
                   ),
                 ],
               ),
@@ -588,7 +645,7 @@ class _AnalyticsTab extends StatelessWidget {
 
           const SizedBox(height: 16),
 
-          // Users by Department
+          // Department Distribution Pie Chart
           Card(
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -609,19 +666,54 @@ class _AnalyticsTab extends StatelessWidget {
                         child: Text('No department data available'),
                       ),
                     )
-                  else
-                    ...stats.usersByDepartment.entries.take(10).map((entry) {
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: _DistributionBar(
-                          label: entry.key,
-                          value: entry.value,
-                          total: stats.totalUsers,
-                          color: Colors.primaries[
-                              entry.key.hashCode % Colors.primaries.length],
+                  else ...[
+                    SizedBox(
+                      height: 200,
+                      child: PieChart(
+                        PieChartData(
+                          sectionsSpace: 2,
+                          centerSpaceRadius: 35,
+                          sections: stats.usersByDepartment.entries
+                              .take(8)
+                              .toList()
+                              .asMap()
+                              .entries
+                              .map((e) {
+                            final color = Colors.primaries[
+                                e.value.key.hashCode % Colors.primaries.length];
+                            return PieChartSectionData(
+                              value: e.value.value.toDouble(),
+                              title: '${e.value.value}',
+                              color: color,
+                              radius: 50,
+                              titleStyle: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            );
+                          }).toList(),
                         ),
-                      );
-                    }),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 12,
+                      runSpacing: 6,
+                      children: stats.usersByDepartment.entries
+                          .take(8)
+                          .map((entry) {
+                        final color = Colors.primaries[
+                            entry.key.hashCode % Colors.primaries.length];
+                        return _ChartLegend(
+                          color: color,
+                          label: entry.key.length > 20
+                              ? '${entry.key.substring(0, 18)}...'
+                              : entry.key,
+                        );
+                      }).toList(),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -629,7 +721,7 @@ class _AnalyticsTab extends StatelessWidget {
 
           const SizedBox(height: 16),
 
-          // Users by Campus
+          // Users by Campus Bar-style
           Card(
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -651,18 +743,102 @@ class _AnalyticsTab extends StatelessWidget {
                       ),
                     )
                   else
-                    ...stats.usersByCampus.entries.map((entry) {
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: _DistributionBar(
-                          label: _formatCampusName(entry.key),
-                          value: entry.value,
-                          total: stats.totalUsers,
-                          color: Colors.primaries[
-                              entry.key.hashCode % Colors.primaries.length],
+                    SizedBox(
+                      height: 200,
+                      child: BarChart(
+                        BarChartData(
+                          alignment: BarChartAlignment.spaceAround,
+                          maxY: (stats.usersByCampus.values.isEmpty
+                                  ? 1
+                                  : stats.usersByCampus.values
+                                      .reduce((a, b) => a > b ? a : b))
+                              .toDouble() *
+                              1.2,
+                          barTouchData: BarTouchData(
+                            touchTooltipData: BarTouchTooltipData(
+                              getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                                final campus = stats.usersByCampus.keys
+                                    .elementAt(group.x.toInt());
+                                return BarTooltipItem(
+                                  '${_formatCampusName(campus)}\n${rod.toY.toInt()} users',
+                                  const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 12,
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                          titlesData: FlTitlesData(
+                            topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                            rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                            leftTitles: AxisTitles(
+                              sideTitles: SideTitles(
+                                showTitles: true,
+                                reservedSize: 32,
+                                getTitlesWidget: (value, meta) {
+                                  return Text(
+                                    value.toInt().toString(),
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: Colors.grey.shade600,
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                            bottomTitles: AxisTitles(
+                              sideTitles: SideTitles(
+                                showTitles: true,
+                                getTitlesWidget: (value, meta) {
+                                  final idx = value.toInt();
+                                  if (idx < 0 || idx >= stats.usersByCampus.length) {
+                                    return const SizedBox.shrink();
+                                  }
+                                  final campus = stats.usersByCampus.keys.elementAt(idx);
+                                  final shortName = campus.length > 6
+                                      ? '${campus.substring(0, 5)}.'
+                                      : campus;
+                                  return Text(
+                                    shortName,
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: Colors.grey.shade600,
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                          ),
+                          gridData: FlGridData(
+                            drawVerticalLine: false,
+                            horizontalInterval: 5,
+                          ),
+                          borderData: FlBorderData(show: false),
+                          barGroups: stats.usersByCampus.entries
+                              .toList()
+                              .asMap()
+                              .entries
+                              .map((e) {
+                            final color = Colors.primaries[
+                                e.value.key.hashCode % Colors.primaries.length];
+                            return BarChartGroupData(
+                              x: e.key,
+                              barRods: [
+                                BarChartRodData(
+                                  toY: e.value.value.toDouble(),
+                                  color: color,
+                                  width: 22,
+                                  borderRadius: const BorderRadius.vertical(
+                                    top: Radius.circular(6),
+                                  ),
+                                ),
+                              ],
+                            );
+                          }).toList(),
                         ),
-                      );
-                    }),
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -670,7 +846,7 @@ class _AnalyticsTab extends StatelessWidget {
 
           const SizedBox(height: 16),
 
-          // Registration Trends
+          // Registration Trends - Line chart style
           Card(
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -678,38 +854,54 @@ class _AnalyticsTab extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Registration Trends',
+                    'Activity Overview',
                     style: theme.textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                   const SizedBox(height: 16),
-                  _TrendItem(
-                    icon: Icons.today,
-                    label: 'Active Today',
-                    value: '${stats.activeToday}',
-                    color: Colors.teal,
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _StatChip(
+                          icon: Icons.today,
+                          label: 'Active Today',
+                          value: '${stats.activeToday}',
+                          color: Colors.teal,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _StatChip(
+                          icon: Icons.wifi,
+                          label: 'Online Now',
+                          value: '${stats.onlineNow}',
+                          color: Colors.green,
+                        ),
+                      ),
+                    ],
                   ),
-                  const Divider(),
-                  _TrendItem(
-                    icon: Icons.date_range,
-                    label: 'New This Week',
-                    value: '${stats.newUsersThisWeek}',
-                    color: Colors.indigo,
-                  ),
-                  const Divider(),
-                  _TrendItem(
-                    icon: Icons.calendar_month,
-                    label: 'New This Month',
-                    value: '${stats.newUsersThisMonth}',
-                    color: Colors.pink,
-                  ),
-                  const Divider(),
-                  _TrendItem(
-                    icon: Icons.wifi,
-                    label: 'Online Now',
-                    value: '${stats.onlineNow}',
-                    color: Colors.green,
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _StatChip(
+                          icon: Icons.date_range,
+                          label: 'New This Week',
+                          value: '${stats.newUsersThisWeek}',
+                          color: Colors.indigo,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _StatChip(
+                          icon: Icons.calendar_month,
+                          label: 'New This Month',
+                          value: '${stats.newUsersThisMonth}',
+                          color: Colors.pink,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -872,6 +1064,528 @@ class _ActivityTab extends StatelessWidget {
     if (diff.inHours < 24) return '${diff.inHours}h ago';
     if (diff.inDays < 7) return '${diff.inDays}d ago';
     return '${time.day}/${time.month}/${time.year}';
+  }
+}
+
+/// System Tab - Broadcast notifications, data export, system health
+class _SystemTab extends StatefulWidget {
+  const _SystemTab();
+
+  @override
+  State<_SystemTab> createState() => _SystemTabState();
+}
+
+class _SystemTabState extends State<_SystemTab> {
+  final _titleController = TextEditingController();
+  final _bodyController = TextEditingController();
+  bool _isSending = false;
+  String _selectedAudience = 'all';
+  
+  // System stats
+  int _totalDocuments = 0;
+  bool _isLoadingStats = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSystemStats();
+  }
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _bodyController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadSystemStats() async {
+    setState(() => _isLoadingStats = true);
+    try {
+      final firestore = FirebaseFirestore.instance;
+      
+      // Count documents in main collections
+      final usersCount = await firestore.collection('users').count().get();
+      final notificationsCount = await firestore.collection('notifications').count().get();
+      final versionsCount = await firestore.collection('app_versions').count().get();
+      
+      setState(() {
+        _totalDocuments = (usersCount.count ?? 0) + 
+                          (notificationsCount.count ?? 0) + 
+                          (versionsCount.count ?? 0);
+        _isLoadingStats = false;
+      });
+    } catch (e) {
+      setState(() => _isLoadingStats = false);
+    }
+  }
+
+  Future<void> _sendBroadcastNotification() async {
+    if (_titleController.text.isEmpty || _bodyController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please fill in title and message')),
+      );
+      return;
+    }
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.campaign, color: Colors.orange),
+            SizedBox(width: 8),
+            Text('Send Broadcast'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Send notification to: ${_getAudienceLabel()}'),
+            const SizedBox(height: 12),
+            Text('Title: ${_titleController.text}', style: const TextStyle(fontWeight: FontWeight.bold)),
+            Text('Message: ${_bodyController.text}'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton.icon(
+            onPressed: () => Navigator.pop(ctx, true),
+            icon: const Icon(Icons.send),
+            label: const Text('Send'),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true || !mounted) return;
+
+    setState(() => _isSending = true);
+
+    try {
+      final firestore = FirebaseFirestore.instance;
+      
+      // Get users based on audience
+      Query<Map<String, dynamic>> query = firestore.collection('users');
+      if (_selectedAudience == 'students') {
+        query = query.where('role', isEqualTo: 'student');
+      } else if (_selectedAudience == 'staff') {
+        query = query.where('role', isEqualTo: 'staff');
+      } else if (_selectedAudience == 'admins') {
+        query = query.where('role', isEqualTo: 'admin');
+      }
+
+      final users = await query.get();
+      int sentCount = 0;
+      
+      // Firestore batch limit is 500, so chunk if needed
+      final chunks = <List<QueryDocumentSnapshot<Map<String, dynamic>>>>[];
+      for (var i = 0; i < users.docs.length; i += 400) {
+        chunks.add(users.docs.sublist(
+          i, i + 400 > users.docs.length ? users.docs.length : i + 400,
+        ));
+      }
+
+      for (final chunk in chunks) {
+        final batch = firestore.batch();
+        for (final userDoc in chunk) {
+          // Write to top-level 'notifications' collection with correct model fields
+          final notifRef = firestore.collection('notifications').doc();
+          
+          batch.set(notifRef, {
+            'senderId': 'system',
+            'senderName': 'UniTrack Admin',
+            'senderPhotoUrl': null,
+            'recipientId': userDoc.id,
+            'type': 'system',
+            'title': _titleController.text,
+            'message': _bodyController.text,
+            'isRead': false,
+            'createdAt': FieldValue.serverTimestamp(),
+            'data': {
+              'source': 'admin_broadcast',
+              'audience': _selectedAudience,
+            },
+          });
+          sentCount++;
+        }
+        await batch.commit();
+      }
+
+      if (mounted) {
+        _titleController.clear();
+        _bodyController.clear();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Broadcast sent to $sentCount users'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSending = false);
+    }
+  }
+
+  String _getAudienceLabel() {
+    switch (_selectedAudience) {
+      case 'students': return 'All Students';
+      case 'staff': return 'All Staff';
+      case 'admins': return 'All Admins';
+      default: return 'All Users';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // System Info Card
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.info_outline, color: theme.colorScheme.primary),
+                      const SizedBox(width: 8),
+                      Text(
+                        'System Information',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  _SystemInfoRow(
+                    icon: Icons.apps,
+                    label: 'App Version',
+                    value: 'v${AppConstants.appVersion}',
+                  ),
+                  const Divider(),
+                  _SystemInfoRow(
+                    icon: Icons.code,
+                    label: 'Version Code',
+                    value: '${AppConstants.versionCode}',
+                  ),
+                  const Divider(),
+                  _SystemInfoRow(
+                    icon: Icons.storage,
+                    label: 'Database Documents',
+                    value: _isLoadingStats ? 'Loading...' : '$_totalDocuments',
+                  ),
+                  const Divider(),
+                  _SystemInfoRow(
+                    icon: Icons.cloud,
+                    label: 'Firebase Project',
+                    value: 'unitrack-sksu-app',
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          // Broadcast Notification Card
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.campaign, color: Colors.orange),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Broadcast Notification',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Send a notification to all users or specific groups',
+                    style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  // Audience selector
+                  Text('Target Audience', style: theme.textTheme.labelLarge),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    children: [
+                      ChoiceChip(
+                        label: const Text('All Users'),
+                        selected: _selectedAudience == 'all',
+                        onSelected: (_) => setState(() => _selectedAudience = 'all'),
+                      ),
+                      ChoiceChip(
+                        label: const Text('Students'),
+                        selected: _selectedAudience == 'students',
+                        onSelected: (_) => setState(() => _selectedAudience = 'students'),
+                      ),
+                      ChoiceChip(
+                        label: const Text('Staff'),
+                        selected: _selectedAudience == 'staff',
+                        onSelected: (_) => setState(() => _selectedAudience = 'staff'),
+                      ),
+                      ChoiceChip(
+                        label: const Text('Admins'),
+                        selected: _selectedAudience == 'admins',
+                        onSelected: (_) => setState(() => _selectedAudience = 'admins'),
+                      ),
+                    ],
+                  ),
+                  
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: _titleController,
+                    decoration: const InputDecoration(
+                      labelText: 'Notification Title',
+                      hintText: 'e.g., Important Announcement',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.title),
+                    ),
+                    maxLength: 50,
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _bodyController,
+                    decoration: const InputDecoration(
+                      labelText: 'Message',
+                      hintText: 'Enter your message here...',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.message),
+                    ),
+                    maxLines: 3,
+                    maxLength: 200,
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: _isSending ? null : _sendBroadcastNotification,
+                      icon: _isSending 
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.send),
+                      label: Text(_isSending ? 'Sending...' : 'Send Broadcast'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.orange,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          // Quick Actions
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.flash_on, color: theme.colorScheme.primary),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Quick Actions',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 12,
+                    children: [
+                      _QuickActionButton(
+                        icon: Icons.system_update,
+                        label: 'App Versions',
+                        color: Colors.green,
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const VersionManagementScreen(),
+                          ),
+                        ),
+                      ),
+                      _QuickActionButton(
+                        icon: Icons.refresh,
+                        label: 'Refresh Stats',
+                        color: Colors.blue,
+                        onTap: () {
+                          _loadSystemStats();
+                          context.read<AdminProvider>().refresh();
+                        },
+                      ),
+                      _QuickActionButton(
+                        icon: Icons.cleaning_services,
+                        label: 'Clear Cache',
+                        color: Colors.purple,
+                        onTap: () async {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Cache cleared')),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          // Build Info
+          Card(
+            color: Colors.grey.shade100,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.build, color: Colors.grey),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Build Configuration',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey.shade700,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Platform: Android\n'
+                    'Architecture: arm64-v8a / x86_64\n'
+                    'Minification: Disabled\n'
+                    'Firebase: Enabled',
+                    style: TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 12,
+                      color: Colors.grey.shade600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SystemInfoRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+
+  const _SystemInfoRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: Colors.grey.shade600),
+          const SizedBox(width: 12),
+          Expanded(child: Text(label)),
+          Text(
+            value,
+            style: const TextStyle(fontWeight: FontWeight.w600),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _QuickActionButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _QuickActionButton({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: color.withAlpha(25),
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, color: color, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: TextStyle(
+                  color: color,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -1344,68 +2058,42 @@ class _RecentUsersSection extends StatelessWidget {
   }
 }
 
-class _DistributionBar extends StatelessWidget {
-  final String label;
-  final int value;
-  final int total;
+class _ChartLegend extends StatelessWidget {
   final Color color;
+  final String label;
 
-  const _DistributionBar({
-    required this.label,
-    required this.value,
-    required this.total,
-    required this.color,
-  });
+  const _ChartLegend({required this.color, required this.label});
 
   @override
   Widget build(BuildContext context) {
-    final percentage = total > 0 ? value / total : 0.0;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Expanded(
-              child: Text(
-                label,
-                style: const TextStyle(fontSize: 13),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            Text(
-              '$value (${(percentage * 100).toStringAsFixed(1)}%)',
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey.shade600,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 4),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(4),
-          child: LinearProgressIndicator(
-            value: percentage,
-            backgroundColor: Colors.grey.shade200,
-            valueColor: AlwaysStoppedAnimation<Color>(color),
-            minHeight: 8,
+        Container(
+          width: 12,
+          height: 12,
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
           ),
+        ),
+        const SizedBox(width: 4),
+        Text(
+          label,
+          style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
         ),
       ],
     );
   }
 }
 
-class _TrendItem extends StatelessWidget {
+class _StatChip extends StatelessWidget {
   final IconData icon;
   final String label;
   final String value;
   final Color color;
 
-  const _TrendItem({
+  const _StatChip({
     required this.icon,
     required this.label,
     required this.value,
@@ -1414,26 +2102,36 @@ class _TrendItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: color.withAlpha(20),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withAlpha(50)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: color.withAlpha(25),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(icon, color: color, size: 20),
+          Row(
+            children: [
+              Icon(icon, color: color, size: 18),
+              const Spacer(),
+              Text(
+                value,
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: color,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: 16),
-          Expanded(child: Text(label)),
+          const SizedBox(height: 4),
           Text(
-            value,
+            label,
             style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: color,
+              fontSize: 12,
+              color: Colors.grey.shade600,
             ),
           ),
         ],
