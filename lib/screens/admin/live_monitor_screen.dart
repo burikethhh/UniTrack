@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../core/constants/app_constants.dart';
+import '../../core/constants/map_constants.dart';
 import '../../core/theme/app_colors.dart';
 import '../../models/models.dart';
 import '../../services/database_service.dart';
+import '../../widgets/map/campus_map.dart';
+import '../../widgets/map/campus_map_3d.dart';
+import '../../widgets/map/map_view_controls.dart';
 
 /// Filter options for the Live Monitor
 enum MonitorFilter { all, students, staff, onlineOnly }
@@ -21,24 +23,40 @@ class LiveMonitorScreen extends StatefulWidget {
 
 class _LiveMonitorScreenState extends State<LiveMonitorScreen> {
   final DatabaseService _databaseService = DatabaseService();
-  final MapController _mapController = MapController();
+  final GlobalKey<CampusMapState> _map2dKey = GlobalKey<CampusMapState>();
+  final GlobalKey<CampusMap3DState> _map3dKey = GlobalKey<CampusMap3DState>();
   MonitorFilter _filter = MonitorFilter.all;
   FacultyWithLocation? _selectedUser;
   bool _showPanel = false;
-  double _currentZoom = 16.0;
+  bool _use3DMap = false;
+  MapViewMode _mapMode = MapViewMode.satellite;
+  String? _selectedCampusId;
 
-  LatLng get _campusCenter {
-    final center = AppConstants.getCampusCenter(AppConstants.defaultCampusId);
-    if (center != null) {
-      return LatLng(center[0], center[1]);
+  /// Cached stream — created once, reused across rebuilds so StreamBuilder
+  /// doesn't re-subscribe on every setState.
+  late final Stream<List<FacultyWithLocation>> _usersStream = _databaseService
+      .getAllUsersWithLocationsStream();
+
+  @override
+  void dispose() {
+    super.dispose();
+  }
+
+  void _animateToCampus(String campusId) {
+    if (_use3DMap) {
+      _map3dKey.currentState?.centerOnCampus(campusId: campusId);
+    } else {
+      _map2dKey.currentState?.animateToCampus(campusId);
     }
-    return LatLng(AppConstants.campusCenterLat, AppConstants.campusCenterLng);
   }
 
   /// Check if a user is "visible" for the monitor
   /// Unlike normal isOnline, this doesn't require isWithinCampus
+  /// Note: isTrackingEnabled is bool? — treat null as enabled so
+  /// users whose field hasn't been written yet are still visible.
+  /// Only hide when explicitly set to false.
   bool _isVisible(FacultyWithLocation f) {
-    if (f.user.isTrackingEnabled != true) return false;
+    if (f.user.isTrackingEnabled == false) return false;
     if (f.location == null) return false;
     if (f.isLocationStale) return false;
     return true;
@@ -50,10 +68,18 @@ class _LiveMonitorScreenState extends State<LiveMonitorScreen> {
 
     switch (_filter) {
       case MonitorFilter.students:
-        visible = visible.where((f) => f.user.role == UserRole.student).toList();
+        visible = visible
+            .where((f) => f.user.role == UserRole.student)
+            .toList();
         break;
       case MonitorFilter.staff:
-        visible = visible.where((f) => f.user.role == UserRole.staff || f.user.role == UserRole.admin).toList();
+        visible = visible
+            .where(
+              (f) =>
+                  f.user.role == UserRole.staff ||
+                  f.user.role == UserRole.admin,
+            )
+            .toList();
         break;
       case MonitorFilter.onlineOnly:
         visible = visible.where((f) => f.isOnline).toList();
@@ -98,91 +124,245 @@ class _LiveMonitorScreenState extends State<LiveMonitorScreen> {
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.center_focus_strong),
-            tooltip: 'Center on campus',
-            onPressed: () {
-              _mapController.move(_campusCenter, 17.0);
-            },
+            icon: Icon(_use3DMap ? Icons.map_outlined : Icons.threed_rotation),
+            tooltip: _use3DMap ? 'Switch to 2D' : 'Switch to 3D',
+            onPressed: () => setState(() => _use3DMap = !_use3DMap),
           ),
+          if (!_use3DMap)
+            IconButton(
+              icon: const Icon(Icons.my_location),
+              tooltip: 'Center on campus',
+              onPressed: () {
+                _map2dKey.currentState?.animateToCampus(
+                  _selectedCampusId ?? AppConstants.defaultCampusId,
+                );
+              },
+            ),
         ],
       ),
       body: StreamBuilder<List<FacultyWithLocation>>(
-        stream: _databaseService.getAllUsersWithLocationsStream(),
+        stream: _usersStream,
         builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            return Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.error_outline, size: 48, color: Colors.red),
+                  const SizedBox(height: 12),
+                  Text('Error loading live data: ${snapshot.error}'),
+                  const SizedBox(height: 12),
+                  ElevatedButton(
+                    onPressed: () => setState(() {}),
+                    child: const Text('Retry'),
+                  ),
+                ],
+              ),
+            );
+          }
           final allUsers = snapshot.data ?? [];
           final filtered = _applyFilter(allUsers);
-          final totalVisible = allUsers.where(_isVisible).length;
-          final studentCount = allUsers.where((f) => _isVisible(f) && f.user.role == UserRole.student).length;
-          final staffCount = allUsers.where((f) => _isVisible(f) && (f.user.role == UserRole.staff || f.user.role == UserRole.admin)).length;
+          final visibleUsers = allUsers.where(_isVisible).toList();
+          final totalVisible = visibleUsers.length;
+          final studentCount = visibleUsers
+              .where((f) => f.user.role == UserRole.student)
+              .length;
+          final staffCount = visibleUsers
+              .where(
+                (f) =>
+                    f.user.role == UserRole.staff ||
+                    f.user.role == UserRole.admin,
+              )
+              .length;
+          final onCampusCount = visibleUsers
+              .where((f) => f.isWithinCampus)
+              .length;
+          final offCampusCount = totalVisible - onCampusCount;
 
           return Stack(
             children: [
-              // Map
-              FlutterMap(
-                mapController: _mapController,
-                options: MapOptions(
-                  initialCenter: _campusCenter,
-                  initialZoom: 17.0,
-                  minZoom: 14.0,
-                  maxZoom: 19.0,
-                  onMapEvent: _onMapEvent,
+              // Map — 2D or 3D
+              if (_use3DMap)
+                CampusMap3D(
+                  key: _map3dKey,
+                  faculty: filtered,
+                  selectedFaculty: _selectedUser,
+                  onMarkerTap: (faculty) {
+                    setState(() {
+                      _selectedUser = faculty;
+                      _showPanel = true;
+                    });
+                  },
+                  showCampusBoundary: true,
+                  enable3DBuildings: true,
+                  campusId: _selectedCampusId ?? AppConstants.defaultCampusId,
+                  viewMode: _mapMode,
+                )
+              else
+                CampusMap(
+                  key: _map2dKey,
+                  faculty: filtered,
+                  selectedFaculty: _selectedUser,
+                  onMarkerTap: (faculty) {
+                    setState(() {
+                      _selectedUser = faculty;
+                      _showPanel = true;
+                    });
+                  },
+                  showCampusBoundary: true,
+                  campusId: _selectedCampusId ?? AppConstants.defaultCampusId,
                   onTap: (_, _) {
                     setState(() {
                       _selectedUser = null;
                       _showPanel = false;
                     });
                   },
+                  customMarkerBuilder: (faculty, isSelected) {
+                    final color = _markerColor(faculty.user.role);
+                    final markerSize = isSelected ? 56.0 : 46.0;
+                    // Green ring = on campus, orange ring = off campus
+                    final campusRingColor = isSelected
+                        ? Colors.amber
+                        : faculty.isWithinCampus
+                        ? Colors.greenAccent
+                        : Colors.orangeAccent;
+                    return AnimatedContainer(
+                      duration: const Duration(milliseconds: 300),
+                      curve: Curves.easeOut,
+                      width: markerSize,
+                      height: markerSize,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: campusRingColor,
+                          width: isSelected ? 4 : 3,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: isSelected
+                                ? Colors.amber.withValues(alpha: 0.6)
+                                : color.withValues(alpha: 0.5),
+                            blurRadius: isSelected ? 14 : 8,
+                            spreadRadius: isSelected ? 3 : 1,
+                          ),
+                        ],
+                      ),
+                      child: ClipOval(
+                        child: _buildMarkerContent(faculty, color, isSelected),
+                      ),
+                    );
+                  },
                 ),
-                children: [
-                  // Satellite tiles
-                  TileLayer(
-                    urlTemplate: 'https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
-                    userAgentPackageName: 'com.sksu.unitrack',
-                    maxZoom: 20,
-                  ),
-                  // Road label overlay
-                  TileLayer(
-                    urlTemplate: 'https://mt1.google.com/vt/lyrs=h&x={x}&y={y}&z={z}',
-                    userAgentPackageName: 'com.sksu.unitrack',
-                    maxZoom: 20,
-                  ),
-                  // Campus boundaries
-                  PolygonLayer(polygons: _buildCampusBoundaries()),
-                  // User markers
-                  MarkerLayer(markers: _buildMarkers(filtered)),
-                ],
-              ),
 
-              // Filter chips at top
+              // Top controls: view mode (3D) + campus selector + filter chips
               Positioned(
                 top: 12,
                 left: 12,
                 right: 12,
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      _buildFilterChip('All ($totalVisible)', MonitorFilter.all),
-                      const SizedBox(width: 8),
-                      _buildFilterChip('Students ($studentCount)', MonitorFilter.students),
-                      const SizedBox(width: 8),
-                      _buildFilterChip('Staff ($staffCount)', MonitorFilter.staff),
-                      const SizedBox(width: 8),
-                      _buildFilterChip('On Campus', MonitorFilter.onlineOnly),
-                    ],
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Row 1: View mode dropdown (3D) + campus selector
+                    Row(
+                      children: [
+                        if (_use3DMap)
+                          MapViewModeDropdown(
+                            currentMode: _mapMode,
+                            onModeChanged: (mode) =>
+                                setState(() => _mapMode = mode),
+                          ),
+                        const Spacer(),
+                        _buildCampusPill(),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    // Row 2: Campus status counts
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.black54,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.location_on,
+                            size: 14,
+                            color: Colors.greenAccent,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'On Campus: $onCampusCount',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Icon(
+                            Icons.location_off,
+                            size: 14,
+                            color: Colors.orangeAccent,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Off Campus: $offCampusCount',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    // Row 3: Filter chips
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          _buildFilterChip(
+                            'All ($totalVisible)',
+                            MonitorFilter.all,
+                          ),
+                          const SizedBox(width: 8),
+                          _buildFilterChip(
+                            'Students ($studentCount)',
+                            MonitorFilter.students,
+                          ),
+                          const SizedBox(width: 8),
+                          _buildFilterChip(
+                            'Staff ($staffCount)',
+                            MonitorFilter.staff,
+                          ),
+                          const SizedBox(width: 8),
+                          _buildFilterChip(
+                            'On Campus',
+                            MonitorFilter.onlineOnly,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ),
 
               // Connection indicator
               if (snapshot.connectionState == ConnectionState.waiting)
                 Positioned(
-                  top: 60,
+                  top: 100,
                   left: 0,
                   right: 0,
                   child: Center(
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.black87,
                         borderRadius: BorderRadius.circular(20),
@@ -212,10 +392,13 @@ class _LiveMonitorScreenState extends State<LiveMonitorScreen> {
               // Live indicator
               if (snapshot.hasData)
                 Positioned(
-                  top: 60,
+                  top: 100,
                   right: 16,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.black87,
                       borderRadius: BorderRadius.circular(16),
@@ -260,6 +443,86 @@ class _LiveMonitorScreenState extends State<LiveMonitorScreen> {
     );
   }
 
+  Widget _buildCampusPill() {
+    final campusList = AppConstants.campusList;
+    final currentId = _selectedCampusId ?? AppConstants.defaultCampusId;
+    final selected = campusList.firstWhere(
+      (c) => c['id'] == currentId,
+      orElse: () => campusList.first,
+    );
+
+    return PopupMenuButton<String>(
+      onSelected: (campusId) {
+        setState(() => _selectedCampusId = campusId);
+        _animateToCampus(campusId);
+      },
+      offset: const Offset(0, 48),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      itemBuilder: (context) => campusList.map((campus) {
+        final isSelected = campus['id'] == currentId;
+        return PopupMenuItem<String>(
+          value: campus['id']!,
+          child: Row(
+            children: [
+              Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: isSelected ? AppColors.primary : AppColors.border,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                campus['shortName'] ?? campus['name']!,
+                style: TextStyle(
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                  color: isSelected ? AppColors.primary : AppColors.textPrimary,
+                ),
+              ),
+            ],
+          ),
+        );
+      }).toList(),
+      child: Container(
+        height: 42,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(21),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.08),
+              blurRadius: 10,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.location_city, size: 16, color: AppColors.primary),
+            const SizedBox(width: 6),
+            Text(
+              selected['shortName'] ?? 'Campus',
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(width: 2),
+            const Icon(
+              Icons.arrow_drop_down,
+              size: 18,
+              color: AppColors.textSecondary,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildFilterChip(String label, MonitorFilter filter) {
     final isActive = _filter == filter;
     return FilterChip(
@@ -280,69 +543,17 @@ class _LiveMonitorScreenState extends State<LiveMonitorScreen> {
       checkmarkColor: Colors.white,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(20),
-        side: BorderSide(
-          color: isActive ? AppColors.primary : Colors.white30,
-        ),
+        side: BorderSide(color: isActive ? AppColors.primary : Colors.white30),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 4),
     );
   }
 
-  List<Marker> _buildMarkers(List<FacultyWithLocation> users) {
-    // Cluster markers when there are many in close proximity
-    final zoom = _currentZoom;
-    if (zoom < 15 && users.length > 10) {
-      return _buildClusteredMarkers(users);
-    }
-    
-    return users.where((f) => f.location != null).map((f) {
-      final color = _markerColor(f.user.role);
-      final isSelected = _selectedUser?.user.id == f.user.id;
-      final markerSize = isSelected ? 56.0 : 46.0;
-
-      return Marker(
-        point: f.location!.latLng,
-        width: markerSize,
-        height: markerSize,
-        child: GestureDetector(
-          onTap: () {
-            setState(() {
-              _selectedUser = f;
-              _showPanel = true;
-            });
-            _mapController.move(f.location!.latLng, 18.5);
-          },
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeOut,
-            width: markerSize,
-            height: markerSize,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: isSelected ? Colors.amber : color,
-                width: isSelected ? 4 : 3,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: isSelected
-                      ? Colors.amber.withValues(alpha: 0.6)
-                      : color.withValues(alpha: 0.5),
-                  blurRadius: isSelected ? 14 : 8,
-                  spreadRadius: isSelected ? 3 : 1,
-                ),
-              ],
-            ),
-            child: ClipOval(
-              child: _buildMarkerContent(f, color, isSelected),
-            ),
-          ),
-        ),
-      );
-    }).toList();
-  }
-
-  Widget _buildMarkerContent(FacultyWithLocation f, Color color, bool isSelected) {
+  Widget _buildMarkerContent(
+    FacultyWithLocation f,
+    Color color,
+    bool isSelected,
+  ) {
     if (f.user.photoUrl != null && f.user.photoUrl!.isNotEmpty) {
       return CachedNetworkImage(
         imageUrl: f.user.photoUrl!,
@@ -354,7 +565,11 @@ class _LiveMonitorScreenState extends State<LiveMonitorScreen> {
     return _buildInitialsAvatar(f, color, isSelected);
   }
 
-  Widget _buildInitialsAvatar(FacultyWithLocation f, Color color, bool isSelected) {
+  Widget _buildInitialsAvatar(
+    FacultyWithLocation f,
+    Color color,
+    bool isSelected,
+  ) {
     return Container(
       color: color,
       child: Center(
@@ -368,122 +583,6 @@ class _LiveMonitorScreenState extends State<LiveMonitorScreen> {
         ),
       ),
     );
-  }
-
-  List<Marker> _buildClusteredMarkers(List<FacultyWithLocation> users) {
-    final validUsers = users.where((f) => f.location != null).toList();
-    final clusters = <_MarkerCluster>[];
-    final used = <int>{};
-    final clusterRadius = 0.002 * (18 - _currentZoom).clamp(1, 10); 
-
-    for (int i = 0; i < validUsers.length; i++) {
-      if (used.contains(i)) continue;
-      final cluster = [validUsers[i]];
-      used.add(i);
-
-      for (int j = i + 1; j < validUsers.length; j++) {
-        if (used.contains(j)) continue;
-        final dist = _distance(
-          validUsers[i].location!.latLng,
-          validUsers[j].location!.latLng,
-        );
-        if (dist < clusterRadius) {
-          cluster.add(validUsers[j]);
-          used.add(j);
-        }
-      }
-      clusters.add(_MarkerCluster(cluster));
-    }
-
-    return clusters.map((cluster) {
-      if (cluster.users.length == 1) {
-        // Single user — render normal marker
-        final f = cluster.users.first;
-        final color = _markerColor(f.user.role);
-        final isSelected = _selectedUser?.user.id == f.user.id;
-        final markerSize = isSelected ? 56.0 : 46.0;
-        return Marker(
-          point: f.location!.latLng,
-          width: markerSize,
-          height: markerSize,
-          child: GestureDetector(
-            onTap: () {
-              setState(() {
-                _selectedUser = f;
-                _showPanel = true;
-              });
-              _mapController.move(f.location!.latLng, 18.5);
-            },
-            child: Container(
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: isSelected ? Colors.amber : color,
-                  width: isSelected ? 4 : 3,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: color.withValues(alpha: 0.5),
-                    blurRadius: 8,
-                    spreadRadius: 1,
-                  ),
-                ],
-              ),
-              child: ClipOval(
-                child: _buildMarkerContent(f, color, isSelected),
-              ),
-            ),
-          ),
-        );
-      }
-
-      // Cluster marker
-      return Marker(
-        point: cluster.center,
-        width: 52,
-        height: 52,
-        child: GestureDetector(
-          onTap: () {
-            // Zoom in to break cluster
-            _mapController.move(cluster.center, _currentZoom + 2);
-          },
-          child: Container(
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: LinearGradient(
-                colors: [AppColors.primary, AppColors.accent],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              border: Border.all(color: Colors.white, width: 3),
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.primary.withValues(alpha: 0.5),
-                  blurRadius: 10,
-                  spreadRadius: 2,
-                ),
-              ],
-            ),
-            child: Center(
-              child: Text(
-                '${cluster.users.length}',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ),
-        ),
-      );
-    }).toList();
-  }
-
-  double _distance(LatLng a, LatLng b) {
-    final dx = a.latitude - b.latitude;
-    final dy = a.longitude - b.longitude;
-    return (dx * dx + dy * dy);
   }
 
   Widget _buildUserPanel(FacultyWithLocation f) {
@@ -585,29 +684,32 @@ class _LiveMonitorScreenState extends State<LiveMonitorScreen> {
           const SizedBox(height: 14),
 
           // Location details
-          Row(
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
             children: [
               _infoChip(
                 icon: f.isWithinCampus ? Icons.check_circle : Icons.public,
                 label: f.isWithinCampus ? 'On Campus' : 'Off Campus',
                 color: f.isWithinCampus ? AppColors.accent : AppColors.info,
               ),
-              const SizedBox(width: 8),
               _infoChip(
                 icon: f.isMoving ? Icons.directions_walk : Icons.place,
                 label: f.isMoving ? 'Moving' : 'Stationary',
                 color: f.isMoving ? Colors.blue : AppColors.textSecondary,
               ),
-              const SizedBox(width: 8),
               _infoChip(
                 icon: Icons.access_time,
                 label: f.lastSeenText,
-                color: f.isFreshLocation ? AppColors.accent : AppColors.textSecondary,
+                color: f.isFreshLocation
+                    ? AppColors.accent
+                    : AppColors.textSecondary,
               ),
             ],
           ),
 
-          if (f.location?.quickMessage != null && f.location!.quickMessage!.isNotEmpty) ...[
+          if (f.location?.quickMessage != null &&
+              f.location!.quickMessage!.isNotEmpty) ...[
             const SizedBox(height: 12),
             Container(
               width: double.infinity,
@@ -662,61 +764,5 @@ class _LiveMonitorScreenState extends State<LiveMonitorScreen> {
         ],
       ),
     );
-  }
-
-  void _onMapEvent(MapEvent event) {
-    if (event is MapEventMove || event is MapEventMoveEnd) {
-      final newZoom = _mapController.camera.zoom;
-      if ((newZoom - _currentZoom).abs() > 0.3) {
-        setState(() => _currentZoom = newZoom);
-      }
-    }
-  }
-
-  List<Polygon> _buildCampusBoundaries() {
-    final List<Polygon> polygons = [];
-    final campusColors = {
-      'isulan': AppColors.primary,
-      'tacurong': Colors.orange,
-      'access': Colors.purple,
-    };
-
-    for (final campus in AppConstants.campusesData) {
-      final campusId = campus['id'] as String;
-      final boundary = campus['boundaryPoints'] as List;
-      final color = campusColors[campusId] ?? AppColors.primary;
-
-      final points = boundary
-          .map<LatLng>((point) => LatLng(
-                (point as List)[0] as double,
-                point[1] as double,
-              ))
-          .toList();
-
-      polygons.add(Polygon(
-        points: points,
-        color: color.withValues(alpha: 0.12),
-        borderColor: color,
-        borderStrokeWidth: 2.0,
-      ));
-    }
-
-    return polygons;
-  }
-}
-
-/// Helper class for marker clustering
-class _MarkerCluster {
-  final List<FacultyWithLocation> users;
-
-  _MarkerCluster(this.users);
-
-  LatLng get center {
-    double lat = 0, lng = 0;
-    for (final u in users) {
-      lat += u.location!.latLng.latitude;
-      lng += u.location!.latLng.longitude;
-    }
-    return LatLng(lat / users.length, lng / users.length);
   }
 }

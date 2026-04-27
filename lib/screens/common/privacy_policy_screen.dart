@@ -9,9 +9,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Privacy Policy'),
-      ),
+      appBar: AppBar(title: const Text('Privacy Policy')),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
@@ -43,7 +41,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Last updated: February 2026',
+                    'Last updated: March 2026',
                     style: TextStyle(
                       color: AppColors.textSecondary,
                       fontSize: 14,
@@ -54,17 +52,12 @@ class PrivacyPolicyScreen extends StatelessWidget {
             ),
             const SizedBox(height: 32),
 
-            _buildSection(
-              context,
-              'Data We Collect',
-              Icons.folder_outlined,
-              [
-                'Basic profile information (name, email, department)',
-                'Location data (only when you enable sharing)',
-                'Device information for push notifications',
-                'App usage analytics (anonymous)',
-              ],
-            ),
+            _buildSection(context, 'Data We Collect', Icons.folder_outlined, [
+              'Basic profile information (name, email, department)',
+              'Location data (only when you enable sharing)',
+              'Device information for push notifications',
+              'App usage analytics (anonymous)',
+            ]),
 
             _buildSection(
               context,
@@ -103,18 +96,13 @@ class PrivacyPolicyScreen extends StatelessWidget {
               ],
             ),
 
-            _buildSection(
-              context,
-              'Your Rights',
-              Icons.gavel_outlined,
-              [
-                'Access your personal data anytime',
-                'Request correction of inaccurate data',
-                'Delete your account and all associated data',
-                'Opt-out of notifications at any time',
-                'Disable location sharing whenever you want',
-              ],
-            ),
+            _buildSection(context, 'Your Rights', Icons.gavel_outlined, [
+              'Access your personal data anytime',
+              'Request correction of inaccurate data',
+              'Delete your account and all associated data',
+              'Opt-out of notifications at any time',
+              'Disable location sharing whenever you want',
+            ]),
 
             _buildSection(
               context,
@@ -162,7 +150,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   SelectableText(
-                    'Email: support@sksu.edu.ph',
+                    'Email: ${AppConstants.supportEmail}',
                     style: TextStyle(
                       color: AppColors.accent,
                       fontWeight: FontWeight.w500,
@@ -177,11 +165,11 @@ class PrivacyPolicyScreen extends StatelessWidget {
             // Footer
             Center(
               child: Text(
-                '© 2026 ${AppConstants.universityShortName}\nAll rights reserved.',
+                '© ${DateTime.now().year} ${AppConstants.universityShortName}\nAll rights reserved.',
                 textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: AppColors.textSecondary,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
               ),
             ),
             const SizedBox(height: 16),
@@ -208,40 +196,42 @@ class PrivacyPolicyScreen extends StatelessWidget {
               const SizedBox(width: 8),
               Text(
                 title,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
               ),
             ],
           ),
           const SizedBox(height: 12),
-          ...points.map((point) => Padding(
-            padding: const EdgeInsets.only(bottom: 8, left: 4),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  margin: const EdgeInsets.only(top: 6),
-                  width: 6,
-                  height: 6,
-                  decoration: BoxDecoration(
-                    color: AppColors.textSecondary,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    point,
-                    style: TextStyle(
-                      color: AppColors.textPrimary,
-                      height: 1.4,
+          ...points.map(
+            (point) => Padding(
+              padding: const EdgeInsets.only(bottom: 8, left: 4),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    margin: const EdgeInsets.only(top: 6),
+                    width: 6,
+                    height: 6,
+                    decoration: BoxDecoration(
+                      color: AppColors.textSecondary,
+                      shape: BoxShape.circle,
                     ),
                   ),
-                ),
-              ],
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      point,
+                      style: TextStyle(
+                        color: AppColors.textPrimary,
+                        height: 1.4,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          )),
+          ),
         ],
       ),
     );

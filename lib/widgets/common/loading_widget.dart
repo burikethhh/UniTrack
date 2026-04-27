@@ -6,14 +6,14 @@ class LoadingOverlay extends StatelessWidget {
   final bool isLoading;
   final Widget child;
   final String? message;
-  
+
   const LoadingOverlay({
     super.key,
     required this.isLoading,
     required this.child,
     this.message,
   });
-  
+
   @override
   Widget build(BuildContext context) {
     return Stack(
@@ -31,7 +31,9 @@ class LoadingOverlay extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       const CircularProgressIndicator(
-                        valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          AppColors.primary,
+                        ),
                       ),
                       if (message != null) ...[
                         const SizedBox(height: 16),
@@ -61,7 +63,7 @@ class EmptyState extends StatelessWidget {
   final String title;
   final String? message;
   final Widget? action;
-  
+
   const EmptyState({
     super.key,
     required this.icon,
@@ -69,7 +71,7 @@ class EmptyState extends StatelessWidget {
     this.message,
     this.action,
   });
-  
+
   @override
   Widget build(BuildContext context) {
     return Center(
@@ -85,11 +87,7 @@ class EmptyState extends StatelessWidget {
                 color: AppColors.primary.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
-              child: Icon(
-                icon,
-                size: 40,
-                color: AppColors.primary,
-              ),
+              child: Icon(icon, size: 40, color: AppColors.primary),
             ),
             const SizedBox(height: 24),
             Text(
@@ -112,10 +110,7 @@ class EmptyState extends StatelessWidget {
                 textAlign: TextAlign.center,
               ),
             ],
-            if (action != null) ...[
-              const SizedBox(height: 24),
-              action!,
-            ],
+            if (action != null) ...[const SizedBox(height: 24), action!],
           ],
         ),
       ),
@@ -127,13 +122,9 @@ class EmptyState extends StatelessWidget {
 class ErrorState extends StatelessWidget {
   final String message;
   final VoidCallback? onRetry;
-  
-  const ErrorState({
-    super.key,
-    required this.message,
-    this.onRetry,
-  });
-  
+
+  const ErrorState({super.key, required this.message, this.onRetry});
+
   @override
   Widget build(BuildContext context) {
     return Center(
@@ -193,13 +184,9 @@ class ErrorState extends StatelessWidget {
 class ShimmerLoading extends StatefulWidget {
   final Widget child;
   final bool isLoading;
-  
-  const ShimmerLoading({
-    super.key,
-    required this.child,
-    this.isLoading = true,
-  });
-  
+
+  const ShimmerLoading({super.key, required this.child, this.isLoading = true});
+
   @override
   State<ShimmerLoading> createState() => _ShimmerLoadingState();
 }
@@ -208,7 +195,7 @@ class _ShimmerLoadingState extends State<ShimmerLoading>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _animation;
-  
+
   @override
   void initState() {
     super.initState();
@@ -216,21 +203,22 @@ class _ShimmerLoadingState extends State<ShimmerLoading>
       vsync: this,
       duration: const Duration(milliseconds: 1500),
     )..repeat();
-    _animation = Tween<double>(begin: -1, end: 2).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
-    );
+    _animation = Tween<double>(
+      begin: -1,
+      end: 2,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
   }
-  
+
   @override
   void dispose() {
     _controller.dispose();
     super.dispose();
   }
-  
+
   @override
   Widget build(BuildContext context) {
     if (!widget.isLoading) return widget.child;
-    
+
     return AnimatedBuilder(
       animation: _animation,
       builder: (context, child) {
@@ -263,14 +251,14 @@ class SkeletonItem extends StatelessWidget {
   final double height;
   final double? width;
   final double borderRadius;
-  
+
   const SkeletonItem({
     super.key,
     this.height = 16,
     this.width,
     this.borderRadius = 4,
   });
-  
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -287,7 +275,7 @@ class SkeletonItem extends StatelessWidget {
 /// Skeleton for faculty/user card loading
 class FacultyCardSkeleton extends StatelessWidget {
   const FacultyCardSkeleton({super.key});
-  
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -343,14 +331,14 @@ class RefreshableList extends StatelessWidget {
   final Future<void> Function() onRefresh;
   final Widget child;
   final Color? color;
-  
+
   const RefreshableList({
     super.key,
     required this.onRefresh,
     required this.child,
     this.color,
   });
-  
+
   @override
   Widget build(BuildContext context) {
     return RefreshIndicator(

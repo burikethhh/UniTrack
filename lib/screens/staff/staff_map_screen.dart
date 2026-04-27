@@ -1,294 +1,241 @@
-import 'dart:convert';
+import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:provider/provider.dart';
-import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:maplibre_gl/maplibre_gl.dart' as maplibre;
 import '../../core/theme/app_colors.dart';
 import '../../core/constants/app_constants.dart';
+import '../../core/constants/map_constants.dart';
 import '../../providers/providers.dart';
+import '../../widgets/map/campus_map.dart';
+import '../../widgets/map/campus_map_3d.dart';
 import '../../widgets/map/campus_selector.dart';
+import '../../widgets/map/map_view_controls.dart';
 
-/// Staff map screen with manual location pinning and 3D support
+/// Staff map screen with GPS auto-tracking and multi-mode views
+/// (satellite, 3D buildings, ground level).
 class StaffMapScreen extends StatefulWidget {
   final bool use3D;
-  final bool useManualPin;
-  
-  const StaffMapScreen({
-    super.key,
-    this.use3D = false,
-    this.useManualPin = false,
-  });
-  
+
+  const StaffMapScreen({super.key, this.use3D = false});
+
   @override
   State<StaffMapScreen> createState() => _StaffMapScreenState();
 }
 
 class _StaffMapScreenState extends State<StaffMapScreen> {
-  final MapController _mapController = MapController();
-  maplibre.MapLibreMapController? _maplibreController;
-  LatLng? _manualPinLocation;
+  final GlobalKey<CampusMap3DState> _map3dKey = GlobalKey<CampusMap3DState>();
+  final GlobalKey<CampusMapState> _map2dKey = GlobalKey<CampusMapState>();
   LatLng? _currentGpsLocation;
-  late bool _useManualPin;
-  late bool _use3D;
-  bool _map3DReady = false;
-  maplibre.Circle? _locationCircle;
-  String? _selectedCampusId; // For navigation to different campuses
-  bool _showLegend = false; // Collapsed legend by default
-  // ignore: unused_field
-  Key _mapKey = UniqueKey(); // Force map recreation on campus change
-  
-  // Get campus center based on selected campus or user's campus
-  LatLng get _campusCenter {
-    final campusId = _selectedCampusId ?? 
-        context.read<AuthProvider>().user?.campusId ?? 
-        AppConstants.defaultCampusId;
-    final center = AppConstants.getCampusCenter(campusId);
-    if (center != null) {
-      return LatLng(center[0], center[1]);
-    }
-    return LatLng(AppConstants.campusCenterLat, AppConstants.campusCenterLng);
-  }
-  
-  // Build map style dynamically with campus boundaries baked in
-  static String _buildMapStyle() {
-    final sources = <String, dynamic>{
-      'satellite': {
-        'type': 'raster',
-        'tiles': ['https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}'],
-        'tileSize': 256,
-        'maxzoom': 20,
-      },
-    };
+  late bool _use3DMap;
+  MapViewMode _mapMode = MapViewMode.satellite;
+  String? _selectedCampusId;
+  bool _showLegend = false;
+  Timer? _locationRefreshTimer;
 
-    final layers = <Map<String, dynamic>>[
-      {
-        'id': 'satellite-layer',
-        'type': 'raster',
-        'source': 'satellite',
-      },
-    ];
-
-    const campusColors = {
-      'isulan': '#41B3A3',
-      'tacurong': '#FF9800',
-      'access': '#9C27B0',
-      'bagumbayan': '#009688',
-      'palimbang': '#3F51B5',
-      'kalamansig': '#E91E63',
-      'lutayan': '#795548',
-    };
-
-    for (final campus in AppConstants.campusesData) {
-      final campusId = campus['id'] as String;
-      final boundary = campus['boundaryPoints'] as List;
-      final color = campusColors[campusId] ?? '#41B3A3';
-
-      final coordinates = boundary
-          .map<List<double>>((point) => [
-                (point as List)[1] as double,
-                point[0] as double,
-              ])
-          .toList();
-
-      if (coordinates.isNotEmpty) {
-        coordinates.add(List<double>.from(coordinates.first));
-      }
-
-      final sourceId = 'campus-boundary-$campusId';
-      sources[sourceId] = {
-        'type': 'geojson',
-        'data': {
-          'type': 'Feature',
-          'geometry': {
-            'type': 'Polygon',
-            'coordinates': [coordinates],
-          },
-        },
-      };
-
-      layers.add({
-        'id': 'campus-fill-$campusId',
-        'type': 'fill',
-        'source': sourceId,
-        'paint': {
-          'fill-color': color,
-          'fill-opacity': 0.15,
-        },
-      });
-
-      layers.add({
-        'id': 'campus-line-$campusId',
-        'type': 'line',
-        'source': sourceId,
-        'paint': {
-          'line-color': color,
-          'line-width': 3.0,
-          'line-opacity': 0.9,
-        },
-      });
-    }
-
-    return jsonEncode({
-      'version': 8,
-      'name': 'SKSU Campus Satellite',
-      'glyphs': 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
-      'sources': sources,
-      'layers': layers,
-    });
-  }
-  
   @override
   void initState() {
     super.initState();
-    _useManualPin = widget.useManualPin;
-    _use3D = kIsWeb ? false : widget.use3D; // Force 2D on web (MapLibre workers unsupported on static hosts)
+    _use3DMap = widget.use3D;
+    _mapMode = widget.use3D ? MapViewMode.buildings3D : MapViewMode.satellite;
     _getCurrentLocation();
-    
-    // Set initial campus from user's profile and recreate map
+
+    // Refresh GPS every 30 seconds so the marker stays current
+    _locationRefreshTimer = Timer.periodic(
+      const Duration(seconds: 30),
+      (_) => _getCurrentLocation(),
+    );
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final authProvider = context.read<AuthProvider>();
-      final userCampusId = authProvider.user?.campusId ?? AppConstants.defaultCampusId;
+      final userCampusId =
+          authProvider.user?.campusId ?? AppConstants.defaultCampusId;
       setState(() {
         _selectedCampusId = userCampusId;
-        _mapKey = UniqueKey(); // Force map recreation with user's campus
       });
     });
   }
-  
+
   Future<void> _getCurrentLocation() async {
-    final locationProvider = context.read<LocationProvider>();
-    final position = await locationProvider.getCurrentPosition();
-    if (position != null && mounted) {
-      setState(() {
-        _currentGpsLocation = LatLng(position.latitude, position.longitude);
-      });
-      // Update 3D map location circle if applicable
-      if (_use3D && _map3DReady && _maplibreController != null) {
-        _update3DLocationMarker();
+    try {
+      final locationProvider = context.read<LocationProvider>();
+      final position = await locationProvider.getCurrentPosition();
+      if (position != null && mounted) {
+        setState(() {
+          _currentGpsLocation = LatLng(position.latitude, position.longitude);
+        });
       }
+    } catch (e) {
+      debugPrint('Staff location error: $e');
     }
   }
-  
+
+  @override
+  void dispose() {
+    _locationRefreshTimer?.cancel();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(_use3D ? '3D Campus View' : 'My Location'),
+        title: Text(_appBarTitle),
         actions: [
-          // Toggle 2D/3D (only on native, MapLibre workers don't work on web static hosts)
-          if (!kIsWeb)
-            IconButton(
-              icon: Icon(_use3D ? Icons.map : Icons.view_in_ar),
-              onPressed: () {
-                setState(() {
-                  _use3D = !_use3D;
-                  _map3DReady = false;
-                });
-              },
-              tooltip: _use3D ? 'Switch to 2D Map' : 'Switch to 3D View',
-            ),
-          // Toggle between GPS and Manual (only for 2D)
-          if (!_use3D)
-            IconButton(
-              icon: Icon(_useManualPin ? Icons.gps_off : Icons.gps_fixed),
-              onPressed: () {
-                setState(() {
-                  _useManualPin = !_useManualPin;
-                });
-                if (!_useManualPin) {
-                  _manualPinLocation = null;
-                }
-              },
-              tooltip: _useManualPin ? 'Use GPS Location' : 'Manual Pin Mode',
-            ),
+          IconButton(
+            icon: Icon(_use3DMap ? Icons.map_outlined : Icons.threed_rotation),
+            onPressed: () => setState(() => _use3DMap = !_use3DMap),
+            tooltip: _use3DMap ? 'Switch to 2D' : 'Switch to 3D',
+          ),
           IconButton(
             icon: const Icon(Icons.my_location),
-            onPressed: _getCurrentLocation,
-            tooltip: 'Refresh Location',
+            onPressed: _goToMyLocation,
+            tooltip: 'My Location',
           ),
         ],
       ),
       body: Stack(
         children: [
-          // 3D Map or 2D Map based on toggle
-          if (_use3D)
-            _build3DMap()
-          else
-            _build2DMap(),
-          
-          // Top controls: Campus selector
+          // Map
+          _use3DMap ? _build3DMap() : _build2DMap(),
+
+          // ── Top controls ──
           Positioned(
             top: 12,
+            left: 12,
             right: 12,
-            child: CampusSelector(
-              selectedCampusId: _selectedCampusId ?? AppConstants.defaultCampusId,
-              onCampusSelected: (campusId) {
-                setState(() {
-                  _selectedCampusId = campusId;
-                  _mapKey = UniqueKey();
-                  _map3DReady = false;
-                });
-                // Animate to the selected campus
-                final center = AppConstants.getCampusCenter(campusId);
-                if (center != null) {
-                  if (!_use3D) {
-                    _mapController.move(LatLng(center[0], center[1]), 17.0);
-                  } else if (_maplibreController != null) {
-                    _maplibreController?.animateCamera(
-                      maplibre.CameraUpdate.newCameraPosition(
-                        maplibre.CameraPosition(
-                          target: maplibre.LatLng(center[0], center[1]),
-                          zoom: 17.0,
-                          tilt: 45.0,
-                        ),
-                      ),
-                    );
-                  }
-                }
-              },
-              compact: true,
+            child: Row(
+              children: [
+                if (_use3DMap)
+                  MapViewModeDropdown(
+                    currentMode: _mapMode,
+                    onModeChanged: (mode) => setState(() => _mapMode = mode),
+                  ),
+                const Spacer(),
+                _buildCampusPill(),
+              ],
             ),
           ),
-          
-          // Mode indicator (top info card)
-          _buildModeIndicator(),
-          
-          // Campus legend (bottom left)
+
+          // ── Campus legend (bottom left) ──
           _buildCampusLegend(),
-          
-          // Location info panel (for manual pin)
-          if (!_use3D && _useManualPin && _manualPinLocation != null)
-            _buildPinInfoPanel(),
-          
-          // 3D loading overlay
-          if (_use3D && !_map3DReady)
-            Container(
-              color: AppColors.background.withValues(alpha: 0.8),
-              child: const Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    CircularProgressIndicator(color: AppColors.primary),
-                    SizedBox(height: 16),
-                    Text(
-                      'Loading 3D Campus Map...',
-                      style: TextStyle(
-                        color: AppColors.textSecondary,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
         ],
       ),
-      floatingActionButton: _buildFAB(),
     );
   }
-  
+
+  String get _appBarTitle {
+    if (!_use3DMap) return 'Campus Map';
+    switch (_mapMode) {
+      case MapViewMode.satellite:
+        return 'Satellite View';
+      case MapViewMode.buildings3D:
+        return '3D Campus View';
+      case MapViewMode.groundLevel:
+        return 'Ground Level View';
+    }
+  }
+
+  void _animateToCampus(String campusId) {
+    if (_use3DMap) {
+      _map3dKey.currentState?.centerOnCampus(campusId: campusId);
+    } else {
+      _map2dKey.currentState?.animateToCampus(campusId);
+    }
+  }
+
+  void _goToMyLocation() {
+    _getCurrentLocation().then((_) {
+      if (_currentGpsLocation != null && mounted) {
+        if (_use3DMap) {
+          // 3D: handled by CampusMap3D
+        } else {
+          _map2dKey.currentState?.flyTo(_currentGpsLocation!, 18.0);
+        }
+      }
+    });
+  }
+
+  Widget _buildCampusPill() {
+    final campusList = AppConstants.campusList;
+    final currentId = _selectedCampusId ?? AppConstants.defaultCampusId;
+    final selected = campusList.firstWhere(
+      (c) => c['id'] == currentId,
+      orElse: () => campusList.first,
+    );
+
+    return PopupMenuButton<String>(
+      onSelected: (campusId) {
+        setState(() => _selectedCampusId = campusId);
+        _animateToCampus(campusId);
+      },
+      offset: const Offset(0, 48),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      itemBuilder: (context) => campusList.map((campus) {
+        final isSelected = campus['id'] == currentId;
+        return PopupMenuItem<String>(
+          value: campus['id']!,
+          child: Row(
+            children: [
+              Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: isSelected ? AppColors.primary : AppColors.border,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                campus['shortName'] ?? campus['name']!,
+                style: TextStyle(
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                  color: isSelected ? AppColors.primary : AppColors.textPrimary,
+                ),
+              ),
+            ],
+          ),
+        );
+      }).toList(),
+      child: Container(
+        height: 42,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(21),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.08),
+              blurRadius: 10,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.location_city, size: 16, color: AppColors.primary),
+            const SizedBox(width: 6),
+            Text(
+              selected['shortName'] ?? 'Campus',
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(width: 2),
+            const Icon(
+              Icons.arrow_drop_down,
+              size: 18,
+              color: AppColors.textSecondary,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   /// Build campus legend overlay with navigation
   Widget _buildCampusLegend() {
     return Positioned(
@@ -297,728 +244,39 @@ class _StaffMapScreenState extends State<StaffMapScreen> {
       child: CampusLegend(
         expanded: _showLegend,
         selectedCampusId: _selectedCampusId ?? AppConstants.defaultCampusId,
-        onToggle: () {
-          setState(() {
-            _showLegend = !_showLegend;
-          });
-        },
+        onToggle: () => setState(() => _showLegend = !_showLegend),
         onCampusSelected: (campusId) {
-          setState(() {
-            _selectedCampusId = campusId;
-            _mapKey = UniqueKey();
-            _map3DReady = false;
-          });
-          // Animate to the selected campus
-          final center = AppConstants.getCampusCenter(campusId);
-          if (center != null) {
-            if (!_use3D) {
-              _mapController.move(LatLng(center[0], center[1]), 17.0);
-            } else if (_maplibreController != null) {
-              _maplibreController?.animateCamera(
-                maplibre.CameraUpdate.newCameraPosition(
-                  maplibre.CameraPosition(
-                    target: maplibre.LatLng(center[0], center[1]),
-                    zoom: 17.0,
-                    tilt: 45.0,
-                  ),
-                ),
-              );
-            }
-          }
+          setState(() => _selectedCampusId = campusId);
+          _animateToCampus(campusId);
         },
       ),
     );
-  }
-  
-  /// Build 2D FlutterMap
-  Widget _build2DMap() {
-    return FlutterMap(
-      mapController: _mapController,
-      options: MapOptions(
-        initialCenter: _currentGpsLocation ?? _campusCenter,
-        initialZoom: 17.0,
-        minZoom: 10.0,
-        maxZoom: 20.0,
-        onTap: _useManualPin ? (tapPos, latLng) {
-          setState(() {
-            _manualPinLocation = latLng;
-          });
-        } : null,
-      ),
-      children: [
-        // Satellite Tile Layer
-        TileLayer(
-          urlTemplate: 'https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',
-          userAgentPackageName: 'com.sksu.unitrack',
-          maxZoom: 20,
-        ),
-        
-        // All campus boundaries (show all 7 SKSU campuses)
-        PolygonLayer(
-          polygons: _buildAllCampusBoundaries(),
-        ),
-        
-        // GPS Location marker (blue)
-        if (_currentGpsLocation != null && !_useManualPin)
-          MarkerLayer(
-            markers: [
-              Marker(
-                point: _currentGpsLocation!,
-                width: 40,
-                height: 40,
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: AppColors.primary,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white, width: 3),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.primary.withValues(alpha: 0.4),
-                        blurRadius: 8,
-                        spreadRadius: 2,
-                      ),
-                    ],
-                  ),
-                  child: const Icon(
-                    Icons.person,
-                    color: Colors.white,
-                    size: 20,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        
-        // Manual Pin marker (red/accent)
-        if (_manualPinLocation != null && _useManualPin)
-          MarkerLayer(
-            markers: [
-              Marker(
-                point: _manualPinLocation!,
-                width: 50,
-                height: 50,
-                child: const Icon(
-                  Icons.location_on,
-                  color: AppColors.accent,
-                  size: 50,
-                ),
-              ),
-            ],
-          ),
-      ],
-    );
-  }
-  
-  /// Build 3D MapLibre map
-  Widget _build3DMap() {
-    return maplibre.MapLibreMap(
-      onMapCreated: (controller) {
-        _maplibreController = controller;
-      },
-      onStyleLoadedCallback: () async {
-        setState(() {
-          _map3DReady = true;
-        });
-        // Add location marker
-        await _update3DLocationMarker();
-        // Campus boundaries are baked into the style JSON — no runtime calls needed.
-        // Animate to tilted view
-        _maplibreController?.animateCamera(
-          maplibre.CameraUpdate.newCameraPosition(
-            maplibre.CameraPosition(
-              target: maplibre.LatLng(
-                _currentGpsLocation?.latitude ?? _campusCenter.latitude,
-                _currentGpsLocation?.longitude ?? _campusCenter.longitude,
-              ),
-              zoom: 17.0,
-              tilt: 45.0,
-              bearing: 0.0,
-            ),
-          ),
-        );
-      },
-      initialCameraPosition: maplibre.CameraPosition(
-        target: maplibre.LatLng(
-          _currentGpsLocation?.latitude ?? _campusCenter.latitude,
-          _currentGpsLocation?.longitude ?? _campusCenter.longitude,
-        ),
-        zoom: 17.0,
-        tilt: 45.0,
-      ),
-      styleString: _buildMapStyle(),
-      myLocationEnabled: true,
-      myLocationTrackingMode: maplibre.MyLocationTrackingMode.none,
-      compassEnabled: true,
-      rotateGesturesEnabled: true,
-      tiltGesturesEnabled: true,
-    );
-  }
-  
-  /// Update 3D location marker
-  Future<void> _update3DLocationMarker() async {
-    if (_maplibreController == null || !_map3DReady) return;
-    
-    // Remove existing marker
-    if (_locationCircle != null) {
-      try {
-        await _maplibreController?.removeCircle(_locationCircle!);
-      } catch (e) {
-        debugPrint('Error removing circle: $e');
-      }
-      _locationCircle = null;
-    }
-    
-    // Add new marker if we have a location
-    if (_currentGpsLocation != null) {
-      try {
-        _locationCircle = await _maplibreController?.addCircle(
-          maplibre.CircleOptions(
-            geometry: maplibre.LatLng(
-              _currentGpsLocation!.latitude,
-              _currentGpsLocation!.longitude,
-            ),
-            circleRadius: 12.0,
-            circleColor: '#41B3A3',
-            circleStrokeColor: '#FFFFFF',
-            circleStrokeWidth: 3.0,
-            circleOpacity: 1.0,
-          ),
-        );
-      } catch (e) {
-        debugPrint('Error adding location circle: $e');
-      }
-    }
-  }
-  
-  /// Build mode indicator card
-  Widget _buildModeIndicator() {
-    final locationProvider = context.watch<LocationProvider>();
-    final isManualPinActive = locationProvider.isManualPinMode;
-    
-    IconData icon;
-    Color color;
-    String title;
-    String subtitle;
-    
-    if (_use3D) {
-      icon = Icons.view_in_ar;
-      color = AppColors.info;
-      title = '3D Campus View';
-      subtitle = 'Rotate and tilt to explore campus';
-    } else if (isManualPinActive) {
-      // Currently using a manually pinned location
-      icon = Icons.push_pin;
-      color = AppColors.accent;
-      title = 'Manual Pin Active';
-      subtitle = 'Location pinned - students can see you here';
-    } else if (_useManualPin) {
-      icon = Icons.touch_app;
-      color = AppColors.accent;
-      title = 'Manual Pin Mode';
-      subtitle = 'Tap anywhere on the map to set your location';
-    } else {
-      icon = Icons.gps_fixed;
-      color = AppColors.primary;
-      title = 'GPS Tracking Mode';
-      subtitle = 'Your location is tracked via GPS';
-    }
-    
-    return Positioned(
-      top: 16,
-      left: 16,
-      right: 140, // Leave room for campus selector
-      child: Container(
-        padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.shadow,
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(icon, color: color, size: 20),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: color,
-                      fontSize: 13,
-                    ),
-                  ),
-                  Text(
-                    subtitle,
-                    style: const TextStyle(
-                      fontSize: 11,
-                      color: AppColors.textSecondary,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
-            ),
-            // Within campus indicator
-            if (_currentGpsLocation != null)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: _isWithinCampus(_currentGpsLocation!)
-                      ? AppColors.success.withValues(alpha: 0.1)
-                      : AppColors.warning.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      _isWithinCampus(_currentGpsLocation!)
-                          ? Icons.check_circle
-                          : Icons.warning,
-                      color: _isWithinCampus(_currentGpsLocation!)
-                          ? AppColors.success
-                          : AppColors.warning,
-                      size: 14,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      _isWithinCampus(_currentGpsLocation!) ? 'In' : 'Out',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: _isWithinCampus(_currentGpsLocation!)
-                            ? AppColors.success
-                            : AppColors.warning,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-  
-  /// Build pin info panel
-  Widget _buildPinInfoPanel() {
-    return Positioned(
-      bottom: 100,
-      left: 16,
-      right: 16,
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.shadow,
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.location_on, color: AppColors.accent, size: 20),
-                const SizedBox(width: 8),
-                const Text(
-                  'Pinned Location',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-                const Spacer(),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: _isWithinCampus(_manualPinLocation!)
-                        ? AppColors.success.withValues(alpha: 0.1)
-                        : AppColors.warning.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        _isWithinCampus(_manualPinLocation!)
-                            ? Icons.check_circle
-                            : Icons.warning,
-                        color: _isWithinCampus(_manualPinLocation!)
-                            ? AppColors.success
-                            : AppColors.warning,
-                        size: 14,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        _isWithinCampus(_manualPinLocation!)
-                            ? 'Within Campus'
-                            : 'Outside Campus',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: _isWithinCampus(_manualPinLocation!)
-                              ? AppColors.success
-                              : AppColors.warning,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Lat: ${_manualPinLocation!.latitude.toStringAsFixed(6)}, Lng: ${_manualPinLocation!.longitude.toStringAsFixed(6)}',
-              style: const TextStyle(
-                fontSize: 12,
-                color: AppColors.textSecondary,
-                fontFamily: 'monospace',
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-  
-  /// Build FAB
-  Widget _buildFAB() {
-    return Consumer<LocationProvider>(
-      builder: (context, locationProvider, _) {
-        return Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Set Manual Location Button (only for 2D + manual pin mode)
-            if (!_use3D && _useManualPin && _manualPinLocation != null)
-              FloatingActionButton.extended(
-                heroTag: 'setManual',
-                onPressed: () => _setManualLocation(locationProvider),
-                icon: const Icon(Icons.check),
-                label: const Text('Set This Location'),
-                backgroundColor: AppColors.accent,
-                foregroundColor: Colors.white,
-              ),
-            if (!_use3D && _useManualPin && _manualPinLocation != null)
-              const SizedBox(height: 12),
-            // Switch to Auto GPS button (only visible when in manual pin mode)
-            if (locationProvider.isManualPinMode)
-              FloatingActionButton.extended(
-                heroTag: 'switchToAuto',
-                onPressed: () async {
-                  await locationProvider.switchToAutoTracking();
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar( // ignore: use_build_context_synchronously
-                      const SnackBar(
-                        content: Text('Switched to automatic GPS tracking'),
-                        backgroundColor: AppColors.primary,
-                        duration: Duration(seconds: 2),
-                      ),
-                    );
-                  }
-                },
-                icon: const Icon(Icons.gps_fixed),
-                label: const Text('Use GPS'),
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
-              ),
-            if (locationProvider.isManualPinMode)
-              const SizedBox(height: 12),
-            // Center on campus button
-            FloatingActionButton(
-              heroTag: 'center',
-              onPressed: () {
-                if (_use3D && _maplibreController != null) {
-                  _maplibreController?.animateCamera(
-                    maplibre.CameraUpdate.newCameraPosition(
-                      maplibre.CameraPosition(
-                        target: maplibre.LatLng(
-                          _campusCenter.latitude,
-                          _campusCenter.longitude,
-                        ),
-                        zoom: 17.0,
-                        tilt: 45.0,
-                        bearing: 0.0,
-                      ),
-                    ),
-                  );
-                } else {
-                  _mapController.move(_campusCenter, 17.0);
-                }
-              },
-              backgroundColor: Colors.white,
-              child: const Icon(Icons.center_focus_strong, color: AppColors.primary),
-            ),
-            const SizedBox(height: 12),
-            // Show all campuses button (zoom out to see all 3)
-            FloatingActionButton.small(
-              heroTag: 'allCampuses',
-              onPressed: _showAllCampuses,
-              backgroundColor: Colors.white,
-              child: const Icon(Icons.zoom_out_map, color: AppColors.primaryDark),
-            ),
-          ],
-        );
-      },
-    );
-  }
-  
-  /// Zoom out to show all 7 SKSU campuses
-  void _showAllCampuses() {
-    // Center point between all 3 campuses (roughly in the middle)
-    // Isulan: 6.6333, 124.6091
-    // Tacurong: 6.691763, 124.67835
-    // ACCESS: 6.668761, 124.62971
-    const centerLat = 6.665; // Approximate center
-    const centerLng = 124.645;
-    const zoomLevel = 11.5; // Zoom out to see all campuses
-    
-    if (_use3D && _maplibreController != null) {
-      _maplibreController?.animateCamera(
-        maplibre.CameraUpdate.newCameraPosition(
-          maplibre.CameraPosition(
-            target: maplibre.LatLng(centerLat, centerLng),
-            zoom: zoomLevel,
-            tilt: 0.0,
-            bearing: 0.0,
-          ),
-        ),
-      );
-    } else {
-      _mapController.move(const LatLng(centerLat, centerLng), zoomLevel);
-    }
-    
-    // Show info about the 3 campuses
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            Container(width: 12, height: 12, decoration: BoxDecoration(color: AppColors.primary, shape: BoxShape.circle)),
-            const SizedBox(width: 4),
-            const Text('Isulan', style: TextStyle(fontSize: 11)),
-            const SizedBox(width: 12),
-            Container(width: 12, height: 12, decoration: BoxDecoration(color: Colors.orange, shape: BoxShape.circle)),
-            const SizedBox(width: 4),
-            const Text('Tacurong', style: TextStyle(fontSize: 11)),
-            const SizedBox(width: 12),
-            Container(width: 12, height: 12, decoration: BoxDecoration(color: Colors.purple, shape: BoxShape.circle)),
-            const SizedBox(width: 4),
-            const Text('ACCESS', style: TextStyle(fontSize: 11)),
-          ],
-        ),
-        duration: const Duration(seconds: 4),
-        backgroundColor: Colors.black87,
-      ),
-    );
-  }
-  
-  /// Build polygon boundaries for ALL 7 campuses
-  List<Polygon> _buildAllCampusBoundaries() {
-    final List<Polygon> polygons = [];
-    
-    // Campus colors for distinction (all 7 campuses)
-    final campusColors = {
-      'isulan': AppColors.primary,
-      'tacurong': Colors.orange,
-      'access': Colors.purple,
-      'bagumbayan': Colors.teal,
-      'palimbang': Colors.indigo,
-      'kalamansig': Colors.pink,
-      'lutayan': Colors.brown,
-    };
-    
-    for (final campus in AppConstants.campusesData) {
-      final campusId = campus['id'] as String;
-      final boundary = campus['boundaryPoints'] as List;
-      final color = campusColors[campusId] ?? AppColors.primary;
-      
-      final points = boundary
-          .map<LatLng>((point) => LatLng(
-                (point as List)[0] as double,
-                point[1] as double,
-              ))
-          .toList();
-      
-      polygons.add(Polygon(
-        points: points,
-        color: color.withValues(alpha: 0.15),
-        borderColor: color,
-        borderStrokeWidth: 2.5,
-      ));
-    }
-    
-    return polygons;
   }
 
-  /// Check if location is within ANY of the 7 SKSU campuses
-  bool _isWithinCampus(LatLng location) {
-    return _isWithinAnyCampus(location.latitude, location.longitude);
-  }
-  
-  /// Check if position is within ANY SKSU campus
-  bool _isWithinAnyCampus(double latitude, double longitude) {
-    for (final campus in AppConstants.campusesData) {
-      final boundary = campus['boundaryPoints'] as List;
-      if (_isInsidePolygon(latitude, longitude, boundary)) {
-        return true;
-      }
-    }
-    return false;
-  }
-  
-  /// Point-in-polygon algorithm
-  bool _isInsidePolygon(double latitude, double longitude, List boundary) {
-    int intersections = 0;
-    
-    for (int i = 0; i < boundary.length; i++) {
-      final j = (i + 1) % boundary.length;
-      final point1 = boundary[i] as List;
-      final point2 = boundary[j] as List;
-      final xi = point1[1] as double; // longitude
-      final yi = point1[0] as double; // latitude
-      final xj = point2[1] as double; // longitude
-      final yj = point2[0] as double; // latitude
-      
-      if (((yi > latitude) != (yj > latitude)) &&
-          (longitude < (xj - xi) * (latitude - yi) / (yj - yi) + xi)) {
-        intersections++;
-      }
-    }
-    
-    return intersections.isOdd;
-  }
-  
-  Future<void> _setManualLocation(LocationProvider locationProvider) async {
-    if (_manualPinLocation == null) return;
-    
-    // Update location in Firestore with manual pin
-    final userId = context.read<AuthProvider>().user?.id;
-    if (userId == null) return;
-    
-    // Show confirmation
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Row(
-          children: [
-            Icon(Icons.location_on, color: AppColors.accent),
-            SizedBox(width: 8),
-            Text('Set Manual Location'),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('This will broadcast your location as:'),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Latitude: ${_manualPinLocation!.latitude.toStringAsFixed(6)}',
-                    style: const TextStyle(fontFamily: 'monospace'),
-                  ),
-                  Text(
-                    'Longitude: ${_manualPinLocation!.longitude.toStringAsFixed(6)}',
-                    style: const TextStyle(fontFamily: 'monospace'),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Icon(
-                  _isWithinCampus(_manualPinLocation!)
-                      ? Icons.check_circle
-                      : Icons.warning,
-                  color: _isWithinCampus(_manualPinLocation!)
-                      ? AppColors.success
-                      : AppColors.warning,
-                  size: 18,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  _isWithinCampus(_manualPinLocation!)
-                      ? 'Within Campus Boundaries'
-                      : 'Outside Campus Boundaries',
-                  style: TextStyle(
-                    color: _isWithinCampus(_manualPinLocation!)
-                        ? AppColors.success
-                        : AppColors.warning,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton.icon(
-            onPressed: () => Navigator.pop(context, true),
-            icon: const Icon(Icons.check, size: 18),
-            label: const Text('Confirm'),
-          ),
-        ],
-      ),
+  /// Build 2D flutter_map — reliable on web (pure Dart, no JS interop)
+  Widget _build2DMap() {
+    return CampusMap(
+      key: _map2dKey,
+      userLocation: _currentGpsLocation,
+      showCampusBoundary: true,
+      campusId: _selectedCampusId ?? AppConstants.defaultCampusId,
     );
-    
-    if (confirmed == true) {
-      // Start tracking with manual location
-      await locationProvider.setManualLocation(
-        _manualPinLocation!.latitude,
-        _manualPinLocation!.longitude,
-      );
-      
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Row(
-              children: [
-                Icon(Icons.check_circle, color: Colors.white, size: 20),
-                SizedBox(width: 8),
-                Text('Manual location set successfully!'),
-              ],
-            ),
-            backgroundColor: AppColors.success,
-          ),
-        );
-        Navigator.pop(context);
-      }
-    }
+  }
+
+  /// Build 3D MapLibre map (native platforms only)
+  Widget _build3DMap() {
+    return CampusMap3D(
+      key: _map3dKey,
+      userLocation: _currentGpsLocation != null
+          ? maplibre.LatLng(
+              _currentGpsLocation!.latitude,
+              _currentGpsLocation!.longitude,
+            )
+          : null,
+      showCampusBoundary: true,
+      enable3DBuildings: true,
+      campusId: _selectedCampusId ?? AppConstants.defaultCampusId,
+      viewMode: _mapMode,
+    );
   }
 }

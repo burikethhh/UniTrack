@@ -2,17 +2,87 @@ rules_version='2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
-      // This rule allows anyone with your database reference to view, edit,
-      // and delete all data in your database. It is useful for getting
-      // started, but it is configured to expire after 30 days because it
-      // leaves your app open to attackers. At that time, all client
-      // requests to your database will be denied.
-      //
-      // Make sure to write security rules for your app before that time, or
-      // else all client requests to your database will be denied until you
-      // update your rules.
-      allow read, write: if request.time < timestamp.date(2026, 3, 15);
+
+    // ── Helper functions ──────────────────────────────────────────────
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function getUserRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && getUserRole() == 'admin';
+    }
+
+    // ── Users collection ──────────────────────────────────────────────
+    // Authenticated users can read any profile (needed for faculty lookup).
+    // Users can update their OWN doc (but not role/isActive fields).
+    // Admins can update ANY user doc including role/isActive.
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow create: if isOwner(userId)
+                    && request.resource.data.role != 'admin';
+      allow update: if isOwner(userId)
+                    && !request.resource.data.diff(resource.data).affectedKeys()
+                        .hasAny(['role', 'isActive'])
+                    || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ── Locations collection ──────────────────────────────────────────
+    // Authenticated users can read all locations (map lookups).
+    // Only the owner can write their own location doc.
+    match /locations/{userId} {
+      allow read: if isSignedIn();
+      allow write: if isOwner(userId);
+    }
+
+    // ── Notifications collection ──────────────────────────────────────
+    // Users can read/update/delete their own received notifications.
+    // Authenticated users can create notifications (student→staff pings).
+    // Admins can read/update/delete any notification.
+    match /notifications/{notifId} {
+      allow read: if isSignedIn()
+                  && (resource.data.recipientId == request.auth.uid
+                      || resource.data.senderId == request.auth.uid)
+                  || isAdmin();
+      allow create: if isSignedIn();
+      allow update, delete: if isSignedIn()
+                            && resource.data.recipientId == request.auth.uid
+                            || isAdmin();
+    }
+
+    // ── Activity logs collection ──────────────────────────────────────
+    // Only admins can read. Authenticated users can create (server-side
+    // logging from admin actions still originates from the client).
+    match /activity_logs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isSignedIn();
+      allow update, delete: if false; // immutable audit trail
+    }
+
+    // ── Departments collection ────────────────────────────────────────
+    match /departments/{deptId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // ── App versions collection ───────────────────────────────────────
+    match /app_versions/{versionId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // ── Config collection ─────────────────────────────────────────────
+    match /config/{configId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
     }
   }
 }

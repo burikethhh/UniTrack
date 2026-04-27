@@ -12,7 +12,7 @@ import '../../widgets/widgets.dart';
 /// Registration Screen for UniTrack
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
-  
+
   @override
   State<RegisterScreen> createState() => _RegisterScreenState();
 }
@@ -24,24 +24,32 @@ class _RegisterScreenState extends State<RegisterScreen> with SnackBarMixin {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
-  
+
   UserRole _selectedRole = UserRole.student;
   String? _selectedDepartment;
   String _selectedCampus = 'isulan'; // Default campus
   final _positionController = TextEditingController();
   int _passwordStrength = 0;
-  
+
   // Campus options - All SKSU Campuses
   final List<Map<String, String>> _campuses = [
     {'id': 'isulan', 'name': 'Isulan Campus', 'shortName': 'Isulan'},
     {'id': 'tacurong', 'name': 'Tacurong Campus', 'shortName': 'Tacurong'},
     {'id': 'access', 'name': 'ACCESS Campus', 'shortName': 'ACCESS'},
-    {'id': 'bagumbayan', 'name': 'Bagumbayan Campus', 'shortName': 'Bagumbayan'},
+    {
+      'id': 'bagumbayan',
+      'name': 'Bagumbayan Campus',
+      'shortName': 'Bagumbayan',
+    },
     {'id': 'palimbang', 'name': 'Palimbang Campus', 'shortName': 'Palimbang'},
-    {'id': 'kalamansig', 'name': 'Kalamansig Campus', 'shortName': 'Kalamansig'},
+    {
+      'id': 'kalamansig',
+      'name': 'Kalamansig Campus',
+      'shortName': 'Kalamansig',
+    },
     {'id': 'lutayan', 'name': 'Lutayan Campus', 'shortName': 'Lutayan'},
   ];
-  
+
   final List<String> _departments = [
     'College of Teacher Education',
     'College of Arts and Sciences',
@@ -53,7 +61,7 @@ class _RegisterScreenState extends State<RegisterScreen> with SnackBarMixin {
     'Graduate School',
     'Administration',
   ];
-  
+
   @override
   void dispose() {
     _firstNameController.dispose();
@@ -64,48 +72,65 @@ class _RegisterScreenState extends State<RegisterScreen> with SnackBarMixin {
     _positionController.dispose();
     super.dispose();
   }
-  
+
   Future<void> _handleRegister() async {
     if (!_formKey.currentState!.validate()) return;
-    
+
     // Check connectivity first
     if (!ConnectivityService().isConnected) {
-      showErrorSnackBar(context, 'No internet connection. Please check your network.');
+      showErrorSnackBar(
+        context,
+        'No internet connection. Please check your network.',
+      );
       return;
     }
-    
+
+    final email = _emailController.text.trim().toLowerCase();
+
+    // Staff / Faculty must use an official SKSU email address
+    if (_selectedRole == UserRole.staff && !email.endsWith('@sksu.edu.ph')) {
+      showErrorSnackBar(
+        context,
+        'Faculty/Staff accounts require an official SKSU email (@sksu.edu.ph).',
+      );
+      return;
+    }
+
     final authProvider = context.read<AuthProvider>();
-    
+
     final success = await authProvider.register(
-      email: _emailController.text.trim(),
+      email: email,
       password: _passwordController.text,
       firstName: _firstNameController.text.trim(),
       lastName: _lastNameController.text.trim(),
       role: _selectedRole,
       department: _selectedDepartment,
-      position: _selectedRole != UserRole.student 
-          ? _positionController.text.trim() 
+      position: _selectedRole != UserRole.student
+          ? _positionController.text.trim()
           : null,
       campusId: _selectedCampus,
     );
-    
+
     if (mounted) {
       if (success) {
         Navigator.pop(context);
-        showSuccessSnackBar(context, 'Registration successful! Welcome to UniTrack.');
+        showSuccessSnackBar(
+          context,
+          'Registration successful! A verification email has been sent — please verify your email.',
+        );
       } else {
         final errorMsg = ErrorMessages.registerError(authProvider.error);
         showErrorSnackBar(context, errorMsg);
       }
     }
   }
-  
+
   void _updatePasswordStrength(String password) {
     setState(() {
       _passwordStrength = Validators.passwordStrength(password);
     });
   }
-  
+
   /// Campus colors for visual distinction
   static const Map<String, Color> _campusColors = {
     'isulan': AppColors.primary,
@@ -116,7 +141,7 @@ class _RegisterScreenState extends State<RegisterScreen> with SnackBarMixin {
     'kalamansig': Colors.pink,
     'lutayan': Colors.brown,
   };
-  
+
   /// Build campus selector - tappable card that opens bottom sheet
   Widget _buildCampusSelector() {
     final selectedCampus = _campuses.firstWhere(
@@ -124,7 +149,7 @@ class _RegisterScreenState extends State<RegisterScreen> with SnackBarMixin {
       orElse: () => _campuses.first,
     );
     final color = _campusColors[_selectedCampus] ?? AppColors.primary;
-    
+
     return InkWell(
       onTap: _showCampusBottomSheet,
       borderRadius: BorderRadius.circular(12),
@@ -175,7 +200,7 @@ class _RegisterScreenState extends State<RegisterScreen> with SnackBarMixin {
       ),
     );
   }
-  
+
   /// Show campus selection bottom sheet
   void _showCampusBottomSheet() {
     showModalBottomSheet(
@@ -248,8 +273,9 @@ class _RegisterScreenState extends State<RegisterScreen> with SnackBarMixin {
                 itemBuilder: (context, index) {
                   final campus = _campuses[index];
                   final isSelected = _selectedCampus == campus['id'];
-                  final color = _campusColors[campus['id']] ?? AppColors.primary;
-                  
+                  final color =
+                      _campusColors[campus['id']] ?? AppColors.primary;
+
                   return ListTile(
                     contentPadding: const EdgeInsets.symmetric(
                       horizontal: 20,
@@ -259,7 +285,7 @@ class _RegisterScreenState extends State<RegisterScreen> with SnackBarMixin {
                       width: 44,
                       height: 44,
                       decoration: BoxDecoration(
-                        color: isSelected 
+                        color: isSelected
                             ? color.withValues(alpha: 0.15)
                             : AppColors.surface,
                         borderRadius: BorderRadius.circular(10),
@@ -277,7 +303,9 @@ class _RegisterScreenState extends State<RegisterScreen> with SnackBarMixin {
                     title: Text(
                       campus['name']!,
                       style: TextStyle(
-                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                        fontWeight: isSelected
+                            ? FontWeight.w600
+                            : FontWeight.normal,
                         color: isSelected ? color : AppColors.textPrimary,
                       ),
                     ),
@@ -307,7 +335,7 @@ class _RegisterScreenState extends State<RegisterScreen> with SnackBarMixin {
       },
     );
   }
-  
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -342,9 +370,9 @@ class _RegisterScreenState extends State<RegisterScreen> with SnackBarMixin {
                         color: AppColors.textSecondary,
                       ),
                     ),
-                    
+
                     const SizedBox(height: 32),
-                    
+
                     // Role selection
                     Text(
                       'I am a:',
@@ -380,9 +408,46 @@ class _RegisterScreenState extends State<RegisterScreen> with SnackBarMixin {
                         ),
                       ],
                     ),
-                    
+
+                    // Staff email domain notice
+                    if (_selectedRole == UserRole.staff) ...[
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.warning.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: AppColors.warning.withValues(alpha: 0.3),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.info_outline,
+                              size: 16,
+                              color: AppColors.warning,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Faculty/Staff must register with an official @sksu.edu.ph email.',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: AppColors.warning,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+
                     const SizedBox(height: 24),
-                    
+
                     // Campus selection (tap to open selector)
                     Text(
                       'My Campus:',
@@ -390,9 +455,9 @@ class _RegisterScreenState extends State<RegisterScreen> with SnackBarMixin {
                     ),
                     const SizedBox(height: 12),
                     _buildCampusSelector(),
-                    
+
                     const SizedBox(height: 24),
-                    
+
                     // Name fields
                     Row(
                       children: [
@@ -402,7 +467,8 @@ class _RegisterScreenState extends State<RegisterScreen> with SnackBarMixin {
                             label: 'First Name',
                             prefixIcon: Icons.person_outline,
                             textInputAction: TextInputAction.next,
-                            validator: (value) => Validators.name(value, fieldName: 'first name'),
+                            validator: (value) =>
+                                Validators.name(value, fieldName: 'first name'),
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -411,14 +477,15 @@ class _RegisterScreenState extends State<RegisterScreen> with SnackBarMixin {
                             controller: _lastNameController,
                             label: 'Last Name',
                             textInputAction: TextInputAction.next,
-                            validator: (value) => Validators.name(value, fieldName: 'last name'),
+                            validator: (value) =>
+                                Validators.name(value, fieldName: 'last name'),
                           ),
                         ),
                       ],
                     ),
-                    
+
                     const SizedBox(height: 16),
-                    
+
                     // Email field
                     CustomTextField(
                       controller: _emailController,
@@ -429,12 +496,13 @@ class _RegisterScreenState extends State<RegisterScreen> with SnackBarMixin {
                       textInputAction: TextInputAction.next,
                       validator: Validators.email,
                     ),
-                    
+
                     const SizedBox(height: 16),
-                    
+
                     // Department dropdown (for both roles)
                     DropdownButtonFormField<String>(
-                      value: _selectedDepartment, // ignore: deprecated_member_use
+                      initialValue:
+                          _selectedDepartment, // ignore: deprecated_member_use
                       decoration: const InputDecoration(
                         labelText: 'Department/College',
                         prefixIcon: Icon(Icons.business),
@@ -442,10 +510,7 @@ class _RegisterScreenState extends State<RegisterScreen> with SnackBarMixin {
                       items: _departments.map((dept) {
                         return DropdownMenuItem(
                           value: dept,
-                          child: Text(
-                            dept,
-                            overflow: TextOverflow.ellipsis,
-                          ),
+                          child: Text(dept, overflow: TextOverflow.ellipsis),
                         );
                       }).toList(),
                       onChanged: (value) {
@@ -460,7 +525,7 @@ class _RegisterScreenState extends State<RegisterScreen> with SnackBarMixin {
                         return null;
                       },
                     ),
-                    
+
                     // Position field (staff only)
                     if (_selectedRole == UserRole.staff) ...[
                       const SizedBox(height: 16),
@@ -472,18 +537,19 @@ class _RegisterScreenState extends State<RegisterScreen> with SnackBarMixin {
                         textInputAction: TextInputAction.next,
                       ),
                     ],
-                    
+
                     const SizedBox(height: 16),
-                    
+
                     // Password fields with strength indicator
                     PasswordTextField(
                       controller: _passwordController,
                       label: 'Password',
                       textInputAction: TextInputAction.next,
                       onChanged: _updatePasswordStrength,
-                      validator: (value) => Validators.password(value, checkStrength: false),
+                      validator: (value) =>
+                          Validators.password(value, checkStrength: false),
                     ),
-                    
+
                     // Password strength indicator
                     if (_passwordController.text.isNotEmpty) ...[
                       const SizedBox(height: 8),
@@ -494,7 +560,11 @@ class _RegisterScreenState extends State<RegisterScreen> with SnackBarMixin {
                               value: _passwordStrength / 4,
                               backgroundColor: AppColors.border,
                               valueColor: AlwaysStoppedAnimation<Color>(
-                                Color(Validators.passwordStrengthColor(_passwordStrength)),
+                                Color(
+                                  Validators.passwordStrengthColor(
+                                    _passwordStrength,
+                                  ),
+                                ),
                               ),
                               minHeight: 4,
                               borderRadius: BorderRadius.circular(2),
@@ -505,26 +575,33 @@ class _RegisterScreenState extends State<RegisterScreen> with SnackBarMixin {
                             Validators.passwordStrengthLabel(_passwordStrength),
                             style: TextStyle(
                               fontSize: 12,
-                              color: Color(Validators.passwordStrengthColor(_passwordStrength)),
+                              color: Color(
+                                Validators.passwordStrengthColor(
+                                  _passwordStrength,
+                                ),
+                              ),
                               fontWeight: FontWeight.w500,
                             ),
                           ),
                         ],
                       ),
                     ],
-                    
+
                     const SizedBox(height: 16),
-                    
+
                     PasswordTextField(
                       controller: _confirmPasswordController,
                       label: 'Confirm Password',
                       textInputAction: TextInputAction.done,
                       onSubmitted: (_) => _handleRegister(),
-                      validator: (value) => Validators.confirmPassword(value, _passwordController.text),
+                      validator: (value) => Validators.confirmPassword(
+                        value,
+                        _passwordController.text,
+                      ),
                     ),
-                    
+
                     const SizedBox(height: 24),
-                    
+
                     // Privacy notice
                     Container(
                       padding: const EdgeInsets.all(16),
@@ -558,18 +635,18 @@ class _RegisterScreenState extends State<RegisterScreen> with SnackBarMixin {
                         ],
                       ),
                     ),
-                    
+
                     const SizedBox(height: 32),
-                    
+
                     // Register button
                     PrimaryButton(
                       text: 'Create Account',
                       onPressed: _handleRegister,
                       isLoading: authProvider.isLoading,
                     ),
-                    
+
                     const SizedBox(height: 16),
-                    
+
                     // Back to login
                     Center(
                       child: TextButton(
@@ -594,14 +671,14 @@ class _RoleCard extends StatelessWidget {
   final IconData icon;
   final bool isSelected;
   final VoidCallback onTap;
-  
+
   const _RoleCard({
     required this.title,
     required this.icon,
     required this.isSelected,
     required this.onTap,
   });
-  
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -610,7 +687,7 @@ class _RoleCard extends StatelessWidget {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: isSelected 
+          color: isSelected
               ? AppColors.primary.withValues(alpha: 0.1)
               : AppColors.surface,
           borderRadius: BorderRadius.circular(12),

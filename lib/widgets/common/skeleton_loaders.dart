@@ -34,10 +34,7 @@ class ShimmerBox extends StatelessWidget {
 class ShimmerCircle extends StatelessWidget {
   final double size;
 
-  const ShimmerCircle({
-    super.key,
-    required this.size,
-  });
+  const ShimmerCircle({super.key, required this.size});
 
   @override
   Widget build(BuildContext context) {
@@ -101,7 +98,7 @@ class FacultyCardSkeleton extends StatelessWidget {
             // Avatar skeleton
             const ShimmerCircle(size: 56),
             const SizedBox(width: 16),
-            
+
             // Text content skeleton
             Expanded(
               child: Column(
@@ -121,15 +118,11 @@ class FacultyCardSkeleton extends StatelessWidget {
                   ),
                   const SizedBox(height: 6),
                   // Status
-                  const ShimmerBox(
-                    width: 80,
-                    height: 24,
-                    borderRadius: 12,
-                  ),
+                  const ShimmerBox(width: 80, height: 24, borderRadius: 12),
                 ],
               ),
             ),
-            
+
             // Action icon
             const ShimmerCircle(size: 32),
           ],
@@ -143,10 +136,7 @@ class FacultyCardSkeleton extends StatelessWidget {
 class FacultyListSkeleton extends StatelessWidget {
   final int itemCount;
 
-  const FacultyListSkeleton({
-    super.key,
-    this.itemCount = 5,
-  });
+  const FacultyListSkeleton({super.key, this.itemCount = 5});
 
   @override
   Widget build(BuildContext context) {
@@ -226,10 +216,7 @@ class ProfileHeaderSkeleton extends StatelessWidget {
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [
-              Colors.grey[300]!,
-              Colors.grey[200]!,
-            ],
+            colors: [Colors.grey[300]!, Colors.grey[200]!],
           ),
         ),
         child: SafeArea(
@@ -321,10 +308,7 @@ class NotificationItemSkeleton extends StatelessWidget {
 class NotificationListSkeleton extends StatelessWidget {
   final int itemCount;
 
-  const NotificationListSkeleton({
-    super.key,
-    this.itemCount = 6,
-  });
+  const NotificationListSkeleton({super.key, this.itemCount = 6});
 
   @override
   Widget build(BuildContext context) {
@@ -449,10 +433,7 @@ class DetailsPageSkeleton extends StatelessWidget {
         child: Column(
           children: [
             // Header
-            Container(
-              height: 200,
-              color: Colors.grey[300],
-            ),
+            Container(height: 200, color: Colors.grey[300]),
             Padding(
               padding: const EdgeInsets.all(24),
               child: Column(
@@ -464,7 +445,7 @@ class DetailsPageSkeleton extends StatelessWidget {
                   const SizedBox(height: 8),
                   const Center(child: ShimmerBox(width: 160, height: 18)),
                   const SizedBox(height: 32),
-                  
+
                   // Info sections
                   ...List.generate(
                     4,
@@ -495,12 +476,16 @@ class DetailsPageSkeleton extends StatelessWidget {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     ShimmerBox(
-                                      width: MediaQuery.of(context).size.width * 0.4,
+                                      width:
+                                          MediaQuery.of(context).size.width *
+                                          0.4,
                                       height: 16,
                                     ),
                                     const SizedBox(height: 6),
                                     ShimmerBox(
-                                      width: MediaQuery.of(context).size.width * 0.25,
+                                      width:
+                                          MediaQuery.of(context).size.width *
+                                          0.25,
                                       height: 12,
                                     ),
                                   ],

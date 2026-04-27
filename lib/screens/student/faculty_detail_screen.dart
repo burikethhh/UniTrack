@@ -1,36 +1,29 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/utils/helpers.dart';
 import '../../providers/providers.dart';
 import '../../models/models.dart';
 import '../../widgets/widgets.dart';
-import 'student_map_screen.dart';
 
 /// Detailed view for a specific faculty member
 class FacultyDetailScreen extends StatelessWidget {
   final String facultyId;
-  
-  const FacultyDetailScreen({
-    super.key,
-    required this.facultyId,
-  });
-  
+
+  const FacultyDetailScreen({super.key, required this.facultyId});
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Faculty Details'),
-      ),
+      appBar: AppBar(title: const Text('Faculty Details')),
       body: Consumer<FacultyProvider>(
         builder: (context, provider, _) {
           final faculty = provider.getFacultyById(facultyId);
-          
+
           if (faculty == null) {
-            return const Center(
-              child: Text('Faculty not found'),
-            );
+            return const Center(child: Text('Faculty not found'));
           }
-          
+
           return SingleChildScrollView(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -79,14 +72,11 @@ class FacultyDetailScreen extends StatelessWidget {
                         ),
                       ],
                       const SizedBox(height: 16),
-                      StatusBadge(
-                        status: faculty.displayStatus,
-                        fontSize: 14,
-                      ),
+                      StatusBadge(status: faculty.displayStatus, fontSize: 14),
                     ],
                   ),
                 ),
-                
+
                 // Quick message
                 if (faculty.location?.quickMessage != null)
                   Container(
@@ -129,7 +119,7 @@ class FacultyDetailScreen extends StatelessWidget {
                       ],
                     ),
                   ),
-                
+
                 // Info cards
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -153,9 +143,9 @@ class FacultyDetailScreen extends StatelessWidget {
                             ),
                         ],
                       ),
-                      
+
                       const SizedBox(height: 16),
-                      
+
                       // Office hours card
                       if (faculty.user.officeHours != null &&
                           faculty.user.officeHours!.isNotEmpty)
@@ -163,16 +153,15 @@ class FacultyDetailScreen extends StatelessWidget {
                           title: 'Office Hours',
                           icon: Icons.schedule,
                           children: faculty.user.officeHours!
-                              .map((hours) => _buildInfoRow(
-                                    Icons.access_time,
-                                    '',
-                                    hours,
-                                  ))
+                              .map(
+                                (hours) =>
+                                    _buildInfoRow(Icons.access_time, '', hours),
+                              )
                               .toList(),
                         ),
-                      
+
                       const SizedBox(height: 16),
-                      
+
                       // Location info (if online)
                       if (faculty.isOnline && faculty.location != null)
                         _buildInfoCard(
@@ -196,11 +185,10 @@ class FacultyDetailScreen extends StatelessWidget {
                     ],
                   ),
                 ),
-                
+
                 // Add bottom padding for the floating action bar
-                if (faculty.isOnline)
-                  const SizedBox(height: 100),
-                
+                if (faculty.isOnline) const SizedBox(height: 100),
+
                 const SizedBox(height: 16),
               ],
             ),
@@ -211,11 +199,11 @@ class FacultyDetailScreen extends StatelessWidget {
       bottomNavigationBar: Consumer<FacultyProvider>(
         builder: (context, provider, _) {
           final faculty = provider.getFacultyById(facultyId);
-          
+
           if (faculty == null || !faculty.isOnline) {
             return const SizedBox.shrink();
           }
-          
+
           return Container(
             padding: EdgeInsets.fromLTRB(
               16,
@@ -241,7 +229,11 @@ class FacultyDetailScreen extends StatelessWidget {
                     icon: Icons.notifications_active_outlined,
                     label: 'Notify',
                     color: AppColors.info,
-                    onPressed: () => _pingFaculty(context, faculty),
+                    onPressed: () => pingFaculty(
+                      context: context,
+                      facultyId: faculty.user.id,
+                      facultyName: faculty.user.fullName,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -261,7 +253,7 @@ class FacultyDetailScreen extends StatelessWidget {
       ),
     );
   }
-  
+
   Widget _buildInfoCard({
     required String title,
     required IconData icon,
@@ -294,7 +286,7 @@ class FacultyDetailScreen extends StatelessWidget {
       ),
     );
   }
-  
+
   Widget _buildInfoRow(IconData icon, String label, String value) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
@@ -305,10 +297,7 @@ class FacultyDetailScreen extends StatelessWidget {
           if (label.isNotEmpty) ...[
             Text(
               '$label: ',
-              style: TextStyle(
-                color: AppColors.textSecondary,
-                fontSize: 14,
-              ),
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
             ),
           ],
           Expanded(
@@ -324,119 +313,7 @@ class FacultyDetailScreen extends StatelessWidget {
       ),
     );
   }
-  
-  /// Send a "looking for you" ping to a faculty member
-  Future<void> _pingFaculty(BuildContext context, FacultyWithLocation faculty) async {
-    final authProvider = context.read<AuthProvider>();
-    final notificationProvider = context.read<NotificationProvider>();
-    
-    final currentUser = authProvider.user;
-    if (currentUser == null) return;
-    
-    // Show confirmation dialog
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: AppColors.info.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Icon(Icons.notifications_active, color: AppColors.info),
-            ),
-            const SizedBox(width: 12),
-            const Text('Notify Teacher'),
-          ],
-        ),
-        content: Text(
-          'Send a notification to ${faculty.user.firstName} that you\'re looking for them?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton.icon(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            icon: const Icon(Icons.send, size: 18),
-            label: const Text('Send'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.info,
-              foregroundColor: Colors.white,
-            ),
-          ),
-        ],
-      ),
-    );
-    
-    if (confirmed != true || !context.mounted) return;
-    
-    try {
-      final success = await notificationProvider.pingStaff(
-        student: currentUser,
-        staffId: faculty.user.id,
-        staffName: faculty.user.fullName,
-      );
-      
-      if (!success && context.mounted) {
-        // Show error if there was one (like spam prevention)
-        if (notificationProvider.error != null) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Row(
-                children: [
-                  const Icon(Icons.info_outline, color: Colors.white, size: 20),
-                  const SizedBox(width: 8),
-                  Expanded(child: Text(notificationProvider.error!)),
-                ],
-              ),
-              backgroundColor: AppColors.warning,
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
-          notificationProvider.clearError();
-          return;
-        }
-      }
-      
-      if (success && context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.check_circle, color: Colors.white, size: 20),
-                const SizedBox(width: 8),
-                Text('Notification sent to ${faculty.user.firstName}'),
-              ],
-            ),
-            backgroundColor: AppColors.success,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.error_outline, color: Colors.white, size: 20),
-                const SizedBox(width: 8),
-                Expanded(child: Text(e.toString())),
-              ],
-            ),
-            backgroundColor: AppColors.error,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-    }
-  }
-  
+
   /// Navigate to in-app map with faculty location
   void _navigateToMap(BuildContext context, FacultyWithLocation faculty) {
     if (faculty.location == null) {
@@ -445,18 +322,13 @@ class FacultyDetailScreen extends StatelessWidget {
       );
       return;
     }
-    
-    // Navigate to map screen with faculty selected
-    // Use pushAndRemoveUntil to properly clean up the navigation stack
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(
-        builder: (_) => StudentMapScreen(
-          initialFacultyId: faculty.user.id,
-        ),
-      ),
-      (route) => route.isFirst, // Keep only the first route (home)
-    );
+
+    // Set focused faculty in provider — the map tab already listens for this
+    context.read<FacultyProvider>().setFocusedFaculty(faculty.user.id);
+
+    // Pop back to home screen (which has the map in its IndexedStack)
+    // This avoids creating a duplicate StudentMapScreen instance
+    Navigator.popUntil(context, (route) => route.isFirst);
   }
 }
 
@@ -486,10 +358,7 @@ class _ActionButton extends StatelessWidget {
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [
-                color,
-                color.withValues(alpha: 0.85),
-              ],
+              colors: [color, color.withValues(alpha: 0.85)],
             ),
             borderRadius: BorderRadius.circular(16),
             boxShadow: [

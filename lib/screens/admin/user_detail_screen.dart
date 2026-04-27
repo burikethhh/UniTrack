@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../models/models.dart';
 import '../../providers/providers.dart';
+import '../../core/utils/helpers.dart';
 
 /// Detailed user profile screen for admin management
 class UserDetailScreen extends StatefulWidget {
@@ -31,7 +32,7 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
 
   Future<void> _loadUserDetails() async {
     if (!mounted) return;
-    
+
     setState(() {
       _isLoading = true;
       _error = null;
@@ -213,7 +214,9 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
                       children: [
                         CircleAvatar(
                           radius: 50,
-                          backgroundColor: _getRoleColor(user.role).withAlpha(25),
+                          backgroundColor: _getRoleColor(
+                            user.role,
+                          ).withAlpha(25),
                           child: user.photoUrl != null
                               ? ClipOval(
                                   child: Image.network(
@@ -221,7 +224,8 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
                                     width: 100,
                                     height: 100,
                                     fit: BoxFit.cover,
-                                    errorBuilder: (_, _, _) => _buildInitials(user),
+                                    errorBuilder: (_, _, _) =>
+                                        _buildInitials(user),
                                   ),
                                 )
                               : _buildInitials(user),
@@ -252,7 +256,9 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
                       user.fullName,
                       style: theme.textTheme.headlineSmall?.copyWith(
                         fontWeight: FontWeight.bold,
-                        decoration: isActive ? null : TextDecoration.lineThrough,
+                        decoration: isActive
+                            ? null
+                            : TextDecoration.lineThrough,
                       ),
                       textAlign: TextAlign.center,
                     ),
@@ -268,7 +274,7 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
                     const SizedBox(height: 12),
 
                     // Role Badge
-                    _RoleBadgeLarge(role: user.role),
+                    RoleBadge(role: user.role, large: true),
 
                     // Status Badge
                     if (!isActive) ...[
@@ -286,7 +292,11 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.block, size: 16, color: Colors.red.shade700),
+                            Icon(
+                              Icons.block,
+                              size: 16,
+                              color: Colors.red.shade700,
+                            ),
                             const SizedBox(width: 8),
                             Text(
                               'ACCOUNT BANNED',
@@ -355,7 +365,7 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
                     _InfoRow(
                       icon: Icons.location_city,
                       label: 'Campus',
-                      value: _formatCampusName(user.campusId),
+                      value: formatCampusName(user.campusId),
                     ),
                     if (user.department != null)
                       _InfoRow(
@@ -503,29 +513,6 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
     }
   }
 
-  String _formatCampusName(String campusId) {
-    switch (campusId) {
-      case 'access':
-        return 'ACCESS Campus';
-      case 'main':
-        return 'Main Campus';
-      case 'tacurong':
-        return 'Tacurong Campus';
-      case 'isulan':
-        return 'Isulan Campus';
-      case 'kalamansig':
-        return 'Kalamansig Campus';
-      case 'lutayan':
-        return 'Lutayan Campus';
-      case 'palimbang':
-        return 'Palimbang Campus';
-      case 'bagumbayan':
-        return 'Bagumbayan Campus';
-      default:
-        return campusId.toUpperCase();
-    }
-  }
-
   String _formatDateTime(DateTime dateTime) {
     final now = DateTime.now();
     final diff = now.difference(dateTime);
@@ -580,18 +567,27 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
           title: const Text('Change User Role'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
-            children: UserRole.values
-                .map((role) => RadioListTile<UserRole>(
-                      title: Text(role.name.toUpperCase()),
-                      value: role,
-                      groupValue: selectedRole, // ignore: deprecated_member_use
-                      onChanged: (value) { // ignore: deprecated_member_use
-                        if (value != null) {
-                          setState(() => selectedRole = value);
-                        }
-                      },
-                    ))
-                .toList(),
+            children: [
+              RadioGroup<UserRole>(
+                groupValue: selectedRole,
+                onChanged: (value) {
+                  if (value != null) {
+                    setState(() => selectedRole = value);
+                  }
+                },
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: UserRole.values
+                      .map(
+                        (role) => RadioListTile<UserRole>(
+                          title: Text(role.name.toUpperCase()),
+                          value: role,
+                        ),
+                      )
+                      .toList(),
+                ),
+              ),
+            ],
           ),
           actions: [
             TextButton(
@@ -611,7 +607,11 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
                       if (success) {
                         await _loadUserDetails();
                       }
-                      _showResult(success, 'Role updated', 'Failed to update role');
+                      _showResult(
+                        success,
+                        'Role updated',
+                        'Failed to update role',
+                      );
                     },
               child: const Text('Save'),
             ),
@@ -744,8 +744,9 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
             onPressed: () async {
               Navigator.pop(ctx);
               final success = await adminProvider.deleteUser(_user!.id);
+              if (!mounted) return;
               _showResult(success, 'User deleted', 'Failed to delete user');
-              if (success && mounted) {
+              if (success) {
                 Navigator.pop(context);
               }
             },
@@ -778,60 +779,6 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
 }
 
 // ===================== Widget Components =====================
-
-class _RoleBadgeLarge extends StatelessWidget {
-  final UserRole role;
-
-  const _RoleBadgeLarge({required this.role});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        color: _getColor().withAlpha(25),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: _getColor()),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(_getIcon(), color: _getColor()),
-          const SizedBox(width: 8),
-          Text(
-            role.name.toUpperCase(),
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: _getColor(),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Color _getColor() {
-    switch (role) {
-      case UserRole.student:
-        return Colors.green;
-      case UserRole.staff:
-        return Colors.orange;
-      case UserRole.admin:
-        return Colors.purple;
-    }
-  }
-
-  IconData _getIcon() {
-    switch (role) {
-      case UserRole.student:
-        return Icons.school;
-      case UserRole.staff:
-        return Icons.work;
-      case UserRole.admin:
-        return Icons.admin_panel_settings;
-    }
-  }
-}
 
 class _InfoRow extends StatelessWidget {
   final IconData icon;
@@ -868,10 +815,7 @@ class _InfoRow extends StatelessWidget {
           Expanded(
             child: Text(
               value,
-              style: TextStyle(
-                fontWeight: FontWeight.w500,
-                color: valueColor,
-              ),
+              style: TextStyle(fontWeight: FontWeight.w500, color: valueColor),
             ),
           ),
         ],

@@ -5,20 +5,19 @@
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="UniTrack - Real-Time Faculty & Staff Locator for SKSU">
+  <meta name="description" content="iSKSUlars Track - Real-Time Faculty & Staff Locator for SKSU">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
 
   <!-- Security Headers (meta-tag equivalents for static hosting) -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://unpkg.com https://www.gstatic.com https://*.googleapis.com https://*.firebaseio.com https://*.firebase.com; style-src 'self' 'unsafe-inline' https://unpkg.com https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://*.firebase.com https://*.cloudfunctions.net wss://*.firebaseio.com https://api.maptiler.com https://*.maptiler.com https://unpkg.com; frame-src 'none'; frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self';">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.googleapis.com https://*.gstatic.com https://apis.google.com https://*.firebaseio.com https://*.firebaseapp.com https://unpkg.com blob:; worker-src blob: 'self' https://unpkg.com; style-src 'self' 'unsafe-inline' https://*.googleapis.com https://unpkg.com; font-src 'self' https://*.gstatic.com data:; img-src 'self' data: blob: https://*.googleapis.com https://*.gstatic.com https://*.tile.openstreetmap.org https://*.arcgisonline.com https://api.maptiler.com; connect-src 'self' https://*.googleapis.com https://*.gstatic.com https://*.firebaseio.com https://*.firebaseapp.com https://firestore.googleapis.com https://api.maptiler.com https://unpkg.com https://*.tile.openstreetmap.org https://*.arcgisonline.com wss://*.firebaseio.com; frame-src 'self' https://*.firebaseapp.com https://apis.google.com; object-src 'none'; base-uri 'self'; form-action 'self';">
   <meta http-equiv="X-Content-Type-Options" content="nosniff">
-  <meta http-equiv="X-Frame-Options" content="DENY">
   <meta name="referrer" content="strict-origin-when-cross-origin">
 
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="UniTrack">
+  <meta name="apple-mobile-web-app-title" content="iSKSUlars Track">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
   <link rel="apple-touch-icon" sizes="512x512" href="icons/Icon-512.png">
 
@@ -45,27 +44,79 @@
         media="(device-width: 1024px) and (device-height: 1366px) and (-webkit-device-pixel-ratio: 2)">
 
   <!-- Theme color for Android & desktop -->
-  <meta name="theme-color" content="#1a1a2e">
+  <meta name="theme-color" content="#0a2540">
   <!-- Safari pinned tab color -->
-  <meta name="msapplication-TileColor" content="#1a1a2e">
+  <meta name="msapplication-TileColor" content="#0a2540">
 
   <!-- Favicon -->
   <link rel="icon" type="image/png" sizes="32x32" href="favicon.png"/>
 
-  <title>UniTrack - SKSU Faculty Tracker</title>
+  <title>iSKSUlars Track - SKSU Faculty Tracker</title>
   <link rel="manifest" href="manifest.json">
 
-  <!-- Preconnect to Firebase for faster auth -->
+  <!-- Preconnect to external origins for faster loading -->
   <link rel="preconnect" href="https://identitytoolkit.googleapis.com">
   <link rel="preconnect" href="https://firestore.googleapis.com">
+  <link rel="preconnect" href="https://unpkg.com" crossorigin>
+  <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 
-  <!-- MapLibre GL JS for web map support -->
+  <!-- MapLibre GL JS for web map support (loaded synchronously before Flutter) -->
   <script src="https://unpkg.com/maplibre-gl@4.3.2/dist/maplibre-gl.js"></script>
   <link href="https://unpkg.com/maplibre-gl@4.3.2/dist/maplibre-gl.css" rel="stylesheet" />
   <script>
+    // Set worker URL immediately — MapLibre is already loaded (synchronous)
     if (typeof maplibregl !== 'undefined') {
       maplibregl.workerUrl = 'https://unpkg.com/maplibre-gl@4.3.2/dist/maplibre-gl-csp-worker.js';
+
+      // ── Suppress MapLibre tile-load errors that flood the console ──
+      // MapLibre fires an 'error' event for every failed tile request
+      // (404, 403, network timeouts, etc.).  During zoom this creates
+      // a "rain" of console errors.  We patch Map.prototype.fire to
+      // silently swallow tile/source errors while still letting real
+      // application errors through.
+      (function() {
+        var _origFire = maplibregl.Map.prototype.fire;
+        maplibregl.Map.prototype.fire = function(type, properties) {
+          if (type === 'error' && properties) {
+            var err = properties.error || properties;
+            var msg = (err && err.message) ? err.message : String(err);
+            // Swallow tile/source HTTP errors (404, 403, network)
+            if (msg.indexOf('AJAXError') !== -1 ||
+                msg.indexOf('Error loading') !== -1 ||
+                msg.indexOf('tile') !== -1 ||
+                msg.indexOf('source') !== -1 ||
+                (err && (err.status === 404 || err.status === 403))) {
+              return this; // swallow silently
+            }
+          }
+          return _origFire.apply(this, arguments);
+        };
+      })();
     }
+  </script>
+
+  <!-- Background tracking helper: Wake Lock + beforeunload beacon -->
+  <script src="bg_tracking.js" defer></script>
+
+  <!-- Catch unhandled Promise rejections from MapLibre/maplibre_gl plugin.
+       The Flutter maplibre_gl plugin fires async JS calls to add/remove
+       annotations.  If a style swap happens mid-flight, the JS side
+       rejects with a TypeError that Dart's try-catch cannot catch.
+       We suppress these harmless race-condition errors here. -->
+  <script>
+    window.addEventListener('unhandledrejection', function(event) {
+      var reason = event.reason;
+      if (reason instanceof TypeError && reason.message) {
+        // "Cannot set properties of undefined (setting 'XXXX_N')"
+        // "Cannot read properties of undefined (reading 'XXXX')"
+        // These are MapLibre annotation-manager errors during style transitions.
+        if (/Cannot (set|read) properties of (undefined|null)/.test(reason.message)) {
+          event.preventDefault();
+          return;
+        }
+      }
+    });
   </script>
 
   <style>
@@ -232,8 +283,8 @@
 <body>
   <!-- Loading Splash (shown while Flutter engine loads) -->
   <div id="loading">
-    <img src="icons/Icon-192.png" alt="UniTrack" class="logo">
-    <div class="app-name">UniTrack</div>
+    <img src="icons/Icon-192.png" alt="iSKSUlars Track" class="logo">
+    <div class="app-name">iSKSUlars Track</div>
     <div class="app-tagline">Real-Time Faculty & Staff Locator</div>
     <div class="spinner"></div>
   </div>
@@ -241,9 +292,9 @@
   <!-- PWA Install Prompt Banner -->
   <div id="installBanner">
     <div class="install-content">
-      <img src="icons/Icon-192.png" alt="UniTrack" class="install-icon">
+      <img src="icons/Icon-192.png" alt="iSKSUlars Track" class="install-icon">
       <div class="install-text">
-        <p class="install-title">Install UniTrack</p>
+        <p class="install-title">Install iSKSUlars Track</p>
         <p class="install-subtitle">Add to your home screen for quick access</p>
       </div>
       <button class="install-btn" id="installBtn">Install</button>
@@ -251,13 +302,108 @@
     </div>
   </div>
 
-  <!-- Register service worker -->
+  <!-- Register service worker + auto-update detection -->
+  <!-- Flutter's aggressive SW is disabled (--pwa-strategy=none); we use our own -->
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', function() {
-        navigator.serviceWorker.register('sw.js');
+        // Register immediately — no delay
+        navigator.serviceWorker.register('sw.js').then(function(reg) {
+          console.log('[App] SW registered');
+
+          // Check for SW updates every 30 seconds (aggressive freshness)
+          setInterval(function() {
+            reg.update().catch(function() {});
+          }, 30 * 1000);
+
+          // Also check when tab regains focus (user returns to app)
+          document.addEventListener('visibilitychange', function() {
+            if (document.visibilityState === 'visible') {
+              reg.update().catch(function() {});
+            }
+          });
+
+          // Detect when a new SW is waiting
+          reg.addEventListener('updatefound', function() {
+            var newWorker = reg.installing;
+            if (!newWorker) return;
+            newWorker.addEventListener('statechange', function() {
+              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                console.log('[App] New version detected, activating...');
+                newWorker.postMessage('SKIP_WAITING');
+              }
+            });
+          });
+        }).catch(function(e) {
+          console.warn('[App] SW registration failed:', e);
+        });
+
+        // Listen for messages from the SW
+        navigator.serviceWorker.addEventListener('message', function(event) {
+          if (event.data && event.data.type === 'SW_UPDATED') {
+            console.log('[App] SW updated to:', event.data.version);
+            // Clear all caches then hard-reload
+            caches.keys().then(function(names) {
+              return Promise.all(names.map(function(n) { return caches.delete(n); }));
+            }).then(function() {
+              window.location.reload();
+            });
+          }
+          if (event.data && event.data.type === 'CACHES_CLEARED') {
+            console.log('[App] All caches cleared');
+            window.location.reload();
+          }
+        });
+
+        // When a new SW takes over, reload for fresh assets
+        var refreshing = false;
+        navigator.serviceWorker.addEventListener('controllerchange', function() {
+          if (!refreshing) {
+            refreshing = true;
+            console.log('[App] New SW controller, reloading...');
+            window.location.reload();
+          }
+        });
       });
     }
+
+    // ── Version polling — catches updates even when SW lifecycle is stuck ──
+    // Fetches version.json every 2 minutes; if the version changes, clears
+    // caches and reloads. This handles iOS Safari PWAs where SW updates
+    // are unreliable, and any other edge-case.
+    (function() {
+      var knownVersion = null;
+      function checkVersion() {
+        fetch('version.json?_t=' + Date.now(), { cache: 'no-store' })
+          .then(function(r) { return r.json(); })
+          .then(function(data) {
+            if (!data || !data.version) return;
+            if (knownVersion === null) {
+              // First load — just record the current version
+              knownVersion = data.version;
+              return;
+            }
+            if (data.version !== knownVersion) {
+              console.log('[App] New app version detected via poll:', data.version);
+              knownVersion = data.version;
+              // Clear SW caches then reload
+              caches.keys().then(function(names) {
+                return Promise.all(names.map(function(n) { return caches.delete(n); }));
+              }).then(function() {
+                window.location.reload();
+              });
+            }
+          })
+          .catch(function() { /* offline — skip */ });
+      }
+      // Check on load and every 30 seconds
+      setTimeout(checkVersion, 1500);
+      setInterval(checkVersion, 30 * 1000);
+      // Also check when tab becomes visible
+      document.addEventListener('visibilitychange', function() {
+        if (document.visibilityState === 'visible') checkVersion();
+      });
+    })();
   </script>
 
   <!-- PWA Install Logic (Android/Desktop Chrome + iOS Safari fallback) -->
@@ -293,7 +439,7 @@
         });
       } else if (isIOS) {
         // iOS: show instructions since there's no native install API
-        alert('To install UniTrack:\n\n1. Tap the Share button (square with arrow)\n2. Scroll down and tap "Add to Home Screen"\n3. Tap "Add"');
+        alert('To install iSKSUlars Track:\n\n1. Tap the Share button (square with arrow)\n2. Scroll down and tap "Add to Home Screen"\n3. Tap "Add"');
         installBanner.style.display = 'none';
       }
     });
@@ -326,6 +472,16 @@
         setTimeout(function() { loading.remove(); }, 600);
       }
     });
+    // Failsafe: if Flutter hasn't rendered in 8 seconds, remove the splash
+    // anyway so the user isn't stuck on a spinner forever.
+    setTimeout(function() {
+      var loading = document.getElementById('loading');
+      if (loading) {
+        console.warn('[App] Loading screen failsafe triggered (8s timeout)');
+        loading.classList.add('fade-out');
+        setTimeout(function() { loading.remove(); }, 600);
+      }
+    }, 8000);
   </script>
   <script src="flutter_bootstrap.js" async></script>
 
@@ -338,35 +494,7 @@
         document.body.innerHTML = '<h1 style="color:red;text-align:center;margin-top:40vh">Access Denied: This app cannot be embedded in an iframe.</h1>';
         return;
       }
-      // Disable right-click context menu
-      document.addEventListener('contextmenu', function(e) { e.preventDefault(); });
-      // Disable common copy/inspect shortcuts
-      document.addEventListener('keydown', function(e) {
-        // Ctrl+U (view source), Ctrl+S (save), Ctrl+Shift+I (devtools), Ctrl+Shift+J (console), F12
-        if ((e.ctrlKey && e.key === 'u') || (e.ctrlKey && e.key === 's') ||
-            (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'i')) ||
-            (e.ctrlKey && e.shiftKey && (e.key === 'J' || e.key === 'j')) ||
-            (e.ctrlKey && e.shiftKey && (e.key === 'C' || e.key === 'c')) ||
-            e.key === 'F12') {
-          e.preventDefault(); e.stopPropagation();
-        }
-      });
-      // Disable text selection & drag on the body
-      document.body.style.userSelect = 'none';
-      document.body.style.webkitUserSelect = 'none';
-      document.addEventListener('dragstart', function(e) { e.preventDefault(); });
-      document.addEventListener('selectstart', function(e) {
-        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' ||
-            e.target.isContentEditable) return;
-        e.preventDefault();
-      });
-      // Clear console periodically to deter casual snooping
-      setInterval(function() {
-        try { console.clear(); } catch(e) {}
-      }, 3000);
-      // Warn in console
-      console.log('%cSTOP!', 'color:red;font-size:60px;font-weight:bold');
-      console.log('%cThis is a protected application. Unauthorized access, copying, or reverse engineering is prohibited.', 'font-size:16px;color:#333');
+      // Security protections disabled for debugging
     })();
   </script>
 </body>

@@ -1,8 +1,11 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/constants/app_constants.dart';
+import '../../core/utils/responsive.dart';
+import '../../core/utils/helpers.dart';
 import '../../providers/providers.dart';
 import 'staff_settings_screen.dart';
 import 'staff_map_screen.dart';
@@ -12,57 +15,67 @@ import 'notifications_screen.dart';
 /// Main dashboard for staff/faculty members
 class StaffDashboardScreen extends StatefulWidget {
   const StaffDashboardScreen({super.key});
-  
+
   @override
   State<StaffDashboardScreen> createState() => _StaffDashboardScreenState();
 }
 
-class _StaffDashboardScreenState extends State<StaffDashboardScreen> with WidgetsBindingObserver {
+class _StaffDashboardScreenState extends State<StaffDashboardScreen>
+    with WidgetsBindingObserver {
   bool _isShowingBackgroundDialog = false;
-  
+  LocationProvider?
+  _locationProvider; // Cache to avoid context.read in lifecycle callbacks
+
   @override
   void initState() {
     super.initState();
     // Add lifecycle observer
     WidgetsBinding.instance.addObserver(this);
-    
+
     // Initialize location provider for staff with their campus
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final authProvider = context.read<AuthProvider>();
+      _locationProvider = context.read<LocationProvider>();
       if (authProvider.user != null) {
-        context.read<LocationProvider>().initialize(
-          authProvider.user!.id,
-          campusId: authProvider.user!.campusId,
-        );
+        try {
+          _locationProvider!.initialize(
+            authProvider.user!.id,
+            campusId: authProvider.user!.campusId,
+          );
+        } catch (e) {
+          debugPrint('Error initializing location provider: $e');
+        }
       }
     });
   }
-  
+
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
-  
+
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
-    
+
+    final locationProvider = _locationProvider;
+    if (locationProvider == null) return;
+
     // When app is about to be hidden/paused
-    if (state == AppLifecycleState.inactive || state == AppLifecycleState.paused) {
-      final locationProvider = context.read<LocationProvider>();
-      
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused) {
       // If tracking is on and we haven't shown the dialog yet
-      if (locationProvider.isTracking && !_isShowingBackgroundDialog && !locationProvider.isBackgroundTrackingEnabled) {
+      if (locationProvider.isTracking &&
+          !_isShowingBackgroundDialog &&
+          !locationProvider.isBackgroundTrackingEnabled) {
         // We can't show dialog when going to background, so just enable background tracking
         // The dialog will be shown when user returns
       }
     }
-    
+
     // When app resumes from background
     if (state == AppLifecycleState.resumed) {
-      final locationProvider = context.read<LocationProvider>();
-      
       // Refresh location data
       if (locationProvider.isTracking) {
         // Location is still tracking in background
@@ -70,7 +83,7 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> with Widget
       }
     }
   }
-  
+
   /// Show dialog asking about background location sharing
   Future<bool> _showBackgroundTrackingDialog() async {
     final result = await showDialog<bool>(
@@ -103,10 +116,7 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> with Widget
             SizedBox(height: 12),
             Text(
               'Students will still be able to see your location on the map.',
-              style: TextStyle(
-                fontSize: 12,
-                color: AppColors.textSecondary,
-              ),
+              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
             ),
           ],
         ),
@@ -129,17 +139,17 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> with Widget
     );
     return result ?? false;
   }
-  
+
   /// Handle back button press
   Future<bool> _onWillPop() async {
     final locationProvider = context.read<LocationProvider>();
-    
+
     // If location sharing is active, show the background dialog
     if (locationProvider.isTracking) {
       _isShowingBackgroundDialog = true;
       final continueSharing = await _showBackgroundTrackingDialog();
       _isShowingBackgroundDialog = false;
-      
+
       if (continueSharing) {
         // Enable background tracking and minimize app
         await locationProvider.enableBackgroundTracking();
@@ -159,8 +169,8 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> with Widget
             ),
           );
         }
-        // Minimize app (go to home)
-        SystemNavigator.pop();
+        // Minimize app (go to home) - only works on Android
+        if (!kIsWeb) SystemNavigator.pop();
         return false;
       } else {
         // Stop tracking and allow exit
@@ -168,10 +178,10 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> with Widget
         return true;
       }
     }
-    
+
     return true;
   }
-  
+
   @override
   Widget build(BuildContext context) {
     return PopScope(
@@ -193,7 +203,10 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> with Widget
                 if (locationProvider.isBackgroundTrackingEnabled) {
                   return Container(
                     margin: const EdgeInsets.only(right: 8),
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: AppColors.primary.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
@@ -201,7 +214,11 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> with Widget
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.location_on, color: AppColors.primary, size: 16),
+                        Icon(
+                          Icons.location_on,
+                          color: AppColors.primary,
+                          size: 16,
+                        ),
                         const SizedBox(width: 4),
                         Text(
                           'BG',
@@ -249,8 +266,8 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> with Widget
                             minHeight: 16,
                           ),
                           child: Text(
-                            notificationProvider.unreadCount > 9 
-                                ? '9+' 
+                            notificationProvider.unreadCount > 9
+                                ? '9+'
                                 : notificationProvider.unreadCount.toString(),
                             style: const TextStyle(
                               color: Colors.white,
@@ -281,233 +298,310 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> with Widget
         body: Consumer2<AuthProvider, LocationProvider>(
           builder: (context, authProvider, locationProvider, _) {
             final user = authProvider.user;
-            
+
             if (user == null) {
-              return const Center(
-                child: Text('No user data available'),
-              );
+              return const Center(child: Text('No user data available'));
             }
-          
-          return RefreshIndicator(
-            onRefresh: () async {
-              // Refresh user data
-            },
-            child: SingleChildScrollView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // Welcome card with campus info
-                  _buildWelcomeCard(context, user.firstName, user.campusId),
-                  
-                  const SizedBox(height: 20),
-                  
-                  // Location sharing toggle
-                  _buildLocationSharingCard(context, locationProvider),
-                  
-                  const SizedBox(height: 20),
-                  
-                  // Status selection
-                  _buildStatusCard(context, locationProvider),
-                  
-                  const SizedBox(height: 20),
-                  
-                  // Quick messages
-                  _buildQuickMessagesCard(context, locationProvider),
-                  
-                  const SizedBox(height: 20),
-                  
-                  // Stats card
-                  _buildStatsCard(context, locationProvider),
-                  
-                  const SizedBox(height: 20),
-                  
-                  // Map button for manual pinning - Enhanced
-                  Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Container(
-                                width: 44,
-                                height: 44,
-                                decoration: BoxDecoration(
-                                  color: AppColors.primary.withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: const Icon(Icons.map_outlined, color: AppColors.primary),
-                              ),
-                              const SizedBox(width: 14),
-                              const Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'Location Management',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.w600,
-                                        fontSize: 16,
-                                        color: AppColors.textPrimary,
-                                      ),
-                                    ),
-                                    SizedBox(height: 2),
-                                    Text(
-                                      'View or manually set your location',
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        color: AppColors.textSecondary,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 16),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: _buildMapActionButton(
-                                  icon: Icons.gps_fixed,
-                                  label: 'GPS Mode',
-                                  subtitle: 'Auto-track',
-                                  color: AppColors.primary,
-                                  onTap: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(builder: (_) => const StaffMapScreen(use3D: false, useManualPin: false)),
-                                    );
-                                  },
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: _buildMapActionButton(
-                                  icon: Icons.touch_app,
-                                  label: 'Pin Mode',
-                                  subtitle: 'Set manually',
-                                  color: AppColors.accent,
-                                  onTap: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(builder: (_) => const StaffMapScreen(use3D: false, useManualPin: true)),
-                                    );
-                                  },
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: _buildMapActionButton(
-                                  icon: Icons.view_in_ar,
-                                  label: '3D View',
-                                  subtitle: 'Campus map',
-                                  color: AppColors.info,
-                                  onTap: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(builder: (_) => const StaffMapScreen(use3D: true, useManualPin: false)),
-                                    );
-                                  },
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  
-                  const SizedBox(height: 20),
-                  
-                  // Find Colleagues card
-                  Card(
-                    child: InkWell(
-                      onTap: () {
-                        Navigator.push(
+
+            return RefreshIndicator(
+              onRefresh: () async {
+                await authProvider.refreshUser();
+                if (context.mounted) {
+                  context.read<FacultyProvider>().refresh();
+                }
+              },
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: EdgeInsets.all(context.responsivePadding),
+                child: ResponsiveContainer(
+                  maxWidth: 1000,
+                  padding: EdgeInsets.zero,
+                  child: ResponsiveBuilder(
+                    builder: (context, screenSize, deviceType) {
+                      // On tablet/desktop, use two-column layout for some cards
+                      if (deviceType != DeviceType.mobile) {
+                        return _buildDesktopLayout(
                           context,
-                          MaterialPageRoute(builder: (_) => const StaffDirectoryScreen()),
+                          user,
+                          locationProvider,
                         );
-                      },
-                      borderRadius: BorderRadius.circular(16),
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 50,
-                              height: 50,
-                              decoration: BoxDecoration(
-                                gradient: AppColors.accentGradient,
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: const Icon(Icons.people, color: Colors.white, size: 26),
-                            ),
-                            const SizedBox(width: 16),
-                            const Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Find Colleagues',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 16,
-                                    ),
-                                  ),
-                                  SizedBox(height: 4),
-                                  Text(
-                                    'Locate other staff members on campus',
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      color: AppColors.textSecondary,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const Icon(Icons.chevron_right, color: AppColors.textSecondary),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  
-                  const SizedBox(height: 20),
-                  
-                  // Sign out button
-                  OutlinedButton.icon(
-                    onPressed: () {
-                      _showSignOutDialog(context);
+                      }
+                      return _buildMobileLayout(
+                        context,
+                        user,
+                        locationProvider,
+                      );
                     },
-                    icon: const Icon(Icons.logout, color: AppColors.error),
-                    label: const Text(
-                      'Sign Out',
-                      style: TextStyle(color: AppColors.error),
-                    ),
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: AppColors.error),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                    ),
                   ),
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMobileLayout(
+    BuildContext context,
+    dynamic user,
+    LocationProvider locationProvider,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Welcome card
+        _buildWelcomeCard(context, user.firstName, user.campusId),
+        const SizedBox(height: 20),
+        // Location sharing toggle
+        _buildLocationSharingCard(context, locationProvider),
+        const SizedBox(height: 20),
+        // Status selection
+        _buildStatusCard(context, locationProvider),
+        const SizedBox(height: 20),
+        // Quick messages
+        _buildQuickMessagesCard(context, locationProvider),
+        const SizedBox(height: 20),
+        // Stats card
+        _buildStatsCard(context, locationProvider),
+        const SizedBox(height: 20),
+        // Map button
+        _buildMapManagementCard(context),
+        const SizedBox(height: 20),
+        // Find Colleagues card
+        _buildFindColleaguesCard(context),
+        const SizedBox(height: 20),
+        // Sign out button
+        _buildSignOutButton(context),
+      ],
+    );
+  }
+
+  Widget _buildDesktopLayout(
+    BuildContext context,
+    dynamic user,
+    LocationProvider locationProvider,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Welcome card (full width)
+        _buildWelcomeCard(context, user.firstName, user.campusId),
+        const SizedBox(height: 20),
+
+        // Two column layout for main controls
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Column(
+                children: [
+                  _buildLocationSharingCard(context, locationProvider),
+                  const SizedBox(height: 20),
+                  _buildStatusCard(context, locationProvider),
                 ],
               ),
             ),
-          );
-        },
-      ),
-    ),
+            const SizedBox(width: 20),
+            Expanded(
+              child: Column(
+                children: [
+                  _buildQuickMessagesCard(context, locationProvider),
+                  const SizedBox(height: 20),
+                  _buildStatsCard(context, locationProvider),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+
+        // Bottom row
+        Row(
+          children: [
+            Expanded(child: _buildMapManagementCard(context)),
+            const SizedBox(width: 20),
+            Expanded(child: _buildFindColleaguesCard(context)),
+          ],
+        ),
+        const SizedBox(height: 20),
+
+        // Sign out button (centered on desktop)
+        Center(
+          child: SizedBox(width: 300, child: _buildSignOutButton(context)),
+        ),
+      ],
     );
   }
-  
-  Widget _buildWelcomeCard(BuildContext context, String firstName, String campusId) {
+
+  Widget _buildMapManagementCard(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.map_outlined,
+                    color: AppColors.primary,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Location Management',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 16,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      SizedBox(height: 2),
+                      Text(
+                        'View or manually set your location',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: _buildMapActionButton(
+                    icon: Icons.gps_fixed,
+                    label: 'GPS Mode',
+                    subtitle: 'Auto-track',
+                    color: AppColors.primary,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const StaffMapScreen(use3D: false),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _buildMapActionButton(
+                    icon: Icons.view_in_ar,
+                    label: '3D View',
+                    subtitle: 'Campus map',
+                    color: AppColors.info,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const StaffMapScreen(use3D: true),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFindColleaguesCard(BuildContext context) {
+    return Card(
+      child: InkWell(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const StaffDirectoryScreen()),
+          );
+        },
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                width: 50,
+                height: 50,
+                decoration: BoxDecoration(
+                  gradient: AppColors.accentGradient,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.people, color: Colors.white, size: 26),
+              ),
+              const SizedBox(width: 16),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Find Colleagues',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      'Locate other staff members on campus',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right, color: AppColors.textSecondary),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSignOutButton(BuildContext context) {
+    return OutlinedButton.icon(
+      onPressed: () {
+        _showSignOutDialog(context);
+      },
+      icon: const Icon(Icons.logout, color: AppColors.error),
+      label: const Text('Sign Out', style: TextStyle(color: AppColors.error)),
+      style: OutlinedButton.styleFrom(
+        side: const BorderSide(color: AppColors.error),
+        padding: const EdgeInsets.symmetric(vertical: 14),
+      ),
+    );
+  }
+
+  Widget _buildWelcomeCard(
+    BuildContext context,
+    String firstName,
+    String campusId,
+  ) {
     final hour = DateTime.now().hour;
     String greeting;
     IconData icon;
-    
+
     if (hour < 12) {
       greeting = 'Good Morning';
       icon = Icons.wb_sunny;
@@ -518,11 +612,11 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> with Widget
       greeting = 'Good Evening';
       icon = Icons.nightlight_round;
     }
-    
+
     // Get campus display name
     final campus = AppConstants.getCampusById(campusId);
     final campusName = campus?['shortName'] ?? 'Unknown Campus';
-    
+
     return Card(
       child: Container(
         padding: const EdgeInsets.all(20),
@@ -557,7 +651,10 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> with Widget
                       ),
                       const Spacer(),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.white.withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(12),
@@ -603,7 +700,7 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> with Widget
       ),
     );
   }
-  
+
   Widget _buildLocationSharingCard(
     BuildContext context,
     LocationProvider locationProvider,
@@ -641,9 +738,8 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> with Widget
                     children: [
                       Text(
                         'Location Sharing',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.w600),
                       ),
                       Text(
                         locationProvider.isTracking
@@ -676,10 +772,10 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> with Widget
                 ),
               ],
             ),
-            
+
             if (locationProvider.isTracking) ...[
               const Divider(height: 24),
-              
+
               // Location info
               Row(
                 children: [
@@ -706,7 +802,41 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> with Widget
                   ),
                 ],
               ),
-              
+
+              // Off-campus privacy notice
+              if (!locationProvider.isWithinCampus) ...[
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.warning.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.visibility_off,
+                        size: 16,
+                        color: AppColors.warning,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Your location is only visible to administrators while off campus.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppColors.warning,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+
               if (locationProvider.lastUpdate != null) ...[
                 const SizedBox(height: 8),
                 Row(
@@ -727,16 +857,21 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> with Widget
                   ],
                 ),
               ],
-              
+
               // Background tracking indicator
               if (locationProvider.isBackgroundTrackingEnabled) ...[
                 const SizedBox(height: 12),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.primary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+                    border: Border.all(
+                      color: AppColors.primary.withValues(alpha: 0.3),
+                    ),
                   ),
                   child: Row(
                     children: [
@@ -764,7 +899,11 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> with Widget
                             );
                           }
                         },
-                        child: const Icon(Icons.close, color: AppColors.primary, size: 18),
+                        child: const Icon(
+                          Icons.close,
+                          color: AppColors.primary,
+                          size: 18,
+                        ),
                       ),
                     ],
                   ),
@@ -776,7 +915,7 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> with Widget
       ),
     );
   }
-  
+
   Widget _buildStatusCard(
     BuildContext context,
     LocationProvider locationProvider,
@@ -789,9 +928,9 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> with Widget
           children: [
             Text(
               'Current Status',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 16),
             Wrap(
@@ -807,12 +946,16 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> with Widget
                           locationProvider.setStatus(status);
                         }
                       : null,
-                  selectedColor: AppColors.getStatusColor(status).withValues(alpha: 0.2),
+                  selectedColor: AppColors.getStatusColor(
+                    status,
+                  ).withValues(alpha: 0.2),
                   labelStyle: TextStyle(
                     color: isSelected
                         ? AppColors.getStatusColor(status)
                         : AppColors.textPrimary,
-                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                    fontWeight: isSelected
+                        ? FontWeight.w600
+                        : FontWeight.normal,
                   ),
                   side: BorderSide(
                     color: isSelected
@@ -822,7 +965,7 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> with Widget
                 );
               }).toList(),
             ),
-            
+
             if (!locationProvider.isTracking) ...[
               const SizedBox(height: 12),
               Text(
@@ -839,7 +982,7 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> with Widget
       ),
     );
   }
-  
+
   Widget _buildQuickMessagesCard(
     BuildContext context,
     LocationProvider locationProvider,
@@ -871,7 +1014,7 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> with Widget
               ],
             ),
             const SizedBox(height: 12),
-            
+
             if (locationProvider.currentMessage != null) ...[
               Container(
                 padding: const EdgeInsets.all(12),
@@ -900,7 +1043,7 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> with Widget
               ),
               const SizedBox(height: 16),
             ],
-            
+
             Wrap(
               spacing: 8,
               runSpacing: 8,
@@ -926,9 +1069,9 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> with Widget
                 );
               }).toList(),
             ),
-            
+
             const SizedBox(height: 12),
-            
+
             // Custom message
             TextButton.icon(
               onPressed: locationProvider.isTracking
@@ -942,7 +1085,7 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> with Widget
       ),
     );
   }
-  
+
   Widget _buildStatsCard(
     BuildContext context,
     LocationProvider locationProvider,
@@ -955,9 +1098,9 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> with Widget
           children: [
             Text(
               'Today\'s Summary',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 16),
             Row(
@@ -988,7 +1131,7 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> with Widget
       ),
     );
   }
-  
+
   Widget _buildStatItem({
     required IconData icon,
     required String value,
@@ -1016,29 +1159,17 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> with Widget
           const SizedBox(height: 2),
           Text(
             label,
-            style: TextStyle(
-              fontSize: 12,
-              color: AppColors.textSecondary,
-            ),
+            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
           ),
         ],
       ),
     );
   }
-  
+
   String _formatTime(DateTime time) {
-    final now = DateTime.now();
-    final diff = now.difference(time);
-    
-    if (diff.inSeconds < 60) {
-      return 'Just now';
-    } else if (diff.inMinutes < 60) {
-      return '${diff.inMinutes} min ago';
-    } else {
-      return '${time.hour}:${time.minute.toString().padLeft(2, '0')}';
-    }
+    return formatRelativeTime(time);
   }
-  
+
   void _showCustomMessageDialog(
     BuildContext context,
     LocationProvider locationProvider,
@@ -1046,7 +1177,7 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> with Widget
     final controller = TextEditingController(
       text: locationProvider.currentMessage,
     );
-    
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -1076,9 +1207,9 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> with Widget
           ),
         ],
       ),
-    );
+    ).then((_) => controller.dispose());
   }
-  
+
   void _showSignOutDialog(BuildContext context) {
     final authProvider = context.read<AuthProvider>();
     final locationProvider = context.read<LocationProvider>();
@@ -1100,16 +1231,14 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> with Widget
               locationProvider.stopTracking();
               await authProvider.signOut();
             },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.error,
-            ),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
             child: const Text('Sign Out'),
           ),
         ],
       ),
     );
   }
-  
+
   Widget _buildMapActionButton({
     required IconData icon,
     required String label,
@@ -1125,10 +1254,7 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> with Widget
         decoration: BoxDecoration(
           color: color.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: color.withValues(alpha: 0.3),
-            width: 1,
-          ),
+          border: Border.all(color: color.withValues(alpha: 0.3), width: 1),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,

@@ -10,7 +10,7 @@ class PrimaryButton extends StatelessWidget {
   final IconData? icon;
   final double height;
   final Color? color;
-  
+
   const PrimaryButton({
     super.key,
     required this.text,
@@ -21,27 +21,29 @@ class PrimaryButton extends StatelessWidget {
     this.height = 56,
     this.color,
   });
-  
+
   @override
   Widget build(BuildContext context) {
     final buttonColor = color ?? AppColors.primary;
     final isDisabled = isLoading || onPressed == null;
-    
+
     return Container(
       width: isFullWidth ? double.infinity : null,
       height: height,
       decoration: BoxDecoration(
-        gradient: isDisabled 
-            ? null 
+        gradient: isDisabled
+            ? null
             : LinearGradient(
                 colors: [buttonColor, buttonColor.withValues(alpha: 0.85)],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
-        color: isDisabled ? AppColors.textSecondary.withValues(alpha: 0.3) : null,
+        color: isDisabled
+            ? AppColors.textSecondary.withValues(alpha: 0.3)
+            : null,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: isDisabled 
-            ? null 
+        boxShadow: isDisabled
+            ? null
             : [
                 BoxShadow(
                   color: buttonColor.withValues(alpha: 0.35),
@@ -100,7 +102,7 @@ class SecondaryButton extends StatelessWidget {
   final IconData? icon;
   final double height;
   final Color? color;
-  
+
   const SecondaryButton({
     super.key,
     required this.text,
@@ -111,23 +113,23 @@ class SecondaryButton extends StatelessWidget {
     this.height = 56,
     this.color,
   });
-  
+
   @override
   Widget build(BuildContext context) {
     final buttonColor = color ?? AppColors.primary;
     final isDisabled = isLoading || onPressed == null;
-    
+
     return Container(
       width: isFullWidth ? double.infinity : null,
       height: height,
       decoration: BoxDecoration(
-        color: isDisabled 
-            ? AppColors.surfaceLight 
+        color: isDisabled
+            ? AppColors.surfaceLight
             : buttonColor.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: isDisabled 
-              ? AppColors.border 
+          color: isDisabled
+              ? AppColors.border
               : buttonColor.withValues(alpha: 0.3),
           width: 1.5,
         ),
@@ -153,16 +155,20 @@ class SecondaryButton extends StatelessWidget {
                     children: [
                       if (icon != null) ...[
                         Icon(
-                          icon, 
-                          size: 22, 
-                          color: isDisabled ? AppColors.textSecondary : buttonColor,
+                          icon,
+                          size: 22,
+                          color: isDisabled
+                              ? AppColors.textSecondary
+                              : buttonColor,
                         ),
                         const SizedBox(width: 10),
                       ],
                       Text(
                         text,
                         style: TextStyle(
-                          color: isDisabled ? AppColors.textSecondary : buttonColor,
+                          color: isDisabled
+                              ? AppColors.textSecondary
+                              : buttonColor,
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
                           letterSpacing: 0.3,
@@ -186,7 +192,7 @@ class CustomIconButton extends StatelessWidget {
   final double size;
   final double iconSize;
   final String? tooltip;
-  
+
   const CustomIconButton({
     super.key,
     required this.icon,
@@ -197,11 +203,11 @@ class CustomIconButton extends StatelessWidget {
     this.iconSize = 24,
     this.tooltip,
   });
-  
+
   @override
   Widget build(BuildContext context) {
     final bgColor = backgroundColor ?? AppColors.surfaceLight;
-    
+
     Widget button = Container(
       width: size,
       height: size,
@@ -231,14 +237,11 @@ class CustomIconButton extends StatelessWidget {
         ),
       ),
     );
-    
+
     if (tooltip != null) {
-      button = Tooltip(
-        message: tooltip!,
-        child: button,
-      );
+      button = Tooltip(message: tooltip!, child: button);
     }
-    
+
     return button;
   }
 }
@@ -250,7 +253,7 @@ class GradientActionButton extends StatelessWidget {
   final Color color;
   final VoidCallback? onPressed;
   final bool isCompact;
-  
+
   const GradientActionButton({
     super.key,
     required this.icon,
@@ -259,7 +262,7 @@ class GradientActionButton extends StatelessWidget {
     this.onPressed,
     this.isCompact = false,
   });
-  
+
   @override
   Widget build(BuildContext context) {
     return Material(
@@ -315,7 +318,7 @@ class SmallActionButton extends StatelessWidget {
   final String label;
   final Color color;
   final VoidCallback? onPressed;
-  
+
   const SmallActionButton({
     super.key,
     required this.icon,
@@ -323,7 +326,7 @@ class SmallActionButton extends StatelessWidget {
     required this.color,
     this.onPressed,
   });
-  
+
   @override
   Widget build(BuildContext context) {
     return Material(
@@ -335,10 +338,7 @@ class SmallActionButton extends StatelessWidget {
           decoration: BoxDecoration(
             color: color.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: color.withValues(alpha: 0.2),
-              width: 1,
-            ),
+            border: Border.all(color: color.withValues(alpha: 0.2), width: 1),
           ),
           child: Container(
             height: 40,

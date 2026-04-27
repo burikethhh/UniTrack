@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../models/notification_model.dart';
 import '../../providers/notification_provider.dart';
-import '../../widgets/common/user_avatar.dart';
+import '../../widgets/widgets.dart';
 
 /// Screen to display notifications for staff members
 class NotificationsScreen extends StatelessWidget {
@@ -17,8 +17,10 @@ class NotificationsScreen extends StatelessWidget {
         actions: [
           Consumer<NotificationProvider>(
             builder: (context, provider, _) {
-              if (provider.notifications.isEmpty) return const SizedBox.shrink();
-              
+              if (provider.notifications.isEmpty) {
+                return const SizedBox.shrink();
+              }
+
               return PopupMenuButton<String>(
                 icon: const Icon(Icons.more_vert),
                 onSelected: (value) {
@@ -58,7 +60,7 @@ class NotificationsScreen extends StatelessWidget {
       body: Consumer<NotificationProvider>(
         builder: (context, provider, _) {
           if (provider.isLoading) {
-            return const Center(child: CircularProgressIndicator());
+            return const NotificationListSkeleton();
           }
 
           if (provider.notifications.isEmpty) {
@@ -98,7 +100,7 @@ class NotificationsScreen extends StatelessWidget {
       ),
     );
   }
-  
+
   /// Groups notifications by date and returns a ListView with date headers
   Widget _buildGroupedNotificationList(
     BuildContext context,
@@ -108,17 +110,17 @@ class NotificationsScreen extends StatelessWidget {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final yesterday = today.subtract(const Duration(days: 1));
-    
+
     // Group notifications by date category
     final Map<String, List<AppNotification>> grouped = {};
-    
+
     for (final notification in notifications) {
       final notifDate = DateTime(
         notification.createdAt.year,
         notification.createdAt.month,
         notification.createdAt.day,
       );
-      
+
       String key;
       if (notifDate == today) {
         key = 'Today';
@@ -129,53 +131,40 @@ class NotificationsScreen extends StatelessWidget {
       } else {
         key = 'Earlier';
       }
-      
+
       grouped.putIfAbsent(key, () => []);
       grouped[key]!.add(notification);
     }
-    
+
     // Order of date sections
     final sectionOrder = ['Today', 'Yesterday', 'This Week', 'Earlier'];
-    
+
+    // Build a flat list of widgets to avoid index arithmetic bugs
+    final List<Widget> items = [];
+    for (final section in sectionOrder) {
+      final sectionItems = grouped[section];
+      if (sectionItems == null || sectionItems.isEmpty) continue;
+      items.add(_buildDateHeader(section));
+      for (final notification in sectionItems) {
+        items.add(
+          _NotificationTile(
+            key: ValueKey(notification.id),
+            notification: notification,
+            onTap: () =>
+                _handleNotificationTap(context, notification, provider),
+            onDismiss: () => provider.deleteNotification(notification.id),
+          ),
+        );
+      }
+    }
+
     return ListView.builder(
       padding: const EdgeInsets.symmetric(vertical: 8),
-      itemCount: sectionOrder.fold<int>(
-        0, 
-        (count, section) => count + (grouped[section]?.isNotEmpty == true 
-            ? grouped[section]!.length + 1 // +1 for header
-            : 0),
-      ),
-      itemBuilder: (context, index) {
-        // Calculate which section and item this index represents
-        int currentIndex = 0;
-        for (final section in sectionOrder) {
-          final items = grouped[section];
-          if (items == null || items.isEmpty) continue;
-          
-          // Header
-          if (index == currentIndex) {
-            return _buildDateHeader(section);
-          }
-          currentIndex++;
-          
-          // Items in this section
-          final itemIndex = index - currentIndex;
-          if (itemIndex < items.length) {
-            final notification = items[itemIndex];
-            return _NotificationTile(
-              notification: notification,
-              onTap: () => _handleNotificationTap(context, notification, provider),
-              onDismiss: () => provider.deleteNotification(notification.id),
-            );
-          }
-          currentIndex += items.length;
-        }
-        
-        return const SizedBox.shrink();
-      },
+      itemCount: items.length,
+      itemBuilder: (context, index) => items[index],
     );
   }
-  
+
   /// Builds a date section header
   Widget _buildDateHeader(String title) {
     return Padding(
@@ -223,16 +212,22 @@ class NotificationsScreen extends StatelessWidget {
     // Show details dialog
     showDialog(
       context: context,
-      builder: (context) => _NotificationDetailDialog(notification: notification),
+      builder: (context) =>
+          _NotificationDetailDialog(notification: notification),
     );
   }
 
-  void _showDeleteAllDialog(BuildContext context, NotificationProvider provider) {
+  void _showDeleteAllDialog(
+    BuildContext context,
+    NotificationProvider provider,
+  ) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete All Notifications'),
-        content: const Text('Are you sure you want to delete all notifications? This cannot be undone.'),
+        content: const Text(
+          'Are you sure you want to delete all notifications? This cannot be undone.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -259,6 +254,7 @@ class _NotificationTile extends StatelessWidget {
   final VoidCallback onDismiss;
 
   const _NotificationTile({
+    super.key,
     required this.notification,
     required this.onTap,
     required this.onDismiss,
@@ -281,14 +277,11 @@ class _NotificationTile extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           decoration: BoxDecoration(
-            color: notification.isRead 
-                ? Colors.white 
+            color: notification.isRead
+                ? Colors.white
                 : AppColors.primary.withValues(alpha: 0.05),
             border: Border(
-              bottom: BorderSide(
-                color: AppColors.border,
-                width: 0.5,
-              ),
+              bottom: BorderSide(color: AppColors.border, width: 0.5),
             ),
           ),
           child: Row(
@@ -297,7 +290,7 @@ class _NotificationTile extends StatelessWidget {
               // Avatar or icon
               _buildAvatar(),
               const SizedBox(width: 12),
-              
+
               // Content
               Expanded(
                 child: Column(
@@ -311,8 +304,8 @@ class _NotificationTile extends StatelessWidget {
                             notification.title,
                             style: TextStyle(
                               fontSize: 14,
-                              fontWeight: notification.isRead 
-                                  ? FontWeight.normal 
+                              fontWeight: notification.isRead
+                                  ? FontWeight.normal
                                   : FontWeight.w600,
                               color: AppColors.textPrimary,
                             ),
@@ -328,7 +321,7 @@ class _NotificationTile extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 4),
-                    
+
                     // Message
                     Text(
                       notification.message,
@@ -339,12 +332,15 @@ class _NotificationTile extends StatelessWidget {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    
+
                     // Additional info (department)
                     if (notification.data?['studentDepartment'] != null) ...[
                       const SizedBox(height: 6),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 2,
+                        ),
                         decoration: BoxDecoration(
                           color: AppColors.primary.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(4),
@@ -362,7 +358,7 @@ class _NotificationTile extends StatelessWidget {
                   ],
                 ),
               ),
-              
+
               // Unread indicator
               if (!notification.isRead)
                 Container(
@@ -384,7 +380,7 @@ class _NotificationTile extends StatelessWidget {
   Widget _buildAvatar() {
     IconData icon;
     Color color;
-    
+
     switch (notification.type) {
       case NotificationType.lookingForYou:
         icon = Icons.person_search;
@@ -408,7 +404,7 @@ class _NotificationTile extends StatelessWidget {
     if (notification.senderPhotoUrl != null) {
       return FacultyAvatar(
         imageUrl: notification.senderPhotoUrl,
-        initials: notification.senderName.isNotEmpty 
+        initials: notification.senderName.isNotEmpty
             ? notification.senderName[0].toUpperCase()
             : '?',
         size: 48,
@@ -464,7 +460,9 @@ class _NotificationDetailDialog extends StatelessWidget {
               if (notification.senderPhotoUrl != null)
                 FacultyAvatar(
                   imageUrl: notification.senderPhotoUrl,
-                  initials: notification.senderName[0],
+                  initials: notification.senderName.isNotEmpty
+                      ? notification.senderName[0]
+                      : '?',
                   size: 40,
                   isOnline: false,
                 )
@@ -472,7 +470,9 @@ class _NotificationDetailDialog extends StatelessWidget {
                 CircleAvatar(
                   backgroundColor: AppColors.primary.withValues(alpha: 0.1),
                   child: Text(
-                    notification.senderName[0].toUpperCase(),
+                    notification.senderName.isNotEmpty
+                        ? notification.senderName[0].toUpperCase()
+                        : '?',
                     style: TextStyle(color: AppColors.primary),
                   ),
                 ),
@@ -502,14 +502,11 @@ class _NotificationDetailDialog extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 16),
-          
+
           // Message
-          Text(
-            notification.message,
-            style: const TextStyle(fontSize: 15),
-          ),
+          Text(notification.message, style: const TextStyle(fontSize: 15)),
           const SizedBox(height: 12),
-          
+
           // Time
           Row(
             children: [
@@ -517,10 +514,7 @@ class _NotificationDetailDialog extends StatelessWidget {
               const SizedBox(width: 6),
               Text(
                 notification.timeAgoText,
-                style: TextStyle(
-                  fontSize: 13,
-                  color: AppColors.textSecondary,
-                ),
+                style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
               ),
             ],
           ),

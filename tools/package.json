@@ -1,5 +1,16 @@
 {
   "dependencies": {
-    "firebase-admin": "^13.6.0"
-  }
+    "firebase-admin": "^13.6.0",
+    "sharp": "^0.34.5"
+  },
+  "name": "tools",
+  "version": "1.0.0",
+  "description": "",
+  "main": "convert_icons.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
 }

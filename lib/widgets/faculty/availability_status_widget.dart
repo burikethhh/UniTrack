@@ -33,7 +33,7 @@ class AvailabilityStatusSelector extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
-        
+
         // Status options
         Wrap(
           spacing: 8,
@@ -47,7 +47,7 @@ class AvailabilityStatusSelector extends StatelessWidget {
             );
           }).toList(),
         ),
-        
+
         // Custom message input
         if (showCustomMessage && onCustomMessageChanged != null) ...[
           const SizedBox(height: 16),
@@ -220,9 +220,7 @@ class AvailabilityStatusIndicator extends StatelessWidget {
         decoration: BoxDecoration(
           color: status!.color.withValues(alpha: 0.15),
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: status!.color.withValues(alpha: 0.3),
-          ),
+          border: Border.all(color: status!.color.withValues(alpha: 0.3)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -236,11 +234,7 @@ class AvailabilityStatusIndicator extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
-            Icon(
-              status!.icon,
-              size: 16,
-              color: status!.color,
-            ),
+            Icon(status!.icon, size: 16, color: status!.color),
             const SizedBox(width: 6),
             Flexible(
               child: Text(
@@ -280,11 +274,7 @@ class AvailabilityStatusIndicator extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            Icons.add_circle_outline,
-            size: 16,
-            color: Colors.grey[600],
-          ),
+          Icon(Icons.add_circle_outline, size: 16, color: Colors.grey[600]),
           const SizedBox(width: 6),
           Text(
             'Set Status',
@@ -317,7 +307,8 @@ class AvailabilityStatusBottomSheet extends StatefulWidget {
     required BuildContext context,
     AvailabilityStatus? currentStatus,
     String? customMessage,
-    required void Function(AvailabilityStatus status, String? customMessage) onSave,
+    required void Function(AvailabilityStatus status, String? customMessage)
+    onSave,
   }) async {
     await showModalBottomSheet(
       context: context,
@@ -392,31 +383,27 @@ class _AvailabilityStatusBottomSheetState
           // Title
           const Text(
             'Set Your Status',
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-            ),
+            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
           Text(
             'Let others know your availability',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey[600],
-            ),
+            style: TextStyle(fontSize: 14, color: Colors.grey[600]),
           ),
           const SizedBox(height: 24),
 
           // Status options
-          ...AvailabilityStatus.values.map((status) => _StatusOption(
-                status: status,
-                isSelected: _selectedStatus == status,
-                onTap: () {
-                  setState(() {
-                    _selectedStatus = status;
-                  });
-                },
-              )),
+          ...AvailabilityStatus.values.map(
+            (status) => _StatusOption(
+              status: status,
+              isSelected: _selectedStatus == status,
+              onTap: () {
+                setState(() {
+                  _selectedStatus = status;
+                });
+              },
+            ),
+          ),
 
           const SizedBox(height: 20),
 
@@ -452,10 +439,7 @@ class _AvailabilityStatusBottomSheetState
               ),
               child: const Text(
                 'Save Status',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
               ),
             ),
           ),
@@ -507,11 +491,7 @@ class _StatusOption extends StatelessWidget {
                     color: status.color.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: Icon(
-                    status.icon,
-                    color: status.color,
-                    size: 22,
-                  ),
+                  child: Icon(status.icon, color: status.color, size: 22),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
@@ -519,18 +499,14 @@ class _StatusOption extends StatelessWidget {
                     status.displayName,
                     style: TextStyle(
                       fontSize: 16,
-                      fontWeight:
-                          isSelected ? FontWeight.w600 : FontWeight.w500,
-                      color:
-                          isSelected ? status.color : Colors.grey[800],
+                      fontWeight: isSelected
+                          ? FontWeight.w600
+                          : FontWeight.w500,
+                      color: isSelected ? status.color : Colors.grey[800],
                     ),
                   ),
                 ),
-                if (isSelected)
-                  Icon(
-                    Icons.check_circle,
-                    color: status.color,
-                  ),
+                if (isSelected) Icon(Icons.check_circle, color: status.color),
               ],
             ),
           ),

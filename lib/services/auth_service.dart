@@ -5,35 +5,30 @@ import '../models/user_model.dart';
 
 /// Authentication Service for UniTrack
 class AuthService {
-  final FirebaseAuth _auth = FirebaseAuth.instance;
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  
+  final FirebaseAuth _auth;
+  final FirebaseFirestore _firestore;
+
+  /// Default constructor - uses Firebase instances
+  AuthService()
+      : _auth = FirebaseAuth.instance,
+        _firestore = FirebaseFirestore.instance;
+
+  /// Testable constructor - allows dependency injection
+  @visibleForTesting
+  AuthService.testable({
+    required FirebaseAuth auth,
+    required FirebaseFirestore firestore,
+  })  : _auth = auth,
+        _firestore = firestore;
+
   /// Get current Firebase user
   User? get currentUser => _auth.currentUser;
-  
+
   /// Stream of auth state changes
   Stream<User?> get authStateChanges => _auth.authStateChanges();
-  
+
   /// Check if user is logged in
   bool get isLoggedIn => currentUser != null;
-  
-  /// Build a fallback UserModel from Firebase Auth data when Firestore is unavailable
-  UserModel _buildFallbackUser(User firebaseUser, String email) {
-    final nameParts = (firebaseUser.displayName ?? email.split('@').first).split(' ');
-    final firstName = nameParts.isNotEmpty ? nameParts.first : 'User';
-    final lastName = nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '';
-    return UserModel(
-      id: firebaseUser.uid,
-      email: email,
-      firstName: firstName,
-      lastName: lastName,
-      role: UserRole.student,
-      createdAt: firebaseUser.metadata.creationTime ?? DateTime.now(),
-      lastLoginAt: DateTime.now(),
-      campusId: 'isulan',
-      isActive: true,
-    );
-  }
 
   /// Sign in with email and password
   Future<UserModel?> signInWithEmailPassword({
@@ -46,57 +41,72 @@ class AuthService {
         email: email,
         password: password,
       );
-      
+
       debugPrint('Firebase Auth successful: uid=${credential.user?.uid}');
-      
+
       if (credential.user != null) {
         final firebaseUser = credential.user!;
-        
-        // Fetch user model with timeout to prevent hanging
+
+        // Platform-aware timeout: web Firestore is slower (no persistent connection)
+        final timeout = kIsWeb
+            ? const Duration(seconds: 15)
+            : const Duration(seconds: 8);
+
+        // Fetch user model — retry once on timeout instead of using a fallback
         UserModel? userModel;
         try {
-          userModel = await getUserById(firebaseUser.uid).timeout(
-            const Duration(seconds: 8),
-            onTimeout: () {
-              debugPrint('getUserById timed out, using fallback');
-              return null;
-            },
-          );
+          userModel = await getUserById(firebaseUser.uid).timeout(timeout);
           debugPrint('User document found: ${userModel?.fullName}');
         } catch (e) {
-          debugPrint('Error fetching user document: $e');
+          debugPrint('First attempt to fetch user document failed: $e');
+          // Retry once with a longer timeout
+          try {
+            userModel = await getUserById(
+              firebaseUser.uid,
+            ).timeout(const Duration(seconds: 15));
+            debugPrint('User document found on retry: ${userModel?.fullName}');
+          } catch (e2) {
+            debugPrint('Retry also failed: $e2');
+          }
         }
-        
-        // If user document doesn't exist or Firestore timed out, build from Auth data
+
+        // If user document truly doesn't exist, create it via legacy migration
         if (userModel == null) {
-          debugPrint('No user document found or timed out, creating fallback...');
-          userModel = _buildFallbackUser(firebaseUser, email);
-          
-          // Try to save the document in the background (don't await/block)
-          _firestore
-              .collection('users')
-              .doc(firebaseUser.uid)
-              .set(userModel.toFirestore(), SetOptions(merge: true))
-              .then((_) => debugPrint('Created/merged user document for: ${firebaseUser.uid}'))
-              .catchError((e) => debugPrint('Error saving user document: $e'));
-          
-          return userModel;
+          debugPrint(
+            'No user document found, creating via legacy migration...',
+          );
+          userModel = await createUserDocumentForLegacyUser(firebaseUser)
+              .timeout(
+                const Duration(seconds: 10),
+                onTimeout: () {
+                  debugPrint('Legacy user creation timed out');
+                  return null;
+                },
+              );
         }
-        
+
+        // If we still have no user model, sign out and throw a clear error
+        if (userModel == null) {
+          await _auth.signOut();
+          throw 'Could not load your profile. Please check your connection and try again.';
+        }
+
         // Check if user is banned
         if (!userModel.isActive) {
           debugPrint('User is banned/inactive');
           await _auth.signOut();
           throw 'Your account has been disabled. Please contact an administrator.';
         }
-        
+
         // Update last login time in background (fire-and-forget, don't block)
-        _firestore.collection('users').doc(firebaseUser.uid).set({
-          'lastLoginAt': Timestamp.now(),
-        }, SetOptions(merge: true)).catchError((e) {
-          debugPrint('Error updating last login: $e');
-        });
-        
+        _firestore
+            .collection('users')
+            .doc(firebaseUser.uid)
+            .set({'lastLoginAt': Timestamp.now()}, SetOptions(merge: true))
+            .catchError((e) {
+              debugPrint('Error updating last login: $e');
+            });
+
         debugPrint('Login successful for: ${userModel.fullName}');
         return userModel;
       }
@@ -109,7 +119,7 @@ class AuthService {
       rethrow;
     }
   }
-  
+
   /// Register new user with email and password
   Future<UserModel?> registerWithEmailPassword({
     required String email,
@@ -126,8 +136,16 @@ class AuthService {
         email: email,
         password: password,
       );
-      
+
       if (credential.user != null) {
+        // Send email verification
+        try {
+          await credential.user!.sendEmailVerification();
+          debugPrint('Verification email sent to $email');
+        } catch (e) {
+          debugPrint('Failed to send verification email: $e');
+        }
+
         final user = UserModel(
           id: credential.user!.uid,
           email: email,
@@ -142,13 +160,13 @@ class AuthService {
           isTrackingEnabled: false,
           currentStatus: role == UserRole.staff ? 'Available' : null,
         );
-        
+
         // Save user to Firestore
         await _firestore
             .collection('users')
             .doc(credential.user!.uid)
             .set(user.toFirestore());
-        
+
         return user;
       }
       return null;
@@ -156,7 +174,7 @@ class AuthService {
       throw _handleAuthException(e);
     }
   }
-  
+
   /// Get user by ID (with automatic migration for old documents)
   Future<UserModel?> getUserById(String userId) async {
     try {
@@ -176,29 +194,35 @@ class AuthService {
       throw 'Error fetching user: $e';
     }
   }
-  
+
   /// Get current user model
   Future<UserModel?> getCurrentUserModel() async {
     if (currentUser == null) return null;
     return await getUserById(currentUser!.uid);
   }
-  
+
   /// Create user document for legacy/migrated users who have Firebase Auth but no Firestore document
   Future<UserModel?> createUserDocumentForLegacyUser(User firebaseUser) async {
     try {
       // Check if document already exists
-      final existingDoc = await _firestore.collection('users').doc(firebaseUser.uid).get();
+      final existingDoc = await _firestore
+          .collection('users')
+          .doc(firebaseUser.uid)
+          .get();
       if (existingDoc.exists) {
         // Document exists, return it as UserModel
         return UserModel.fromFirestore(existingDoc);
       }
-      
+
       // Create new user document from Firebase Auth data
       final email = firebaseUser.email ?? '';
-      final nameParts = (firebaseUser.displayName ?? email.split('@').first).split(' ');
+      final nameParts = (firebaseUser.displayName ?? email.split('@').first)
+          .split(' ');
       final firstName = nameParts.isNotEmpty ? nameParts.first : 'User';
-      final lastName = nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '';
-      
+      final lastName = nameParts.length > 1
+          ? nameParts.sublist(1).join(' ')
+          : '';
+
       final user = UserModel(
         id: firebaseUser.uid,
         email: email,
@@ -210,13 +234,13 @@ class AuthService {
         campusId: 'isulan', // Default campus
         isActive: true,
       );
-      
+
       // Save to Firestore
       await _firestore
           .collection('users')
           .doc(firebaseUser.uid)
           .set(user.toFirestore());
-      
+
       debugPrint('Created user document for legacy user: ${firebaseUser.uid}');
       return user;
     } catch (e) {
@@ -224,16 +248,16 @@ class AuthService {
       return null;
     }
   }
-  
+
   /// Migrate user document to ensure all required fields exist
   Future<UserModel?> migrateUserDocument(String userId) async {
     try {
       final doc = await _firestore.collection('users').doc(userId).get();
       if (!doc.exists) return null;
-      
+
       final data = doc.data() as Map<String, dynamic>;
       final updates = <String, dynamic>{};
-      
+
       // Add missing fields with defaults
       if (data['campusId'] == null) {
         updates['campusId'] = 'isulan';
@@ -254,15 +278,24 @@ class AuthService {
       if (data['role'] == null) {
         updates['role'] = 'student';
       }
-      
+
       // Apply updates if any
       if (updates.isNotEmpty) {
-        await _firestore.collection('users').doc(userId).set(updates, SetOptions(merge: true));
-        debugPrint('Migrated user document $userId with fields: ${updates.keys.join(', ')}');
+        await _firestore
+            .collection('users')
+            .doc(userId)
+            .set(updates, SetOptions(merge: true));
+        debugPrint(
+          'Migrated user document $userId with fields: ${updates.keys.join(', ')}',
+        );
       }
-      
-      // Return updated user
-      return await getUserById(userId);
+
+      // Re-fetch and parse — don't recurse through getUserById
+      final updatedDoc = await _firestore.collection('users').doc(userId).get();
+      if (updatedDoc.exists) {
+        return UserModel.fromFirestore(updatedDoc);
+      }
+      return null;
     } catch (e) {
       debugPrint('Error migrating user document: $e');
       return null;
@@ -280,16 +313,24 @@ class AuthService {
       throw 'Error updating profile: $e';
     }
   }
-  
+
   /// Send password reset email
   Future<void> sendPasswordResetEmail(String email) async {
     try {
+      debugPrint('🔑 Sending password reset email to: $email');
       await _auth.sendPasswordResetEmail(email: email);
+      debugPrint('✅ Password reset email sent successfully to: $email');
     } on FirebaseAuthException catch (e) {
+      debugPrint(
+        '❌ Password reset error: code=${e.code}, message=${e.message}',
+      );
       throw _handleAuthException(e);
+    } catch (e) {
+      debugPrint('❌ Password reset unexpected error: $e');
+      rethrow;
     }
   }
-  
+
   /// Sign out
   Future<void> signOut() async {
     await _auth.signOut();
@@ -299,7 +340,7 @@ class AuthService {
   Future<void> reauthenticate(String email, String password) async {
     final user = _auth.currentUser;
     if (user == null) throw 'No user is currently signed in.';
-    
+
     final credential = EmailAuthProvider.credential(
       email: email,
       password: password,
@@ -311,31 +352,44 @@ class AuthService {
   Future<void> deleteAccount() async {
     final user = _auth.currentUser;
     if (user == null) throw 'No user is currently signed in.';
-    
+
     final userId = user.uid;
-    
+
     try {
-      // Delete user's location data
+      // Delete the Firebase Auth account FIRST
+      // (requires recent login — if it fails, data is preserved)
+      await user.delete();
+
+      // Now clean up Firestore data (auth already deleted, so best-effort)
       try {
         await _firestore.collection('locations').doc(userId).delete();
       } catch (_) {}
-      
-      // Delete user's notifications
+
+      // Delete user's notifications (both sent and received) in chunks
       try {
-        final notifSnap = await _firestore
+        final receivedSnap = await _firestore
             .collection('notifications')
-            .where('userId', isEqualTo: userId)
+            .where('recipientId', isEqualTo: userId)
             .get();
-        for (final doc in notifSnap.docs) {
-          await doc.reference.delete();
+        final sentSnap = await _firestore
+            .collection('notifications')
+            .where('senderId', isEqualTo: userId)
+            .get();
+        final allDocs = [...receivedSnap.docs, ...sentSnap.docs];
+        for (int i = 0; i < allDocs.length; i += 499) {
+          final batch = _firestore.batch();
+          final end = (i + 499 < allDocs.length) ? i + 499 : allDocs.length;
+          for (final doc in allDocs.sublist(i, end)) {
+            batch.delete(doc.reference);
+          }
+          await batch.commit();
         }
       } catch (_) {}
-      
+
       // Delete user document from Firestore
-      await _firestore.collection('users').doc(userId).delete();
-      
-      // Delete the Firebase Auth account
-      await user.delete();
+      try {
+        await _firestore.collection('users').doc(userId).delete();
+      } catch (_) {}
     } on FirebaseAuthException catch (e) {
       if (e.code == 'requires-recent-login') {
         throw 'requires-recent-login';
@@ -343,7 +397,7 @@ class AuthService {
       throw _handleAuthException(e);
     }
   }
-  
+
   /// Handle Firebase Auth exceptions
   String _handleAuthException(FirebaseAuthException e) {
     debugPrint('Firebase Auth Error: code=${e.code}, message=${e.message}');

@@ -1,4 +1,6 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/constants/app_constants.dart';
@@ -15,7 +17,7 @@ class FacultyCard extends StatelessWidget {
   final bool showDistance;
   final String? distanceText;
   final bool showQuickActions; // Enable call/email buttons
-  
+
   const FacultyCard({
     super.key,
     required this.faculty,
@@ -26,7 +28,7 @@ class FacultyCard extends StatelessWidget {
     this.distanceText,
     this.showQuickActions = true,
   });
-  
+
   @override
   Widget build(BuildContext context) {
     return Card(
@@ -46,7 +48,7 @@ class FacultyCard extends StatelessWidget {
                 size: 56,
               ),
               const SizedBox(width: 16),
-              
+
               // Info
               Expanded(
                 child: Column(
@@ -62,9 +64,10 @@ class FacultyCard extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 2),
-                    
+
                     // Position & Department
-                    if (faculty.user.position != null || faculty.user.department != null)
+                    if (faculty.user.position != null ||
+                        faculty.user.department != null)
                       Text(
                         [
                           faculty.user.position,
@@ -78,7 +81,7 @@ class FacultyCard extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                       ),
                     const SizedBox(height: 8),
-                    
+
                     // Status row - use Wrap to prevent overflow
                     Wrap(
                       spacing: 6,
@@ -88,7 +91,47 @@ class FacultyCard extends StatelessWidget {
                         StatusBadge(status: faculty.displayStatus),
                         // Campus badge
                         _buildCampusBadge(faculty.user.campusId),
-                        if (faculty.isOnline)
+                        // Reconnecting indicator (location age 60s–180s)
+                        if (faculty.isReconnecting)
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.sync,
+                                size: 12,
+                                color: AppColors.warning,
+                              ),
+                              const SizedBox(width: 2),
+                              Text(
+                                faculty.lastSeenText,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: AppColors.warning,
+                                ),
+                              ),
+                            ],
+                          ),
+                        // Low accuracy indicator
+                        if (faculty.isOnline && faculty.isLowAccuracy)
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.gps_not_fixed,
+                                size: 12,
+                                color: AppColors.warning,
+                              ),
+                              const SizedBox(width: 2),
+                              Text(
+                                '~${faculty.locationAccuracy?.toStringAsFixed(0)}m',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: AppColors.warning,
+                                ),
+                              ),
+                            ],
+                          ),
+                        if (faculty.isOnline && !faculty.isReconnecting)
                           Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
@@ -128,12 +171,15 @@ class FacultyCard extends StatelessWidget {
                           ),
                       ],
                     ),
-                    
+
                     // Quick message
                     if (faculty.location?.quickMessage != null) ...[
                       const SizedBox(height: 6),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
                         decoration: BoxDecoration(
                           color: AppColors.info.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(6),
@@ -150,9 +196,11 @@ class FacultyCard extends StatelessWidget {
                         ),
                       ),
                     ],
-                    
+
                     // Quick Actions Row (Call / Email)
-                    if (showQuickActions && (faculty.user.phoneNumber != null || faculty.user.email.isNotEmpty)) ...[
+                    if (showQuickActions &&
+                        (faculty.user.phoneNumber != null ||
+                            faculty.user.email.isNotEmpty)) ...[
                       const SizedBox(height: 10),
                       Row(
                         children: [
@@ -163,14 +211,16 @@ class FacultyCard extends StatelessWidget {
                               color: AppColors.primary,
                               onTap: () => _launchEmail(faculty.user.email),
                             ),
-                          if (faculty.user.email.isNotEmpty && faculty.user.phoneNumber != null)
+                          if (faculty.user.email.isNotEmpty &&
+                              faculty.user.phoneNumber != null)
                             const SizedBox(width: 8),
                           if (faculty.user.phoneNumber != null)
                             _buildQuickActionChip(
                               icon: Icons.phone_outlined,
                               label: 'Call',
                               color: AppColors.success,
-                              onTap: () => _launchPhone(faculty.user.phoneNumber!),
+                              onTap: () =>
+                                  _launchPhone(faculty.user.phoneNumber!),
                             ),
                         ],
                       ),
@@ -178,7 +228,7 @@ class FacultyCard extends StatelessWidget {
                   ],
                 ),
               ),
-              
+
               // Action buttons - vertical column for better mobile UX
               if (faculty.isOnline && (onPing != null || onNavigate != null))
                 Column(
@@ -210,7 +260,7 @@ class FacultyCard extends StatelessWidget {
       ),
     );
   }
-  
+
   /// Build consistent action button
   Widget _buildActionButton({
     required IconData icon,
@@ -230,22 +280,18 @@ class FacultyCard extends StatelessWidget {
             width: 44,
             height: 44,
             alignment: Alignment.center,
-            child: Icon(
-              icon,
-              color: color,
-              size: 22,
-            ),
+            child: Icon(icon, color: color, size: 22),
           ),
         ),
       ),
     );
   }
-  
+
   /// Build compact campus badge
   Widget _buildCampusBadge(String campusId) {
     final campus = AppConstants.getCampusById(campusId);
     final campusName = campus?['shortName'] ?? 'Unknown';
-    
+
     // Campus-specific colors
     Color badgeColor;
     switch (campusId) {
@@ -261,7 +307,7 @@ class FacultyCard extends StatelessWidget {
       default:
         badgeColor = Colors.grey;
     }
-    
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
@@ -278,7 +324,7 @@ class FacultyCard extends StatelessWidget {
       ),
     );
   }
-  
+
   /// Build quick action chip (Email/Call)
   Widget _buildQuickActionChip({
     required IconData icon,
@@ -313,20 +359,37 @@ class FacultyCard extends StatelessWidget {
       ),
     );
   }
-  
-  /// Launch email app
+
+  /// Launch email app with web fallback
   Future<void> _launchEmail(String email) async {
     final Uri emailUri = Uri(scheme: 'mailto', path: email);
-    if (await canLaunchUrl(emailUri)) {
-      await launchUrl(emailUri);
+    try {
+      if (kIsWeb) {
+        await launchUrl(emailUri);
+      } else if (await canLaunchUrl(emailUri)) {
+        await launchUrl(emailUri);
+      } else {
+        await Clipboard.setData(ClipboardData(text: email));
+      }
+    } catch (_) {
+      await Clipboard.setData(ClipboardData(text: email));
     }
   }
-  
-  /// Launch phone dialer
+
+  /// Launch phone dialer with web fallback
   Future<void> _launchPhone(String phone) async {
     final Uri phoneUri = Uri(scheme: 'tel', path: phone);
-    if (await canLaunchUrl(phoneUri)) {
-      await launchUrl(phoneUri);
+    try {
+      if (kIsWeb) {
+        // tel: links often don't work on web — copy to clipboard
+        await Clipboard.setData(ClipboardData(text: phone));
+      } else if (await canLaunchUrl(phoneUri)) {
+        await launchUrl(phoneUri);
+      } else {
+        await Clipboard.setData(ClipboardData(text: phone));
+      }
+    } catch (_) {
+      await Clipboard.setData(ClipboardData(text: phone));
     }
   }
 }

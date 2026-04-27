@@ -10,7 +10,7 @@ class DepartmentModel {
   final String? buildingLocation;
   final int staffCount;
   final bool isActive;
-  
+
   DepartmentModel({
     required this.id,
     required this.name,
@@ -21,7 +21,7 @@ class DepartmentModel {
     this.staffCount = 0,
     this.isActive = true,
   });
-  
+
   /// Create from Firestore document
   factory DepartmentModel.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
@@ -36,7 +36,7 @@ class DepartmentModel {
       isActive: data['isActive'] ?? true,
     );
   }
-  
+
   /// Convert to Firestore document
   Map<String, dynamic> toFirestore() {
     return {
@@ -49,7 +49,7 @@ class DepartmentModel {
       'isActive': isActive,
     };
   }
-  
+
   @override
   String toString() {
     return 'DepartmentModel(id: $id, name: $name)';

@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Deep Navy Background Gradient -->
+    <linearGradient id="bg-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0a2540" />
+      <stop offset="50%" stop-color="#0f3460" />
+      <stop offset="100%" stop-color="#16213e" />
+    </linearGradient>
+    
+    <!-- Vibrant Emerald Pin Gradient -->
+    <linearGradient id="pin-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#00f5b8" />
+      <stop offset="100%" stop-color="#00c896" />
+    </linearGradient>
+
+    <!-- Subtle Glow Effect -->
+    <filter id="glow" x="-25%" y="-25%" width="150%" height="150%">
+      <feGaussianBlur stdDeviation="6" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+
+    <!-- Soft Inner Shadow for depth -->
+    <filter id="inner-shadow">
+      <feOffset dx="0" dy="2" />
+      <feGaussianBlur stdDeviation="3" result="offset-blur" />
+      <feComposite operator="out" in="SourceGraphic" in2="offset-blur" result="inverse" />
+      <feFlood flood-color="#000" flood-opacity="0.2" result="color" />
+      <feComposite operator="in" in="color" in2="inverse" result="shadow" />
+      <feComposite operator="over" in="shadow" in2="SourceGraphic" />
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="512" height="512" rx="108" fill="url(#bg-grad)" />
+
+  <!-- Subtle Radar Rings (Background texture) -->
+  <g opacity="0.12" stroke="#00f5b8" stroke-width="1.5" fill="none">
+    <circle cx="256" cy="200" r="160" />
+    <circle cx="256" cy="200" r="120" stroke-dasharray="6 6" opacity="0.5" />
+    <circle cx="256" cy="200" r="80" opacity="0.3" stroke-width="2" />
+  </g>
+
+  <!-- Map Pin Group -->
+  <g filter="url(#glow)">
+    <!-- Pin Shape -->
+    <path d="M256 70 C180 70 120 130 120 206 C120 310 256 380 256 380 C256 380 392 310 392 206 C392 130 332 70 256 70 Z" 
+          fill="url(#pin-grad)" />
+    
+    <!-- Person Silhouette -->
+    <g fill="#0a2540">
+      <!-- Head - Larger and bolder -->
+      <circle cx="256" cy="150" r="32" />
+      
+      <!-- Shoulders - Cleaner, more defined shape -->
+      <path d="M256 198 C200 198 164 235 156 285 C168 292 186 296 208 298 L304 298 C326 296 344 292 356 285 C348 235 312 198 256 198 Z" />
+      
+      <!-- V-neck cutout -->
+      <path d="M232 198 L256 238 L280 198 Z" fill="url(#pin-grad)" />
+      
+      <!-- ID Badge -->
+      <rect x="244" y="246" width="24" height="32" rx="5" fill="url(#pin-grad)" />
+      <circle cx="256" cy="254" r="4" fill="#0a2540" />
+      <rect x="248" y="265" width="16" height="3" rx="1.5" fill="#0a2540" opacity="0.6" />
+    </g>
+  </g>
+
+  <!-- Active Tracking Dots -->
+  <circle cx="170" cy="100" r="5" fill="#4DFFD6" opacity="0.9">
+    <animate attributeName="opacity" values="0.9;0.4;0.9" dur="2s" repeatCount="indefinite" />
+  </circle>
+  <circle cx="340" cy="260" r="7" fill="#00f5b8" opacity="0.7" />
+  <circle cx="180" cy="250" r="4" fill="#00c896" opacity="0.5" />
+
+</svg>

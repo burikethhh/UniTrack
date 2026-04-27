@@ -5,9 +5,9 @@ import '../core/constants/app_constants.dart';
 /// Animated splash screen for UniTrack
 class SplashScreen extends StatefulWidget {
   final VoidCallback onComplete;
-  
+
   const SplashScreen({super.key, required this.onComplete});
-  
+
   @override
   State<SplashScreen> createState() => _SplashScreenState();
 }
@@ -18,54 +18,52 @@ class _SplashScreenState extends State<SplashScreen>
   late Animation<double> _fadeAnimation;
   late Animation<double> _scaleAnimation;
   late Animation<Offset> _slideAnimation;
-  
+
   @override
   void initState() {
     super.initState();
-    
+
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1500),
     );
-    
+
     _fadeAnimation = Tween<double>(begin: 0, end: 1).animate(
       CurvedAnimation(
         parent: _controller,
         curve: const Interval(0, 0.5, curve: Curves.easeOut),
       ),
     );
-    
+
     _scaleAnimation = Tween<double>(begin: 0.5, end: 1).animate(
       CurvedAnimation(
         parent: _controller,
         curve: const Interval(0, 0.5, curve: Curves.elasticOut),
       ),
     );
-    
-    _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, 0.3),
-      end: Offset.zero,
-    ).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: const Interval(0.3, 0.7, curve: Curves.easeOut),
-      ),
-    );
-    
+
+    _slideAnimation =
+        Tween<Offset>(begin: const Offset(0, 0.3), end: Offset.zero).animate(
+          CurvedAnimation(
+            parent: _controller,
+            curve: const Interval(0.3, 0.7, curve: Curves.easeOut),
+          ),
+        );
+
     _controller.forward();
-    
+
     // Navigate after animation completes
     Future.delayed(const Duration(milliseconds: 2000), () {
-      widget.onComplete();
+      if (mounted) widget.onComplete();
     });
   }
-  
+
   @override
   void dispose() {
     _controller.dispose();
     super.dispose();
   }
-  
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -75,9 +73,9 @@ class _SplashScreenState extends State<SplashScreen>
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              AppColors.accent,        // Peach
-              AppColors.primaryLight,  // Light Mint Green
-              AppColors.primary,       // Sage Green
+              AppColors.accent, // Peach
+              AppColors.primaryLight, // Light Mint Green
+              AppColors.primary, // Sage Green
             ],
           ),
         ),
@@ -125,7 +123,9 @@ class _SplashScreenState extends State<SplashScreen>
                                       decoration: BoxDecoration(
                                         shape: BoxShape.circle,
                                         border: Border.all(
-                                          color: AppColors.primary.withValues(alpha: 0.3),
+                                          color: AppColors.primary.withValues(
+                                            alpha: 0.3,
+                                          ),
                                           width: 2,
                                         ),
                                       ),
@@ -144,9 +144,9 @@ class _SplashScreenState extends State<SplashScreen>
                         ),
                       ),
                     ),
-                    
+
                     const SizedBox(height: 32),
-                    
+
                     // App name with slide animation
                     SlideTransition(
                       position: _slideAnimation,
@@ -196,9 +196,9 @@ class _SplashScreenState extends State<SplashScreen>
                         ),
                       ),
                     ),
-                    
+
                     const SizedBox(height: 60),
-                    
+
                     // Loading indicator
                     FadeTransition(
                       opacity: _fadeAnimation,
@@ -207,7 +207,9 @@ class _SplashScreenState extends State<SplashScreen>
                         height: 24,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Colors.white,
+                          ),
                         ),
                       ),
                     ),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/utils/validators.dart';
@@ -12,7 +13,7 @@ import 'register_screen.dart';
 /// Login Screen for UniTrack
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
-  
+
   @override
   State<LoginScreen> createState() => _LoginScreenState();
 }
@@ -22,55 +23,74 @@ class _LoginScreenState extends State<LoginScreen> with SnackBarMixin {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _isLoading = false; // Local loading state
-  
+
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
-  
+
   Future<void> _handleLogin() async {
     if (!_formKey.currentState!.validate()) return;
-    
+
     // Check connectivity first
     if (!ConnectivityService().isConnected) {
-      showErrorSnackBar(context, 'No internet connection. Please check your network.');
+      showErrorSnackBar(
+        context,
+        'No internet connection. Please check your network.',
+      );
       return;
     }
-    
+
     final email = _emailController.text.trim();
     final authProvider = context.read<AuthProvider>();
-    
+
     // Set local loading state
     setState(() => _isLoading = true);
-    
+
     try {
-      final success = await authProvider.signIn(
-        email: email,
-        password: _passwordController.text,
-      ).timeout(
-        const Duration(seconds: 30),
-        onTimeout: () {
-          authProvider.resetLoading();
-          if (mounted) {
-            setState(() => _isLoading = false);
-            showErrorSnackBar(context, 'Login timed out. Please check your internet connection and try again.');
-          }
-          return false;
-        },
-      );
-      
+      final success = await authProvider
+          .signIn(email: email, password: _passwordController.text)
+          .timeout(
+            const Duration(seconds: 30),
+            onTimeout: () {
+              authProvider.resetLoading();
+              if (mounted) {
+                setState(() => _isLoading = false);
+                showErrorSnackBar(
+                  context,
+                  'Login timed out. Please check your internet connection and try again.',
+                );
+              }
+              return false;
+            },
+          );
+
       // Always reset loading state
       if (mounted) {
         setState(() => _isLoading = false);
       }
-      
-      if (!success && mounted) {
+
+      if (success && mounted) {
+        // Mark first login for future reference
+        final prefs = await SharedPreferences.getInstance();
+        final hasLoggedInBefore =
+            prefs.getBool('has_logged_in_before') ?? false;
+        if (!hasLoggedInBefore) {
+          await prefs.setBool('has_logged_in_before', true);
+          debugPrint('First login detected');
+        }
+        // AuthProvider.signIn() sets _user and calls notifyListeners(),
+        // which triggers AuthWrapper Consumer to rebuild and navigate.
+        // No reload needed — the widget tree rebuilds automatically.
+        debugPrint('Login success — AuthWrapper will navigate');
+        return;
+      } else if (!success && mounted) {
         final errorMsg = ErrorMessages.loginError(authProvider.error);
         showErrorSnackBar(context, errorMsg);
       }
-      // If success, AuthWrapper will navigate to home screen
+      // AuthWrapper Consumer rebuilds and navigates to home screen
     } catch (e) {
       authProvider.resetLoading();
       if (mounted) {
@@ -79,7 +99,7 @@ class _LoginScreenState extends State<LoginScreen> with SnackBarMixin {
       }
     }
   }
-  
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -97,7 +117,7 @@ class _LoginScreenState extends State<LoginScreen> with SnackBarMixin {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       const SizedBox(height: 40),
-                      
+
                       // Logo and Title
                       Center(
                         child: Column(
@@ -110,7 +130,9 @@ class _LoginScreenState extends State<LoginScreen> with SnackBarMixin {
                                 borderRadius: BorderRadius.circular(24),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: AppColors.accent.withValues(alpha: 0.3),
+                                    color: AppColors.accent.withValues(
+                                      alpha: 0.3,
+                                    ),
                                     blurRadius: 20,
                                     offset: const Offset(0, 10),
                                   ),
@@ -125,32 +147,33 @@ class _LoginScreenState extends State<LoginScreen> with SnackBarMixin {
                             const SizedBox(height: 24),
                             Text(
                               AppConstants.appName,
-                              style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                                color: AppColors.primary,
-                                fontWeight: FontWeight.bold,
-                              ),
+                              style: Theme.of(context).textTheme.displaySmall
+                                  ?.copyWith(
+                                    color: AppColors.primary,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                             ),
                             const SizedBox(height: 4),
                             Text(
                               AppConstants.appTagline,
-                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                color: AppColors.textSecondary,
-                              ),
+                              style: Theme.of(context).textTheme.bodyMedium
+                                  ?.copyWith(color: AppColors.textSecondary),
                             ),
                             const SizedBox(height: 4),
                             Text(
                               AppConstants.universityShortName,
-                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                color: AppColors.primary,
-                                fontWeight: FontWeight.w600,
-                              ),
+                              style: Theme.of(context).textTheme.titleMedium
+                                  ?.copyWith(
+                                    color: AppColors.primary,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                             ),
                           ],
                         ),
                       ),
-                      
+
                       const SizedBox(height: 48),
-                      
+
                       // Welcome text
                       Text(
                         'Welcome Back',
@@ -163,9 +186,9 @@ class _LoginScreenState extends State<LoginScreen> with SnackBarMixin {
                           color: AppColors.textSecondary,
                         ),
                       ),
-                      
+
                       const SizedBox(height: 32),
-                      
+
                       // Email field
                       CustomTextField(
                         controller: _emailController,
@@ -176,9 +199,9 @@ class _LoginScreenState extends State<LoginScreen> with SnackBarMixin {
                         textInputAction: TextInputAction.next,
                         validator: Validators.email,
                       ),
-                      
+
                       const SizedBox(height: 16),
-                      
+
                       // Password field
                       PasswordTextField(
                         controller: _passwordController,
@@ -187,9 +210,9 @@ class _LoginScreenState extends State<LoginScreen> with SnackBarMixin {
                         onSubmitted: (_) => _handleLogin(),
                         validator: Validators.loginPassword,
                       ),
-                      
+
                       const SizedBox(height: 12),
-                      
+
                       // Forgot password
                       Align(
                         alignment: Alignment.centerRight,
@@ -200,18 +223,18 @@ class _LoginScreenState extends State<LoginScreen> with SnackBarMixin {
                           child: const Text('Forgot Password?'),
                         ),
                       ),
-                      
+
                       const SizedBox(height: 24),
-                      
+
                       // Login button
                       PrimaryButton(
                         text: 'Sign In',
                         onPressed: _isLoading ? null : _handleLogin,
                         isLoading: _isLoading,
                       ),
-                      
+
                       const SizedBox(height: 24),
-                      
+
                       // Divider
                       Row(
                         children: [
@@ -226,9 +249,9 @@ class _LoginScreenState extends State<LoginScreen> with SnackBarMixin {
                           const Expanded(child: Divider()),
                         ],
                       ),
-                      
+
                       const SizedBox(height: 24),
-                      
+
                       // Register button
                       SecondaryButton(
                         text: 'Create Account',
@@ -241,13 +264,13 @@ class _LoginScreenState extends State<LoginScreen> with SnackBarMixin {
                           );
                         },
                       ),
-                      
+
                       const SizedBox(height: 32),
-                      
+
                       // Footer
                       Center(
                         child: Text(
-                          '© 2026 ${AppConstants.universityName}',
+                          '© ${DateTime.now().year} ${AppConstants.universityName}',
                           style: Theme.of(context).textTheme.bodySmall,
                           textAlign: TextAlign.center,
                         ),
@@ -262,85 +285,230 @@ class _LoginScreenState extends State<LoginScreen> with SnackBarMixin {
       ),
     );
   }
-  
+
   void _showForgotPasswordDialog() {
     final emailController = TextEditingController();
-    
+    bool isSending = false;
+    String? dialogError;
+    bool emailSent = false;
+
     showDialog(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
+      barrierDismissible: true,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) {
+          // Success state
+          if (emailSent) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
               ),
-              child: const Icon(Icons.lock_reset, color: AppColors.primary, size: 20),
+              title: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.green.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(
+                      Icons.mark_email_read,
+                      color: Colors.green,
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  const Text('Email Sent!'),
+                ],
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.check_circle_outline,
+                    color: Colors.green,
+                    size: 64,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Password reset link sent to:\n${emailController.text.trim()}',
+                    textAlign: TextAlign.center,
+                    style: Theme.of(dialogContext).textTheme.bodyMedium,
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Check your inbox and spam folder. The link expires in 1 hour.',
+                    textAlign: TextAlign.center,
+                    style: Theme.of(
+                      dialogContext,
+                    ).textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
+                  ),
+                ],
+              ),
+              actions: [
+                ElevatedButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: const Text('OK'),
+                ),
+              ],
+            );
+          }
+
+          // Default / error state
+          return AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
             ),
-            const SizedBox(width: 12),
-            const Text('Reset Password'),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-              'Enter your email address and we\'ll send you a link to reset your password.',
+            title: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(
+                    Icons.lock_reset,
+                    color: AppColors.primary,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                const Text('Reset Password'),
+              ],
             ),
-            const SizedBox(height: 16),
-            CustomTextField(
-              controller: emailController,
-              label: 'Email Address',
-              prefixIcon: Icons.email_outlined,
-              keyboardType: TextInputType.emailAddress,
-              validator: Validators.email,
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Enter your email address and we\'ll send you a link to reset your password.',
+                ),
+                const SizedBox(height: 16),
+                CustomTextField(
+                  controller: emailController,
+                  label: 'Email Address',
+                  prefixIcon: Icons.email_outlined,
+                  keyboardType: TextInputType.emailAddress,
+                  validator: Validators.email,
+                  enabled: !isSending,
+                ),
+                if (dialogError != null) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.red.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: Colors.red.withValues(alpha: 0.3),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.error_outline,
+                          color: Colors.red,
+                          size: 18,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            dialogError!,
+                            style: const TextStyle(
+                              color: Colors.red,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
             ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final email = emailController.text.trim();
-              if (email.isEmpty) {
-                showErrorSnackBar(context, 'Please enter your email address');
-                return;
-              }
-              
-              final validationError = Validators.email(email);
-              if (validationError != null) {
-                showErrorSnackBar(context, validationError);
-                return;
-              }
-              
-              final authProvider = context.read<AuthProvider>();
-              Navigator.pop(dialogContext);
-              
-              final success = await authProvider.sendPasswordReset(email);
-              if (mounted) {
-                if (success) {
-                  showSuccessSnackBar(context, 'Password reset email sent! Check your inbox.');
-                } else {
-                  showErrorSnackBar(
-                    context, 
-                    ErrorMessages.fromException(authProvider.error ?? 'Failed to send reset email'),
-                  );
-                }
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Send Reset Link'),
-          ),
-        ],
+            actions: [
+              TextButton(
+                onPressed: isSending
+                    ? null
+                    : () => Navigator.pop(dialogContext),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: isSending
+                    ? null
+                    : () async {
+                        final email = emailController.text.trim();
+                        if (email.isEmpty) {
+                          setDialogState(
+                            () =>
+                                dialogError = 'Please enter your email address',
+                          );
+                          return;
+                        }
+
+                        final validationError = Validators.email(email);
+                        if (validationError != null) {
+                          setDialogState(() => dialogError = validationError);
+                          return;
+                        }
+
+                        setDialogState(() {
+                          isSending = true;
+                          dialogError = null;
+                        });
+
+                        try {
+                          final authProvider = context.read<AuthProvider>();
+                          final success = await authProvider.sendPasswordReset(
+                            email,
+                          );
+
+                          if (!dialogContext.mounted) return;
+
+                          if (success) {
+                            setDialogState(() {
+                              emailSent = true;
+                              isSending = false;
+                            });
+                          } else {
+                            setDialogState(() {
+                              isSending = false;
+                              dialogError = ErrorMessages.fromException(
+                                authProvider.error ??
+                                    'Failed to send reset email',
+                              );
+                            });
+                          }
+                        } catch (e) {
+                          if (!dialogContext.mounted) return;
+                          setDialogState(() {
+                            isSending = false;
+                            dialogError = ErrorMessages.fromException(e);
+                          });
+                        }
+                      },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                ),
+                child: isSending
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Text('Send Reset Link'),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

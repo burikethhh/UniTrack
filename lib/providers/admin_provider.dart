@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../models/models.dart';
 
 /// Statistics model for admin dashboard
@@ -82,10 +83,14 @@ class AdminProvider extends ChangeNotifier {
   // Getters
   List<UserModel> get allUsers => _allUsers;
   List<UserModel> get filteredUsers => _filteredUsers;
-  List<UserModel> get students => _allUsers.where((u) => u.role == UserRole.student).toList();
-  List<UserModel> get staff => _allUsers.where((u) => u.role == UserRole.staff).toList();
-  List<UserModel> get admins => _allUsers.where((u) => u.role == UserRole.admin).toList();
-  List<UserModel> get bannedUsers => _allUsers.where((u) => !u.isActive).toList();
+  List<UserModel> get students =>
+      _allUsers.where((u) => u.role == UserRole.student).toList();
+  List<UserModel> get staff =>
+      _allUsers.where((u) => u.role == UserRole.staff).toList();
+  List<UserModel> get admins =>
+      _allUsers.where((u) => u.role == UserRole.admin).toList();
+  List<UserModel> get bannedUsers =>
+      _allUsers.where((u) => !u.isActive).toList();
   AppStatistics get statistics => _statistics;
   bool get isLoading => _isLoading;
   String? get error => _error;
@@ -96,10 +101,7 @@ class AdminProvider extends ChangeNotifier {
 
   /// Initialize and load all data
   Future<void> initialize() async {
-    await Future.wait([
-      loadAllUsers(),
-      loadStatistics(),
-    ]);
+    await Future.wait([loadAllUsers(), loadStatistics()]);
   }
 
   /// Load all users from Firestore
@@ -182,11 +184,13 @@ class AdminProvider extends ChangeNotifier {
         byCampus[user.campusId] = (byCampus[user.campusId] ?? 0) + 1;
       }
 
-      // Get online count from locations
-      final locationsSnapshot = await _firestore
+      // Get online count from locations using aggregation (avoid downloading all docs)
+      // Count ALL location docs – staff outside campus boundaries are still online
+      final onlineCountResult = await _firestore
           .collection('locations')
-          .where('isOnline', isEqualTo: true)
+          .count()
           .get();
+      final onlineNow = onlineCountResult.count ?? 0;
 
       // Load recent activity
       final activitySnapshot = await _firestore
@@ -208,7 +212,7 @@ class AdminProvider extends ChangeNotifier {
         newUsersThisWeek: newThisWeek,
         newUsersThisMonth: newThisMonth,
         bannedUsers: banned,
-        onlineNow: locationsSnapshot.docs.length,
+        onlineNow: onlineNow,
         usersByDepartment: byDepartment,
         usersByCampus: byCampus,
         recentActivity: recentActivity,
@@ -263,7 +267,8 @@ class AdminProvider extends ChangeNotifier {
         final query = _searchQuery.toLowerCase();
         final matchesName = user.fullName.toLowerCase().contains(query);
         final matchesEmail = user.email.toLowerCase().contains(query);
-        final matchesDept = user.department?.toLowerCase().contains(query) ?? false;
+        final matchesDept =
+            user.department?.toLowerCase().contains(query) ?? false;
         if (!matchesName && !matchesEmail && !matchesDept) return false;
       }
 
@@ -375,19 +380,39 @@ class AdminProvider extends ChangeNotifier {
   /// Delete a user permanently
   Future<bool> deleteUser(String userId) async {
     try {
+      // Prevent admin from deleting themselves
+      final currentUid = FirebaseAuth.instance.currentUser?.uid;
+      if (userId == currentUid) {
+        _error = 'Cannot delete your own account from admin panel';
+        notifyListeners();
+        return false;
+      }
+
       // Delete user document
       await _firestore.collection('users').doc(userId).delete();
 
       // Delete user's location if exists
       await _firestore.collection('locations').doc(userId).delete();
 
-      // Delete user's notifications
-      final notifSnapshot = await _firestore
+      // Delete user's notifications (received AND sent) using batch
+      final receivedSnapshot = await _firestore
           .collection('notifications')
           .where('recipientId', isEqualTo: userId)
           .get();
-      for (final doc in notifSnapshot.docs) {
-        await doc.reference.delete();
+      final sentSnapshot = await _firestore
+          .collection('notifications')
+          .where('senderId', isEqualTo: userId)
+          .get();
+      final allNotifDocs = [...receivedSnapshot.docs, ...sentSnapshot.docs];
+      if (allNotifDocs.isNotEmpty) {
+        for (int i = 0; i < allNotifDocs.length; i += 499) {
+          final batch = _firestore.batch();
+          final chunk = allNotifDocs.skip(i).take(499);
+          for (final doc in chunk) {
+            batch.delete(doc.reference);
+          }
+          await batch.commit();
+        }
       }
 
       // Log activity
@@ -445,7 +470,10 @@ class AdminProvider extends ChangeNotifier {
   /// Update user details
   Future<bool> updateUser(String userId, Map<String, dynamic> data) async {
     try {
-      await _firestore.collection('users').doc(userId).set(data, SetOptions(merge: true));
+      await _firestore
+          .collection('users')
+          .doc(userId)
+          .set(data, SetOptions(merge: true));
 
       // Reload users
       await loadAllUsers();

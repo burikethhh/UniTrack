@@ -1,41 +1,41 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/utils/responsive.dart';
+import '../../models/models.dart';
 import '../../providers/providers.dart';
 import '../../widgets/widgets.dart';
 
 /// Admin dashboard for system administration
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
-  
+
   @override
   State<AdminDashboardScreen> createState() => _AdminDashboardScreenState();
 }
 
 class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   int _currentTab = 0;
-  
+
   @override
   void initState() {
     super.initState();
-    _loadData();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadData());
   }
-  
+
   Future<void> _loadData() async {
-    // Load admin data
-    context.read<FacultyProvider>().initialize();
+    // Load admin data from both providers
+    context.read<FacultyProvider>().initialize(viewerRole: UserRole.admin);
+    context.read<AdminProvider>().initialize();
   }
-  
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Admin Dashboard'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _loadData,
-          ),
+          IconButton(icon: const Icon(Icons.refresh), onPressed: _loadData),
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () {
@@ -57,7 +57,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               ],
             ),
           ),
-          
+
           // Content
           Expanded(
             child: IndexedStack(
@@ -73,7 +73,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       ),
     );
   }
-  
+
   Widget _buildTab(int index, String label, IconData icon) {
     final isSelected = _currentTab == index;
     return Expanded(
@@ -105,7 +105,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               Text(
                 label,
                 style: TextStyle(
-                  color: isSelected ? AppColors.primary : AppColors.textSecondary,
+                  color: isSelected
+                      ? AppColors.primary
+                      : AppColors.textSecondary,
                   fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
                 ),
               ),
@@ -115,170 +117,204 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       ),
     );
   }
-  
+
   Widget _buildOverviewTab() {
-    return Consumer<FacultyProvider>(
-      builder: (context, facultyProvider, _) {
+    return Consumer2<FacultyProvider, AdminProvider>(
+      builder: (context, facultyProvider, adminProvider, _) {
+        final stats = adminProvider.statistics;
         return SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Quick stats
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildStatCard(
+          padding: EdgeInsets.all(context.responsivePadding),
+          child: ResponsiveContainer(
+            maxWidth: 1400,
+            padding: EdgeInsets.zero,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Quick stats - responsive grid (real data)
+                ResponsiveGrid(
+                  mobileColumns: 2,
+                  tabletColumns: 2,
+                  desktopColumns: 4,
+                  spacing: 12,
+                  runSpacing: 12,
+                  children: [
+                    _buildStatCard(
                       'Total Users',
-                      '${facultyProvider.allFaculty.length + 50}', // Mock total
+                      '${stats.totalUsers}',
                       Icons.people,
                       AppColors.primary,
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _buildStatCard(
+                    _buildStatCard(
                       'Online Now',
-                      '${facultyProvider.onlineFaculty}',
+                      '${stats.onlineNow}',
                       Icons.circle,
                       AppColors.statusAvailable,
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildStatCard(
+                    _buildStatCard(
                       'Faculty',
-                      '${facultyProvider.allFaculty.length}',
+                      '${stats.totalStaff}',
                       Icons.school,
                       AppColors.accent,
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _buildStatCard(
-                      'Departments',
-                      '${facultyProvider.departments.length}',
-                      Icons.business,
+                    _buildStatCard(
+                      'Active Today',
+                      '${stats.activeToday}',
+                      Icons.trending_up,
                       AppColors.info,
                     ),
-                  ),
-                ],
-              ),
-              
-              const SizedBox(height: 24),
-              
-              // Recent activity
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            'Recent Activity',
-                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w600,
+                  ],
+                ),
+
+                const SizedBox(height: 24),
+
+                // Recent activity — from activity_logs collection
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Recent Activity',
+                              style: Theme.of(context).textTheme.titleMedium
+                                  ?.copyWith(fontWeight: FontWeight.w600),
                             ),
-                          ),
-                          TextButton(
-                            onPressed: () {
-                              // View all activity
-                            },
-                            child: const Text('View All'),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      _buildActivityItem(
-                        'Dr. Maria Santos went online',
-                        '2 min ago',
-                        Icons.person,
-                        AppColors.statusAvailable,
-                      ),
-                      _buildActivityItem(
-                        'Prof. Juan Dela Cruz updated status',
-                        '5 min ago',
-                        Icons.update,
-                        AppColors.info,
-                      ),
-                      _buildActivityItem(
-                        'New student registered',
-                        '15 min ago',
-                        Icons.person_add,
-                        AppColors.accent,
-                      ),
-                      _buildActivityItem(
-                        'Dr. Ana Garcia went offline',
-                        '30 min ago',
-                        Icons.person_off,
-                        AppColors.textSecondary,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              
-              const SizedBox(height: 24),
-              
-              // System status
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'System Status',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
+                            TextButton(
+                              onPressed: () {
+                                setState(
+                                  () => _currentTab = 1,
+                                ); // Switch to Users tab
+                              },
+                              child: const Text('View All'),
+                            ),
+                          ],
                         ),
-                      ),
-                      const SizedBox(height: 16),
-                      _buildSystemStatus(
-                        'Firebase Auth',
-                        'Operational',
-                        AppColors.statusAvailable,
-                      ),
-                      _buildSystemStatus(
-                        'Firestore Database',
-                        'Operational',
-                        AppColors.statusAvailable,
-                      ),
-                      _buildSystemStatus(
-                        'Location Services',
-                        'Operational',
-                        AppColors.statusAvailable,
-                      ),
-                      _buildSystemStatus(
-                        'Map Tiles',
-                        'Operational',
-                        AppColors.statusAvailable,
-                      ),
-                    ],
+                        const SizedBox(height: 12),
+                        if (stats.recentActivity.isEmpty)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            child: Center(
+                              child: Text(
+                                'No recent activity',
+                                style: TextStyle(
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                            ),
+                          )
+                        else
+                          ...stats.recentActivity.take(6).map((log) {
+                            return _buildActivityItem(
+                              '${log.userName} — ${log.action}${log.details != null ? ' (${log.details})' : ''}',
+                              _timeAgo(log.timestamp),
+                              _iconForAction(log.action),
+                              _colorForAction(log.action),
+                            );
+                          }),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            ],
+
+                const SizedBox(height: 24),
+
+                // System status — dynamic
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'System Status',
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(fontWeight: FontWeight.w600),
+                        ),
+                        const SizedBox(height: 16),
+                        _buildSystemStatus(
+                          'Firebase Auth',
+                          adminProvider.error == null ? 'Operational' : 'Error',
+                          adminProvider.error == null
+                              ? AppColors.statusAvailable
+                              : AppColors.error,
+                        ),
+                        _buildSystemStatus(
+                          'Firestore Database',
+                          stats.totalUsers > 0 ? 'Operational' : 'Checking…',
+                          stats.totalUsers > 0
+                              ? AppColors.statusAvailable
+                              : AppColors.warning,
+                        ),
+                        _buildSystemStatus(
+                          'Location Services',
+                          'Operational',
+                          AppColors.statusAvailable,
+                        ),
+                        _buildSystemStatus(
+                          'Map Tiles',
+                          'Operational',
+                          AppColors.statusAvailable,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         );
       },
     );
   }
-  
+
+  // ── helpers for activity rendering ──────────────────────────────────
+
+  String _timeAgo(DateTime dt) {
+    final diff = DateTime.now().difference(dt);
+    if (diff.inMinutes < 1) return 'just now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes} min ago';
+    if (diff.inHours < 24) return '${diff.inHours}h ago';
+    if (diff.inDays < 7) return '${diff.inDays}d ago';
+    return '${dt.month}/${dt.day}/${dt.year}';
+  }
+
+  IconData _iconForAction(String action) {
+    final a = action.toLowerCase();
+    if (a.contains('ban')) return Icons.block;
+    if (a.contains('unban')) return Icons.check_circle;
+    if (a.contains('delete')) return Icons.delete;
+    if (a.contains('role')) return Icons.swap_horiz;
+    if (a.contains('register') || a.contains('created')) {
+      return Icons.person_add;
+    }
+    if (a.contains('login') || a.contains('online')) return Icons.login;
+    if (a.contains('offline') || a.contains('logout')) return Icons.logout;
+    return Icons.info_outline;
+  }
+
+  Color _colorForAction(String action) {
+    final a = action.toLowerCase();
+    if (a.contains('ban') || a.contains('delete')) return AppColors.error;
+    if (a.contains('unban') || a.contains('online')) {
+      return AppColors.statusAvailable;
+    }
+    if (a.contains('register') || a.contains('created')) {
+      return AppColors.accent;
+    }
+    if (a.contains('role')) return AppColors.info;
+    return AppColors.textSecondary;
+  }
+
   Widget _buildUsersTab() {
     return Consumer<FacultyProvider>(
       builder: (context, provider, _) {
         if (provider.isLoading) {
           return const Center(child: CircularProgressIndicator());
         }
-        
+
         return Column(
           children: [
             // Search and filters
@@ -306,14 +342,21 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   const SizedBox(width: 12),
                   IconButton.filled(
                     onPressed: () {
-                      // Show filter dialog
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'Use User Management for advanced filtering',
+                          ),
+                          duration: Duration(seconds: 2),
+                        ),
+                      );
                     },
                     icon: const Icon(Icons.filter_list),
                   ),
                 ],
               ),
             ),
-            
+
             // User list
             Expanded(
               child: ListView.builder(
@@ -374,7 +417,32 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                           ),
                         ],
                         onSelected: (value) {
-                          // Handle action
+                          if (value == 'view') {
+                            // Navigate to user detail (reuse user management's detail screen)
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'Use User Management for detailed actions',
+                                ),
+                              ),
+                            );
+                          } else if (value == 'edit') {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'Use User Management to edit users',
+                                ),
+                              ),
+                            );
+                          } else if (value == 'disable') {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'Use User Management to disable accounts',
+                                ),
+                              ),
+                            );
+                          }
                         },
                       ),
                     ),
@@ -387,126 +455,121 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       },
     );
   }
-  
+
   Widget _buildAnalyticsTab() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Time period selector
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  const Text(
-                    'Time Period:',
-                    style: TextStyle(fontWeight: FontWeight.w600),
+    return Consumer<AdminProvider>(
+      builder: (context, adminProvider, _) {
+        final stats = adminProvider.statistics;
+        final departments = stats.usersByDepartment.entries.toList()
+          ..sort((a, b) => b.value.compareTo(a.value));
+
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Usage stats — real numbers
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Usage Statistics',
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: 16),
+                      _buildAnalyticRow('Total Users', '${stats.totalUsers}'),
+                      _buildAnalyticRow('Students', '${stats.totalStudents}'),
+                      _buildAnalyticRow(
+                        'Faculty / Staff',
+                        '${stats.totalStaff}',
+                      ),
+                      _buildAnalyticRow('Admins', '${stats.totalAdmins}'),
+                      _buildAnalyticRow('Active Today', '${stats.activeToday}'),
+                      _buildAnalyticRow(
+                        'New This Week',
+                        '${stats.newUsersThisWeek}',
+                      ),
+                      _buildAnalyticRow(
+                        'New This Month',
+                        '${stats.newUsersThisMonth}',
+                      ),
+                      _buildAnalyticRow(
+                        'Banned Accounts',
+                        '${stats.bannedUsers}',
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 12),
-                  ChoiceChip(
-                    label: const Text('Today'),
-                    selected: true,
-                    onSelected: (_) {},
-                  ),
-                  const SizedBox(width: 8),
-                  ChoiceChip(
-                    label: const Text('Week'),
-                    selected: false,
-                    onSelected: (_) {},
-                  ),
-                  const SizedBox(width: 8),
-                  ChoiceChip(
-                    label: const Text('Month'),
-                    selected: false,
-                    onSelected: (_) {},
-                  ),
-                ],
+                ),
               ),
-            ),
-          ),
-          
-          const SizedBox(height: 16),
-          
-          // Usage stats
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Usage Statistics',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
+
+              const SizedBox(height: 16),
+
+              // Campus breakdown
+              if (stats.usersByCampus.isNotEmpty) ...[
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Users by Campus',
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(fontWeight: FontWeight.w600),
+                        ),
+                        const SizedBox(height: 16),
+                        ...stats.usersByCampus.entries.map((e) {
+                          final pct = stats.totalUsers > 0
+                              ? e.value / stats.totalUsers
+                              : 0.0;
+                          return _buildPeakHour(
+                            '${e.key[0].toUpperCase()}${e.key.substring(1)} — ${e.value} users',
+                            pct,
+                          );
+                        }),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 16),
-                  _buildAnalyticRow('Total App Opens', '234'),
-                  _buildAnalyticRow('Unique Users', '89'),
-                  _buildAnalyticRow('Faculty Searches', '156'),
-                  _buildAnalyticRow('Navigation Requests', '45'),
-                  _buildAnalyticRow('Average Session', '4.2 min'),
-                ],
-              ),
-            ),
-          ),
-          
-          const SizedBox(height: 16),
-          
-          // Popular times
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Peak Hours',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
+                ),
+                const SizedBox(height: 16),
+              ],
+
+              // Department breakdown — real data
+              if (departments.isNotEmpty)
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Users by Department',
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(fontWeight: FontWeight.w600),
+                        ),
+                        const SizedBox(height: 16),
+                        ...departments.map((e) {
+                          return _buildDepartmentStat(
+                            e.key,
+                            e.value,
+                            stats.totalUsers,
+                          );
+                        }),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 16),
-                  _buildPeakHour('8:00 AM - 9:00 AM', 0.8),
-                  _buildPeakHour('10:00 AM - 11:00 AM', 0.6),
-                  _buildPeakHour('1:00 PM - 2:00 PM', 0.9),
-                  _buildPeakHour('3:00 PM - 4:00 PM', 0.5),
-                ],
-              ),
-            ),
+                ),
+            ],
           ),
-          
-          const SizedBox(height: 16),
-          
-          // Department activity
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Department Activity',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  _buildDepartmentStat('IT Department', 12, 8),
-                  _buildDepartmentStat('Engineering', 15, 10),
-                  _buildDepartmentStat('Business Admin', 8, 5),
-                  _buildDepartmentStat('Education', 10, 6),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
-  
+
   Widget _buildStatCard(
     String label,
     String value,
@@ -540,17 +603,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             const SizedBox(height: 2),
             Text(
               label,
-              style: TextStyle(
-                color: AppColors.textSecondary,
-                fontSize: 13,
-              ),
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
             ),
           ],
         ),
       ),
     );
   }
-  
+
   Widget _buildActivityItem(
     String text,
     String time,
@@ -590,7 +650,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       ),
     );
   }
-  
+
   Widget _buildSystemStatus(String service, String status, Color color) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
@@ -599,10 +659,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           Container(
             width: 8,
             height: 8,
-            decoration: BoxDecoration(
-              color: color,
-              shape: BoxShape.circle,
-            ),
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
           ),
           const SizedBox(width: 12),
           Expanded(child: Text(service)),
@@ -614,7 +671,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       ),
     );
   }
-  
+
   Widget _buildAnalyticRow(String label, String value) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
@@ -622,15 +679,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(label),
-          Text(
-            value,
-            style: const TextStyle(fontWeight: FontWeight.w600),
-          ),
+          Text(value, style: const TextStyle(fontWeight: FontWeight.w600)),
         ],
       ),
     );
   }
-  
+
   Widget _buildPeakHour(String time, double percentage) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
@@ -660,25 +714,23 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       ),
     );
   }
-  
-  Widget _buildDepartmentStat(String name, int total, int online) {
+
+  Widget _buildDepartmentStat(String name, int count, int total) {
+    final pct = total > 0 ? count / total : 0.0;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         children: [
-          Expanded(child: Text(name)),
+          Expanded(child: Text(name, overflow: TextOverflow.ellipsis)),
           Text(
-            '$online/$total online',
-            style: TextStyle(
-              color: AppColors.textSecondary,
-              fontSize: 13,
-            ),
+            '$count users',
+            style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
           ),
           const SizedBox(width: 12),
           SizedBox(
             width: 60,
             child: LinearProgressIndicator(
-              value: online / total,
+              value: pct,
               backgroundColor: AppColors.border,
               valueColor: AlwaysStoppedAnimation<Color>(AppColors.accent),
             ),
@@ -687,7 +739,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       ),
     );
   }
-  
+
   void _showSignOutDialog(BuildContext context) {
     final authProvider = context.read<AuthProvider>();
     showDialog(
@@ -705,9 +757,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               Navigator.pop(dialogContext);
               await authProvider.signOut();
             },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.error,
-            ),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
             child: const Text('Sign Out'),
           ),
         ],

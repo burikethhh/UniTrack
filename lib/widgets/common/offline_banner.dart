@@ -5,10 +5,7 @@ import '../../services/offline_cache_service.dart';
 class OfflineModeBanner extends StatefulWidget {
   final Widget child;
 
-  const OfflineModeBanner({
-    super.key,
-    required this.child,
-  });
+  const OfflineModeBanner({super.key, required this.child});
 
   @override
   State<OfflineModeBanner> createState() => _OfflineModeBannerState();
@@ -26,7 +23,7 @@ class _OfflineModeBannerState extends State<OfflineModeBanner>
       duration: const Duration(milliseconds: 1200),
       vsync: this,
     )..repeat(reverse: true);
-    
+
     _pulseAnimation = Tween<double>(begin: 0.7, end: 1.0).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
@@ -62,13 +59,13 @@ class _OfflineModeBannerState extends State<OfflineModeBanner>
                     bottom: false,
                     child: Container(
                       width: double.infinity,
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 10,
+                      ),
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
-                          colors: [
-                            Colors.orange[800]!,
-                            Colors.orange[600]!,
-                          ],
+                          colors: [Colors.orange[800]!, Colors.orange[600]!],
                         ),
                       ),
                       child: Row(
@@ -83,7 +80,9 @@ class _OfflineModeBannerState extends State<OfflineModeBanner>
                                 child: Icon(
                                   Icons.cloud_off,
                                   color: Colors.white.withValues(
-                                    alpha: isOnline ? 1.0 : 0.7 + (_pulseAnimation.value * 0.3),
+                                    alpha: isOnline
+                                        ? 1.0
+                                        : 0.7 + (_pulseAnimation.value * 0.3),
                                   ),
                                   size: 18,
                                 ),
@@ -146,7 +145,8 @@ class ConnectivityAwareWidget extends StatefulWidget {
   });
 
   @override
-  State<ConnectivityAwareWidget> createState() => _ConnectivityAwareWidgetState();
+  State<ConnectivityAwareWidget> createState() =>
+      _ConnectivityAwareWidgetState();
 }
 
 class _ConnectivityAwareWidgetState extends State<ConnectivityAwareWidget>
@@ -242,10 +242,7 @@ class _ConnectivityAwareWidgetState extends State<ConnectivityAwareWidget>
 class ConnectivityIndicator extends StatelessWidget {
   final double size;
 
-  const ConnectivityIndicator({
-    super.key,
-    this.size = 12,
-  });
+  const ConnectivityIndicator({super.key, this.size = 12});
 
   @override
   Widget build(BuildContext context) {
@@ -264,7 +261,9 @@ class ConnectivityIndicator extends StatelessWidget {
             shape: BoxShape.circle,
             boxShadow: [
               BoxShadow(
-                color: (isOnline ? Colors.green : Colors.orange).withValues(alpha: 0.4),
+                color: (isOnline ? Colors.green : Colors.orange).withValues(
+                  alpha: 0.4,
+                ),
                 blurRadius: 4,
                 offset: const Offset(0, 1),
               ),
@@ -272,11 +271,7 @@ class ConnectivityIndicator extends StatelessWidget {
           ),
           child: isOnline
               ? null
-              : Icon(
-                  Icons.cloud_off,
-                  size: size * 0.7,
-                  color: Colors.white,
-                ),
+              : Icon(Icons.cloud_off, size: size * 0.7, color: Colors.white),
         );
       },
     );
@@ -286,11 +281,8 @@ class ConnectivityIndicator extends StatelessWidget {
 /// Sync status indicator showing last sync time
 class SyncStatusIndicator extends StatelessWidget {
   final DateTime? lastSyncTime;
-  
-  const SyncStatusIndicator({
-    super.key,
-    this.lastSyncTime,
-  });
+
+  const SyncStatusIndicator({super.key, this.lastSyncTime});
 
   @override
   Widget build(BuildContext context) {

@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:provider/provider.dart';
@@ -19,7 +20,7 @@ String _getInitialsStatic(String fullName) {
 /// Screen for staff to find and locate other staff members
 class StaffDirectoryScreen extends StatefulWidget {
   const StaffDirectoryScreen({super.key});
-  
+
   @override
   State<StaffDirectoryScreen> createState() => _StaffDirectoryScreenState();
 }
@@ -29,13 +30,13 @@ class _StaffDirectoryScreenState extends State<StaffDirectoryScreen> {
   String _searchQuery = '';
   String? _selectedDepartment;
   bool _showOnlineOnly = false;
-  
+
   @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
   }
-  
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -65,10 +66,7 @@ class _StaffDirectoryScreenState extends State<StaffDirectoryScreen> {
                 child: const Text('Online Only'),
               ),
               const PopupMenuDivider(),
-              const PopupMenuItem(
-                value: 'clear',
-                child: Text('Clear Filters'),
-              ),
+              const PopupMenuItem(value: 'clear', child: Text('Clear Filters')),
             ],
           ),
         ],
@@ -107,13 +105,13 @@ class _StaffDirectoryScreenState extends State<StaffDirectoryScreen> {
               },
             ),
           ),
-          
+
           // Department filter chips
           Consumer<FacultyProvider>(
             builder: (context, provider, _) {
               final departments = provider.departments;
               if (departments.isEmpty) return const SizedBox.shrink();
-              
+
               return SizedBox(
                 height: 50,
                 child: ListView.builder(
@@ -132,11 +130,13 @@ class _StaffDirectoryScreenState extends State<StaffDirectoryScreen> {
                               _selectedDepartment = null;
                             });
                           },
-                          selectedColor: AppColors.primary.withValues(alpha: 0.2),
+                          selectedColor: AppColors.primary.withValues(
+                            alpha: 0.2,
+                          ),
                         ),
                       );
                     }
-                    
+
                     final dept = departments[index - 1];
                     return Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -145,7 +145,10 @@ class _StaffDirectoryScreenState extends State<StaffDirectoryScreen> {
                         selected: _selectedDepartment == dept.name,
                         onSelected: (_) {
                           setState(() {
-                            _selectedDepartment = _selectedDepartment == dept.name ? null : dept.name;
+                            _selectedDepartment =
+                                _selectedDepartment == dept.name
+                                ? null
+                                : dept.name;
                           });
                         },
                         selectedColor: AppColors.primary.withValues(alpha: 0.2),
@@ -156,47 +159,51 @@ class _StaffDirectoryScreenState extends State<StaffDirectoryScreen> {
               );
             },
           ),
-          
+
           const SizedBox(height: 8),
-          
+
           // Staff list
           Expanded(
             child: Consumer2<FacultyProvider, AuthProvider>(
               builder: (context, facultyProvider, authProvider, _) {
                 final currentUserId = authProvider.user?.id;
-                
+
                 // Filter faculty (excluding current user)
                 var staffList = facultyProvider.allFaculty
                     .where((f) => f.user.id != currentUserId) // Exclude self
                     .toList();
-                
+
                 // Apply search filter
                 if (_searchQuery.isNotEmpty) {
                   final query = _searchQuery.toLowerCase();
                   staffList = staffList.where((f) {
                     return f.user.fullName.toLowerCase().contains(query) ||
-                        (f.user.department?.toLowerCase().contains(query) ?? false) ||
-                        (f.user.position?.toLowerCase().contains(query) ?? false);
+                        (f.user.department?.toLowerCase().contains(query) ??
+                            false) ||
+                        (f.user.position?.toLowerCase().contains(query) ??
+                            false);
                   }).toList();
                 }
-                
+
                 // Apply department filter
                 if (_selectedDepartment != null) {
-                  staffList = staffList.where((f) => f.user.department == _selectedDepartment).toList();
+                  staffList = staffList
+                      .where((f) => f.user.department == _selectedDepartment)
+                      .toList();
                 }
-                
+
                 // Apply online filter
                 if (_showOnlineOnly) {
                   staffList = staffList.where((f) => f.isOnline).toList();
                 }
-                
+
                 // Sort: online first, then by name
                 staffList.sort((a, b) {
                   if (a.isOnline && !b.isOnline) return -1;
                   if (!a.isOnline && b.isOnline) return 1;
                   return a.user.fullName.compareTo(b.user.fullName);
                 });
-                
+
                 if (staffList.isEmpty) {
                   return Center(
                     child: Column(
@@ -209,7 +216,9 @@ class _StaffDirectoryScreenState extends State<StaffDirectoryScreen> {
                         ),
                         const SizedBox(height: 16),
                         Text(
-                          _searchQuery.isNotEmpty || _selectedDepartment != null || _showOnlineOnly
+                          _searchQuery.isNotEmpty ||
+                                  _selectedDepartment != null ||
+                                  _showOnlineOnly
                               ? 'No colleagues found'
                               : 'No colleagues available',
                           style: TextStyle(
@@ -218,7 +227,9 @@ class _StaffDirectoryScreenState extends State<StaffDirectoryScreen> {
                             fontWeight: FontWeight.w500,
                           ),
                         ),
-                        if (_searchQuery.isNotEmpty || _selectedDepartment != null || _showOnlineOnly) ...[
+                        if (_searchQuery.isNotEmpty ||
+                            _selectedDepartment != null ||
+                            _showOnlineOnly) ...[
                           const SizedBox(height: 8),
                           TextButton(
                             onPressed: () {
@@ -236,16 +247,21 @@ class _StaffDirectoryScreenState extends State<StaffDirectoryScreen> {
                     ),
                   );
                 }
-                
+
                 return ListView.builder(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
                   itemCount: staffList.length,
                   itemBuilder: (context, index) {
                     final staff = staffList[index];
                     return _StaffCard(
                       staff: staff,
                       onTap: () => _showStaffDetails(context, staff),
-                      onLocate: staff.isOnline ? () => _locateStaff(context, staff) : null,
+                      onLocate: staff.isOnline
+                          ? () => _locateStaff(context, staff)
+                          : null,
                     );
                   },
                 );
@@ -256,7 +272,7 @@ class _StaffDirectoryScreenState extends State<StaffDirectoryScreen> {
       ),
     );
   }
-  
+
   void _showStaffDetails(BuildContext context, FacultyWithLocation staff) {
     showModalBottomSheet(
       context: context,
@@ -287,7 +303,7 @@ class _StaffDirectoryScreenState extends State<StaffDirectoryScreen> {
                 ),
               ),
               const SizedBox(height: 20),
-              
+
               // Avatar and name
               Row(
                 children: [
@@ -319,11 +335,16 @@ class _StaffDirectoryScreenState extends State<StaffDirectoryScreen> {
                           ),
                         const SizedBox(height: 4),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 4,
+                          ),
                           decoration: BoxDecoration(
                             color: staff.isOnline
                                 ? AppColors.success.withValues(alpha: 0.1)
-                                : AppColors.textSecondary.withValues(alpha: 0.1),
+                                : AppColors.textSecondary.withValues(
+                                    alpha: 0.1,
+                                  ),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Text(
@@ -331,7 +352,9 @@ class _StaffDirectoryScreenState extends State<StaffDirectoryScreen> {
                             style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
-                              color: staff.isOnline ? AppColors.success : AppColors.textSecondary,
+                              color: staff.isOnline
+                                  ? AppColors.success
+                                  : AppColors.textSecondary,
                             ),
                           ),
                         ),
@@ -340,20 +363,32 @@ class _StaffDirectoryScreenState extends State<StaffDirectoryScreen> {
                   ),
                 ],
               ),
-              
+
               const SizedBox(height: 24),
-              
+
               // Info cards
-              _buildInfoRow(Icons.business, 'Department', staff.user.department ?? 'Not specified'),
+              _buildInfoRow(
+                Icons.business,
+                'Department',
+                staff.user.department ?? 'Not specified',
+              ),
               _buildInfoRow(Icons.location_city, 'Campus', staff.user.campusId),
               _buildInfoRow(Icons.email, 'Email', staff.user.email),
               if (staff.isOnline && staff.location != null)
-                _buildInfoRow(Icons.access_time, 'Last seen', staff.lastSeenText),
+                _buildInfoRow(
+                  Icons.access_time,
+                  'Last seen',
+                  staff.lastSeenText,
+                ),
               if (staff.isOnline && staff.displayStatus != 'Offline')
-                _buildInfoRow(Icons.info_outline, 'Status', staff.displayStatus),
-              
+                _buildInfoRow(
+                  Icons.info_outline,
+                  'Status',
+                  staff.displayStatus,
+                ),
+
               const SizedBox(height: 24),
-              
+
               // Action buttons
               if (staff.isOnline)
                 SizedBox(
@@ -381,7 +416,7 @@ class _StaffDirectoryScreenState extends State<StaffDirectoryScreen> {
       ),
     );
   }
-  
+
   Widget _buildInfoRow(IconData icon, String label, String value) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
@@ -414,7 +449,7 @@ class _StaffDirectoryScreenState extends State<StaffDirectoryScreen> {
       ),
     );
   }
-  
+
   void _locateStaff(BuildContext context, FacultyWithLocation staff) {
     // Navigate to map screen with staff selected
     Navigator.push(
@@ -424,7 +459,7 @@ class _StaffDirectoryScreenState extends State<StaffDirectoryScreen> {
       ),
     );
   }
-  
+
   /// Get initials from a full name
   String _getInitials(String fullName) => _getInitialsStatic(fullName);
 }
@@ -434,20 +469,14 @@ class _StaffCard extends StatelessWidget {
   final FacultyWithLocation staff;
   final VoidCallback onTap;
   final VoidCallback? onLocate;
-  
-  const _StaffCard({
-    required this.staff,
-    required this.onTap,
-    this.onLocate,
-  });
-  
+
+  const _StaffCard({required this.staff, required this.onTap, this.onLocate});
+
   @override
   Widget build(BuildContext context) {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       elevation: 2,
       child: InkWell(
         onTap: onTap,
@@ -464,7 +493,7 @@ class _StaffCard extends StatelessWidget {
                 isOnline: staff.isOnline,
               ),
               const SizedBox(width: 16),
-              
+
               // Info
               Expanded(
                 child: Column(
@@ -511,7 +540,10 @@ class _StaffCard extends StatelessWidget {
                     const SizedBox(height: 4),
                     // Status badge
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 2,
+                      ),
                       decoration: BoxDecoration(
                         color: staff.isOnline
                             ? AppColors.success.withValues(alpha: 0.1)
@@ -523,14 +555,16 @@ class _StaffCard extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
-                          color: staff.isOnline ? AppColors.success : AppColors.textSecondary,
+                          color: staff.isOnline
+                              ? AppColors.success
+                              : AppColors.textSecondary,
                         ),
                       ),
                     ),
                   ],
                 ),
               ),
-              
+
               // Locate button
               if (onLocate != null)
                 Container(
@@ -560,27 +594,25 @@ class _StaffCard extends StatelessWidget {
       ),
     );
   }
-  
-  /// Get initials from a full name  
+
+  /// Get initials from a full name
   String _getInitials(String fullName) => _getInitialsStatic(fullName);
 }
 
 /// Map screen for locating a specific staff member
 class _StaffLocatorMapScreen extends StatelessWidget {
   final FacultyWithLocation targetStaff;
-  
+
   const _StaffLocatorMapScreen({required this.targetStaff});
-  
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Locating ${targetStaff.user.firstName}'),
-      ),
+      appBar: AppBar(title: Text('Locating ${targetStaff.user.firstName}')),
       body: Consumer<LocationProvider>(
         builder: (context, locationProvider, _) {
           final userLocation = locationProvider.currentLocation;
-          
+
           return Stack(
             children: [
               // Use 2D map on web (MapLibre workers don't work on static hosts)
@@ -588,7 +620,10 @@ class _StaffLocatorMapScreen extends StatelessWidget {
                 CampusMap(
                   faculty: [targetStaff],
                   userLocation: userLocation != null
-                      ? latlong2.LatLng(userLocation.latitude, userLocation.longitude)
+                      ? latlong2.LatLng(
+                          userLocation.latitude,
+                          userLocation.longitude,
+                        )
                       : null,
                   selectedLocation: targetStaff.location?.latLng,
                   selectedFaculty: targetStaff,
@@ -603,8 +638,9 @@ class _StaffLocatorMapScreen extends StatelessWidget {
                   selectedFaculty: targetStaff,
                   focusOnSelected: true,
                   showCampusBoundary: true,
+                  campusId: targetStaff.user.campusId,
                 ),
-              
+
               // Info card at bottom
               Positioned(
                 left: 16,
@@ -621,7 +657,9 @@ class _StaffLocatorMapScreen extends StatelessWidget {
                       children: [
                         FacultyAvatar(
                           imageUrl: targetStaff.user.photoUrl,
-                          initials: _getInitialsStatic(targetStaff.user.fullName),
+                          initials: _getInitialsStatic(
+                            targetStaff.user.fullName,
+                          ),
                           size: 50,
                           isOnline: true,
                         ),
@@ -659,8 +697,13 @@ class _StaffLocatorMapScreen extends StatelessWidget {
                           ),
                         ),
                         // Distance indicator (if user location available)
-                        if (userLocation != null && targetStaff.location != null)
-                          _buildDistanceChip(context, userLocation, targetStaff.location!),
+                        if (userLocation != null &&
+                            targetStaff.location != null)
+                          _buildDistanceChip(
+                            context,
+                            userLocation,
+                            targetStaff.location!,
+                          ),
                       ],
                     ),
                   ),
@@ -672,19 +715,26 @@ class _StaffLocatorMapScreen extends StatelessWidget {
       ),
     );
   }
-  
-  Widget _buildDistanceChip(BuildContext context, LocationModel userLoc, LocationModel staffLoc) {
+
+  Widget _buildDistanceChip(
+    BuildContext context,
+    LocationModel userLoc,
+    LocationModel staffLoc,
+  ) {
     final distance = _calculateDistance(
-      userLoc.latitude, userLoc.longitude,
-      staffLoc.latitude, staffLoc.longitude,
+      userLoc.latitude,
+      userLoc.longitude,
+      staffLoc.latitude,
+      staffLoc.longitude,
     );
-    
+
     final distanceText = distance < 1000
         ? '${distance.toStringAsFixed(0)}m'
         : '${(distance / 1000).toStringAsFixed(1)}km';
-    
-    final walkingMinutes = (distance / 83.33).ceil(); // 83.33 m/min walking speed
-    
+
+    final walkingMinutes = (distance / 83.33)
+        .ceil(); // 83.33 m/min walking speed
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
@@ -714,60 +764,25 @@ class _StaffLocatorMapScreen extends StatelessWidget {
       ),
     );
   }
-  
-  double _calculateDistance(double lat1, double lng1, double lat2, double lng2) {
+
+  double _calculateDistance(
+    double lat1,
+    double lng1,
+    double lat2,
+    double lng2,
+  ) {
     const double earthRadius = 6371000; // meters
-    final double dLat = _toRadians(lat2 - lat1);
-    final double dLng = _toRadians(lng2 - lng1);
-    
-    final double a = _sin(dLat / 2) * _sin(dLat / 2) +
-        _cos(_toRadians(lat1)) * _cos(_toRadians(lat2)) *
-        _sin(dLng / 2) * _sin(dLng / 2);
-    final double c = 2 * _atan2(_sqrt(a), _sqrt(1 - a));
-    
+    final double dLat = (lat2 - lat1) * math.pi / 180;
+    final double dLng = (lng2 - lng1) * math.pi / 180;
+
+    final double a =
+        math.sin(dLat / 2) * math.sin(dLat / 2) +
+        math.cos(lat1 * math.pi / 180) *
+            math.cos(lat2 * math.pi / 180) *
+            math.sin(dLng / 2) *
+            math.sin(dLng / 2);
+    final double c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
+
     return earthRadius * c;
-  }
-  
-  double _toRadians(double degrees) => degrees * 3.14159265359 / 180;
-  double _sin(double x) => _sinTaylor(x);
-  double _cos(double x) => _sinTaylor(x + 1.5707963268);
-  double _sqrt(double x) => _sqrtNewton(x);
-  double _atan2(double y, double x) => _atan2Impl(y, x);
-  
-  double _sinTaylor(double x) {
-    x = x % (2 * 3.14159265359);
-    double result = 0, term = x;
-    for (int n = 1; n <= 10; n++) {
-      result += term;
-      term *= -x * x / ((2 * n) * (2 * n + 1));
-    }
-    return result;
-  }
-  
-  double _sqrtNewton(double x) {
-    if (x <= 0) return 0;
-    double guess = x / 2;
-    for (int i = 0; i < 10; i++) {
-      guess = (guess + x / guess) / 2;
-    }
-    return guess;
-  }
-  
-  double _atan2Impl(double y, double x) {
-    if (x > 0) return _atan(y / x);
-    if (x < 0 && y >= 0) return _atan(y / x) + 3.14159265359;
-    if (x < 0 && y < 0) return _atan(y / x) - 3.14159265359;
-    if (x == 0 && y > 0) return 1.5707963268;
-    if (x == 0 && y < 0) return -1.5707963268;
-    return 0;
-  }
-  
-  double _atan(double x) {
-    double result = 0, term = x;
-    for (int n = 0; n < 20; n++) {
-      result += term / (2 * n + 1) * (n % 2 == 0 ? 1 : -1);
-      term *= x * x;
-    }
-    return result;
   }
 }

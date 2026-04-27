@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
-import 'package:flutter/foundation.dart' show debugPrint, kIsWeb;
+import 'package:flutter/foundation.dart' show debugPrint, kDebugMode, kIsWeb, visibleForTesting;
 import 'package:geolocator/geolocator.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 // permission_handler has no web support — only import on non-web
@@ -12,7 +12,7 @@ import '../core/constants/app_constants.dart';
 /// Location tracking configuration for better accuracy
 class LocationConfig {
   /// Minimum accuracy in meters to accept a GPS reading
-  static const double minAccuracyMeters = 50.0;
+  static const double minAccuracyMeters = 30.0;
   
   /// Distance filter for GPS stream (meters)
   static const double distanceFilterMeters = 1.0;
@@ -20,8 +20,10 @@ class LocationConfig {
   /// Movement detection threshold (meters)
   static const double movementThreshold = 0.5;
   
-  /// Stale location threshold (seconds)
-  static const int staleThresholdSeconds = 30;
+  /// Stale location threshold (seconds) — guards the GPS heartbeat.
+  /// If no real GPS reading arrives in this window the heartbeat stops
+  /// refreshing so the location naturally goes stale.
+  static const int staleThresholdSeconds = 90;
   
   /// Location update interval when moving (seconds)
   static const int movingUpdateIntervalSec = 2;
@@ -29,18 +31,23 @@ class LocationConfig {
   /// Location update interval when stationary (seconds)
   static const int stationaryUpdateIntervalSec = 5;
   
-  /// Heartbeat interval to keep location fresh (seconds)
+  /// Heartbeat interval to keep GPS location fresh (seconds)
   static const int heartbeatIntervalSec = 10;
   
+  /// Heartbeat interval for manual pin mode (seconds)
+  static const int manualPinHeartbeatIntervalSec = 20;
+  
   /// Number of readings to average for smoothing
-  static const int smoothingWindowSize = 3;
+  static const int smoothingWindowSize = 5;
 }
 
 /// Location Service for UniTrack
 class LocationService {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseFirestore _firestore;
+  final GeolocatorPlatform? _geolocator;
   StreamSubscription<Position>? _positionSubscription;
   Timer? _heartbeatTimer;
+  Timer? _manualPinHeartbeat; // Dedicated heartbeat for manual pin mode
   Timer? _movementTimer; // Timer for movement updates
   LocationModel? _lastLocation;
   Position? _previousPosition; // For movement detection
@@ -54,8 +61,28 @@ class LocationService {
   // Position history for smoothing (Kalman-like filtering)
   final List<Position> _positionHistory = [];
   DateTime? _lastFirestoreUpdate;
+  DateTime? _lastGpsTimestamp; // When the last real GPS reading arrived
   int _consecutiveBadReadings = 0;
   static const int _maxBadReadings = 5;
+
+  /// Default constructor - uses Firebase and Geolocator instances
+  LocationService()
+      : _firestore = FirebaseFirestore.instance,
+        _geolocator = null;
+
+  /// Testable constructor - allows dependency injection
+  @visibleForTesting
+  LocationService.testable({
+    FirebaseFirestore? firestore,
+    GeolocatorPlatform? geolocator,
+  })  : _firestore = firestore ?? FirebaseFirestore.instance,
+        _geolocator = geolocator;
+
+  /// Check if currently tracking location
+  bool get isTracking => _positionSubscription != null;
+
+  /// Check if in manual pin mode
+  bool get isManualPinMode => _isManualPinMode;
   
   /// Force request location permission - will open settings if denied
   Future<bool> checkAndRequestPermission() async {
@@ -150,7 +177,9 @@ class LocationService {
     }
     
     final isInside = intersections.isOdd;
-    debugPrint('📍 Campus check (${campusId ?? 'default'}): ($latitude, $longitude) -> inside=$isInside');
+    if (kDebugMode) {
+      debugPrint('📍 Campus check (${campusId ?? 'default'}): ($latitude, $longitude) -> inside=$isInside');
+    }
     return isInside;
   }
   
@@ -176,9 +205,6 @@ class LocationService {
     return null;
   }
   
-  /// Check if currently in manual pin mode
-  bool get isManualPinMode => _isManualPinMode;
-  
   /// Set manual pin mode - when true, GPS updates won't overwrite the manual location
   void setManualPinMode(bool enabled) {
     _isManualPinMode = enabled;
@@ -186,13 +212,32 @@ class LocationService {
   }
   
   /// Set manual location (bypasses GPS tracking)
+  /// Starts a dedicated heartbeat so the pin stays fresh in Firestore.
   Future<void> setManualLocation(String userId, LocationModel location) async {
     _isManualPinMode = true;
     _lastLocation = location;
     _currentUserId = userId;
     await updateLocation(userId, location);
     _onLocationUpdate?.call(location);
-    debugPrint('📍 Manual pin set at (${location.latitude}, ${location.longitude}) - GPS updates paused');
+
+    // Start a dedicated heartbeat for manual pin – keeps refreshing the
+    // timestamp so other users continue to see this faculty as online.
+    _manualPinHeartbeat?.cancel();
+    _manualPinHeartbeat = Timer.periodic(
+      Duration(seconds: LocationConfig.manualPinHeartbeatIntervalSec),
+      (timer) async {
+        if (_lastLocation != null && _currentUserId != null && _isManualPinMode) {
+          final refreshed = _lastLocation!.copyWith(timestamp: DateTime.now());
+          _lastLocation = refreshed;
+          await updateLocation(_currentUserId!, refreshed);
+          debugPrint('📍 Manual-pin heartbeat: timestamp refreshed');
+        } else {
+          timer.cancel();
+        }
+      },
+    );
+
+    debugPrint('📍 Manual pin set at (${location.latitude}, ${location.longitude}) — heartbeat started');
   }
   
   /// Calculate distance between two positions in meters
@@ -222,6 +267,8 @@ class LocationService {
     _positionSubscription?.cancel();
     _heartbeatTimer?.cancel();
     _movementTimer?.cancel();
+    _manualPinHeartbeat?.cancel();
+    _isManualPinMode = false;
     _currentUserId = userId;
     _currentStatus = status;
     _currentQuickMessage = quickMessage;
@@ -263,18 +310,42 @@ class LocationService {
     // Start adaptive movement detection timer
     _startAdaptiveTimer();
     
-    // Heartbeat timer to keep location fresh
+    // Heartbeat timer to keep location fresh in Firestore.
+    // For GPS mode: only fires when a real GPS reading arrived recently
+    //   (prevents masking genuinely stale data, e.g. browser crash).
+    // For manual-pin mode: the separate _manualPinHeartbeat handles it,
+    //   so this is effectively a no-op when _isManualPinMode is true.
     _heartbeatTimer = Timer.periodic(
       Duration(seconds: LocationConfig.heartbeatIntervalSec), 
       (timer) async {
-        if (_lastLocation != null && _currentUserId != null) {
-          final refreshedLocation = _lastLocation!.copyWith(
-            timestamp: DateTime.now(),
-          );
-          _lastLocation = refreshedLocation;
-          await updateLocation(_currentUserId!, refreshedLocation);
-          debugPrint('📍 Heartbeat: Location refreshed (withinCampus=${_lastLocation!.isWithinCampus})');
+        if (_lastLocation == null || _currentUserId == null) return;
+        // Manual-pin has its own heartbeat — skip here.
+        if (_isManualPinMode) return;
+        // Guard: if no recent GPS reading, attempt a fresh one before giving up
+        if (_lastGpsTimestamp == null ||
+            DateTime.now().difference(_lastGpsTimestamp!).inSeconds >
+                LocationConfig.staleThresholdSeconds) {
+          if (kDebugMode) debugPrint('📍 Heartbeat: no recent GPS — attempting fresh read');
+          try {
+            final position = await Geolocator.getCurrentPosition(
+              locationSettings: const LocationSettings(
+                accuracy: LocationAccuracy.high,
+                timeLimit: Duration(seconds: 5),
+              ),
+            );
+            await _processGpsPosition(position);
+            return; // _processGpsPosition already updated Firestore
+          } catch (e) {
+            if (kDebugMode) debugPrint('📍 Heartbeat: fresh GPS attempt failed: $e');
+            return; // genuinely stale
+          }
         }
+        final refreshedLocation = _lastLocation!.copyWith(
+          timestamp: DateTime.now(),
+        );
+        _lastLocation = refreshedLocation;
+        await updateLocation(_currentUserId!, refreshedLocation);
+        if (kDebugMode) debugPrint('📍 Heartbeat: Location refreshed (withinCampus=${_lastLocation!.isWithinCampus})');
       },
     );
   }
@@ -289,6 +360,12 @@ class LocationService {
     
     _movementTimer = Timer.periodic(Duration(seconds: interval), (timer) async {
       if (_currentUserId == null) return;
+      
+      // Skip if GPS stream already provided a recent update (fallback only)
+      if (_lastGpsTimestamp != null &&
+          DateTime.now().difference(_lastGpsTimestamp!).inSeconds < interval) {
+        return;
+      }
       
       try {
         final position = await Geolocator.getCurrentPosition(
@@ -364,23 +441,24 @@ class LocationService {
     
     // Reset bad reading counter on successful position
     _consecutiveBadReadings = 0;
+    _lastGpsTimestamp = DateTime.now();
     
     // IMPORTANT: Skip GPS updates if user has manually pinned their location
     if (_isManualPinMode) {
-      debugPrint('📍 GPS Update SKIPPED - Manual Pin Mode is active');
+      if (kDebugMode) debugPrint('📍 GPS Update SKIPPED - Manual Pin Mode is active');
       return;
     }
     
     // Filter out inaccurate readings (but still accept if no better option)
     if (position.accuracy > LocationConfig.minAccuracyMeters) {
-      debugPrint('📍 Low accuracy reading: ${position.accuracy}m (threshold: ${LocationConfig.minAccuracyMeters}m)');
+      if (kDebugMode) debugPrint('📍 Low accuracy reading: ${position.accuracy}m (threshold: ${LocationConfig.minAccuracyMeters}m)');
       // If we have a recent good location, skip this bad reading
       if (_lastLocation != null && 
           _lastLocation!.accuracy != null &&
           _lastLocation!.accuracy! < position.accuracy) {
         final timeSinceLastUpdate = DateTime.now().difference(_lastLocation!.timestamp);
         if (timeSinceLastUpdate.inSeconds < LocationConfig.staleThresholdSeconds) {
-          debugPrint('📍 Skipping low accuracy reading, using cached location');
+          if (kDebugMode) debugPrint('📍 Skipping low accuracy reading, using cached location');
           return;
         }
       }
@@ -436,7 +514,7 @@ class LocationService {
     if (shouldUpdate) {
       await updateLocation(_currentUserId!, location);
       _lastFirestoreUpdate = now;
-      debugPrint('📍 Location UPDATED: accuracy=${smoothedPosition.accuracy.toStringAsFixed(1)}m, campus=$currentCampusLocation, moving=$_isMoving');
+      if (kDebugMode) debugPrint('📍 Location UPDATED: accuracy=${smoothedPosition.accuracy.toStringAsFixed(1)}m, campus=$currentCampusLocation, moving=$_isMoving');
     }
     
     _onLocationUpdate?.call(location);
@@ -454,6 +532,8 @@ class LocationService {
     _positionSubscription = null;
     _heartbeatTimer?.cancel();
     _heartbeatTimer = null;
+    _manualPinHeartbeat?.cancel();
+    _manualPinHeartbeat = null;
     _movementTimer?.cancel();
     _movementTimer = null;
     _lastLocation = null;
@@ -464,13 +544,16 @@ class LocationService {
     _onLocationUpdate = null;
     _positionHistory.clear();
     _lastFirestoreUpdate = null;
+    _lastGpsTimestamp = null;
     _consecutiveBadReadings = 0;
   }
   
   /// Switch from manual pin to automatic GPS tracking
   void switchToAutoTracking() {
     _isManualPinMode = false;
-    debugPrint('📍 Switched to automatic GPS tracking');
+    _manualPinHeartbeat?.cancel();
+    _manualPinHeartbeat = null;
+    debugPrint('📍 Switched to automatic GPS tracking — manual heartbeat stopped');
   }
   
   /// Legacy method - no longer needed but kept for compatibility
@@ -519,7 +602,6 @@ class LocationService {
   Stream<List<LocationModel>> getActiveLocationsStream() {
     return _firestore
         .collection('locations')
-        .where('isWithinCampus', isEqualTo: true)
         .snapshots()
         .map((snapshot) => snapshot.docs
             .map((doc) => LocationModel.fromFirestore(doc))
@@ -549,6 +631,65 @@ class LocationService {
   int estimateWalkingTimeMinutes(double distanceMeters) {
     const walkingSpeedMetersPerMinute = 83.33;
     return (distanceMeters / walkingSpeedMetersPerMinute).ceil();
+  }
+
+  // ==================== TEST HELPER METHODS ====================
+  // These methods are exposed for unit testing purposes
+
+  /// Check if a position has acceptable accuracy
+  @visibleForTesting
+  bool isPositionAccurate(Position position) {
+    return position.accuracy <= LocationConfig.minAccuracyMeters;
+  }
+
+  /// Check if user has moved above the threshold
+  @visibleForTesting
+  bool hasUserMoved(Position? previous, Position current) {
+    if (previous == null) return true;
+    final distance = _calculateDistance(previous, current);
+    return distance > LocationConfig.movementThreshold;
+  }
+
+  /// Calculate smoothed position from position history
+  @visibleForTesting
+  Position? calculateSmoothedPosition(List<Position> history) {
+    if (history.length < LocationConfig.smoothingWindowSize) {
+      return null;
+    }
+
+    double sumLat = 0;
+    double sumLng = 0;
+    double sumAccuracy = 0;
+
+    for (final pos in history) {
+      sumLat += pos.latitude;
+      sumLng += pos.longitude;
+      sumAccuracy += pos.accuracy;
+    }
+
+    final count = history.length;
+    return Position(
+      latitude: sumLat / count,
+      longitude: sumLng / count,
+      timestamp: history.last.timestamp,
+      accuracy: sumAccuracy / count,
+      altitude: history.last.altitude,
+      heading: history.last.heading,
+      speed: history.last.speed,
+      speedAccuracy: history.last.speedAccuracy,
+      altitudeAccuracy: history.last.altitudeAccuracy,
+      headingAccuracy: history.last.headingAccuracy,
+    );
+  }
+
+  /// Get current position history (for testing)
+  @visibleForTesting
+  List<Position> get positionHistory => List.unmodifiable(_positionHistory);
+
+  /// Clear position history (for testing)
+  @visibleForTesting
+  void clearPositionHistory() {
+    _positionHistory.clear();
   }
   
   /// Dispose

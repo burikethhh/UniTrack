@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../models/models.dart';
 import '../../providers/providers.dart';
+import '../../core/utils/helpers.dart';
 import 'user_detail_screen.dart';
 
 /// Full User Management Screen with advanced filtering and sorting
@@ -106,7 +107,8 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                         children: [
                           _FilterChip(
                             label: 'All Users',
-                            selected: adminProvider.roleFilter == null &&
+                            selected:
+                                adminProvider.roleFilter == null &&
                                 !adminProvider.showBannedOnly,
                             onSelected: (_) {
                               adminProvider.clearFilters();
@@ -117,7 +119,8 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                           const SizedBox(width: 8),
                           _FilterChip(
                             label: 'Students',
-                            selected: adminProvider.roleFilter == UserRole.student,
+                            selected:
+                                adminProvider.roleFilter == UserRole.student,
                             onSelected: (_) =>
                                 adminProvider.setRoleFilter(UserRole.student),
                             count: adminProvider.students.length,
@@ -127,7 +130,8 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                           const SizedBox(width: 8),
                           _FilterChip(
                             label: 'Staff',
-                            selected: adminProvider.roleFilter == UserRole.staff,
+                            selected:
+                                adminProvider.roleFilter == UserRole.staff,
                             onSelected: (_) =>
                                 adminProvider.setRoleFilter(UserRole.staff),
                             count: adminProvider.staff.length,
@@ -137,7 +141,8 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                           const SizedBox(width: 8),
                           _FilterChip(
                             label: 'Admins',
-                            selected: adminProvider.roleFilter == UserRole.admin,
+                            selected:
+                                adminProvider.roleFilter == UserRole.admin,
                             onSelected: (_) =>
                                 adminProvider.setRoleFilter(UserRole.admin),
                             count: adminProvider.admins.length,
@@ -162,7 +167,10 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
 
               // Results Count
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -193,32 +201,35 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                 child: adminProvider.isLoading
                     ? const Center(child: CircularProgressIndicator())
                     : adminProvider.filteredUsers.isEmpty
-                        ? _EmptyState(
-                            hasFilters: adminProvider.searchQuery.isNotEmpty ||
-                                adminProvider.roleFilter != null ||
-                                adminProvider.showBannedOnly,
-                            onClear: () {
-                              adminProvider.clearFilters();
-                              _searchController.clear();
-                            },
-                          )
-                        : RefreshIndicator(
-                            onRefresh: () => adminProvider.loadAllUsers(),
-                            child: ListView.builder(
-                              itemCount: adminProvider.filteredUsers.length,
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: 4),
-                              itemBuilder: (context, index) {
-                                final user = adminProvider.filteredUsers[index];
-                                return _UserCard(
-                                  user: user,
-                                  onTap: () => _openUserDetail(user),
-                                  onAction: (action) =>
-                                      _handleUserAction(user, action),
-                                );
-                              },
-                            ),
+                    ? _EmptyState(
+                        hasFilters:
+                            adminProvider.searchQuery.isNotEmpty ||
+                            adminProvider.roleFilter != null ||
+                            adminProvider.showBannedOnly,
+                        onClear: () {
+                          adminProvider.clearFilters();
+                          _searchController.clear();
+                        },
+                      )
+                    : RefreshIndicator(
+                        onRefresh: () => adminProvider.loadAllUsers(),
+                        child: ListView.builder(
+                          itemCount: adminProvider.filteredUsers.length,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 4,
                           ),
+                          itemBuilder: (context, index) {
+                            final user = adminProvider.filteredUsers[index];
+                            return _UserCard(
+                              user: user,
+                              onTap: () => _openUserDetail(user),
+                              onAction: (action) =>
+                                  _handleUserAction(user, action),
+                            );
+                          },
+                        ),
+                      ),
               ),
             ],
           );
@@ -255,9 +266,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
   void _openUserDetail(UserModel user) {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => UserDetailScreen(userId: user.id),
-      ),
+      MaterialPageRoute(builder: (_) => UserDetailScreen(userId: user.id)),
     );
   }
 
@@ -328,14 +337,23 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
             onPressed: () async {
               Navigator.pop(ctx);
               _showLoadingDialog();
-              final success = await adminProvider.banUser(
-                user.id,
-                reason: reasonController.text.isNotEmpty
-                    ? reasonController.text
-                    : null,
-              );
-              if (mounted) Navigator.pop(context);
-              _showResultSnackbar(success, 'User banned', 'Failed to ban user');
+              try {
+                final success = await adminProvider.banUser(
+                  user.id,
+                  reason: reasonController.text.isNotEmpty
+                      ? reasonController.text
+                      : null,
+                );
+                _dismissLoadingDialog();
+                _showResultSnackbar(
+                  success,
+                  'User banned',
+                  'Failed to ban user',
+                );
+              } catch (_) {
+                _dismissLoadingDialog();
+                _showResultSnackbar(false, '', 'Failed to ban user');
+              }
             },
           ),
         ],
@@ -368,10 +386,18 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
             onPressed: () async {
               Navigator.pop(ctx);
               _showLoadingDialog();
-              final success = await adminProvider.unbanUser(user.id);
-              if (mounted) Navigator.pop(context);
-              _showResultSnackbar(
-                  success, 'User unbanned', 'Failed to unban user');
+              try {
+                final success = await adminProvider.unbanUser(user.id);
+                _dismissLoadingDialog();
+                _showResultSnackbar(
+                  success,
+                  'User unbanned',
+                  'Failed to unban user',
+                );
+              } catch (_) {
+                _dismissLoadingDialog();
+                _showResultSnackbar(false, '', 'Failed to unban user');
+              }
             },
           ),
         ],
@@ -431,10 +457,18 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
             onPressed: () async {
               Navigator.pop(ctx);
               _showLoadingDialog();
-              final success = await adminProvider.deleteUser(user.id);
-              if (mounted) Navigator.pop(context);
-              _showResultSnackbar(
-                  success, 'User deleted', 'Failed to delete user');
+              try {
+                final success = await adminProvider.deleteUser(user.id);
+                _dismissLoadingDialog();
+                _showResultSnackbar(
+                  success,
+                  'User deleted',
+                  'Failed to delete user',
+                );
+              } catch (_) {
+                _dismissLoadingDialog();
+                _showResultSnackbar(false, '', 'Failed to delete user');
+              }
             },
           ),
         ],
@@ -456,17 +490,24 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
             children: [
               Text('Change role for ${user.fullName}'),
               const SizedBox(height: 16),
-              ...UserRole.values.map((role) => RadioListTile<UserRole>(
-                    title: Text(role.name.toUpperCase()),
-                    subtitle: Text(_getRoleDescription(role)),
-                    value: role,
-                    groupValue: selectedRole, // ignore: deprecated_member_use
-                    onChanged: (value) { // ignore: deprecated_member_use
-                      if (value != null) {
-                        setState(() => selectedRole = value);
-                      }
-                    },
-                  )),
+              RadioGroup<UserRole>(
+                groupValue: selectedRole,
+                onChanged: (value) {
+                  if (value != null) {
+                    setState(() => selectedRole = value);
+                  }
+                },
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: UserRole.values.map(
+                    (role) => RadioListTile<UserRole>(
+                      title: Text(role.name.toUpperCase()),
+                      subtitle: Text(_getRoleDescription(role)),
+                      value: role,
+                    ),
+                  ).toList(),
+                ),
+              ),
             ],
           ),
           actions: [
@@ -482,11 +523,21 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                   : () async {
                       Navigator.pop(ctx);
                       _showLoadingDialog();
-                      final success = await adminProvider.updateUserRole(
-                          user.id, selectedRole);
-                      if (mounted) Navigator.pop(context); // ignore: use_build_context_synchronously
-                      _showResultSnackbar(
-                          success, 'Role updated', 'Failed to update role');
+                      try {
+                        final success = await adminProvider.updateUserRole(
+                          user.id,
+                          selectedRole,
+                        );
+                        _dismissLoadingDialog();
+                        _showResultSnackbar(
+                          success,
+                          'Role updated',
+                          'Failed to update role',
+                        );
+                      } catch (_) {
+                        _dismissLoadingDialog();
+                        _showResultSnackbar(false, '', 'Failed to update role');
+                      }
                     },
             ),
           ],
@@ -506,7 +557,10 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
     }
   }
 
+  bool _isLoadingDialogShowing = false;
+
   void _showLoadingDialog() {
+    _isLoadingDialogShowing = true;
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -518,7 +572,14 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
           ),
         ),
       ),
-    );
+    ).then((_) => _isLoadingDialogShowing = false);
+  }
+
+  void _dismissLoadingDialog() {
+    if (_isLoadingDialogShowing && mounted) {
+      Navigator.pop(context);
+      _isLoadingDialogShowing = false;
+    }
   }
 
   void _showResultSnackbar(bool success, String successMsg, String failMsg) {
@@ -596,9 +657,7 @@ class _FilterChip extends StatelessWidget {
       onSelected: onSelected,
       selectedColor: color ?? Theme.of(context).colorScheme.primary,
       checkmarkColor: Colors.white,
-      labelStyle: TextStyle(
-        color: selected ? Colors.white : null,
-      ),
+      labelStyle: TextStyle(color: selected ? Colors.white : null),
     );
   }
 }
@@ -643,8 +702,7 @@ class _UserCard extends StatelessWidget {
                               width: 56,
                               height: 56,
                               fit: BoxFit.cover,
-                              errorBuilder: (_, _, _) =>
-                                  _buildInitials(),
+                              errorBuilder: (_, _, _) => _buildInitials(),
                             ),
                           )
                         : _buildInitials(),
@@ -660,8 +718,11 @@ class _UserCard extends StatelessWidget {
                           shape: BoxShape.circle,
                           border: Border.all(color: Colors.white, width: 2),
                         ),
-                        child: const Icon(Icons.block,
-                            size: 12, color: Colors.white),
+                        child: const Icon(
+                          Icons.block,
+                          size: 12,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
                 ],
@@ -680,13 +741,14 @@ class _UserCard extends StatelessWidget {
                             user.fullName,
                             style: theme.textTheme.titleMedium?.copyWith(
                               fontWeight: FontWeight.w600,
-                              decoration:
-                                  isActive ? null : TextDecoration.lineThrough,
+                              decoration: isActive
+                                  ? null
+                                  : TextDecoration.lineThrough,
                               color: isActive ? null : Colors.grey,
                             ),
                           ),
                         ),
-                        _RoleBadge(role: user.role),
+                        RoleBadge(role: user.role),
                       ],
                     ),
                     const SizedBox(height: 2),
@@ -700,8 +762,11 @@ class _UserCard extends StatelessWidget {
                     Row(
                       children: [
                         if (user.department != null) ...[
-                          Icon(Icons.business,
-                              size: 12, color: Colors.grey.shade500),
+                          Icon(
+                            Icons.business,
+                            size: 12,
+                            color: Colors.grey.shade500,
+                          ),
                           const SizedBox(width: 4),
                           Expanded(
                             child: Text(
@@ -714,8 +779,11 @@ class _UserCard extends StatelessWidget {
                           ),
                         ],
                         const Spacer(),
-                        Icon(Icons.calendar_today,
-                            size: 12, color: Colors.grey.shade500),
+                        Icon(
+                          Icons.calendar_today,
+                          size: 12,
+                          color: Colors.grey.shade500,
+                        ),
                         const SizedBox(width: 4),
                         Text(
                           _formatDate(user.createdAt),
@@ -774,8 +842,10 @@ class _UserCard extends StatelessWidget {
                       children: [
                         Icon(Icons.delete_forever, color: Colors.red),
                         SizedBox(width: 8),
-                        Text('Delete User',
-                            style: TextStyle(color: Colors.red)),
+                        Text(
+                          'Delete User',
+                          style: TextStyle(color: Colors.red),
+                        ),
                       ],
                     ),
                   ),
@@ -815,61 +885,6 @@ class _UserCard extends StatelessWidget {
   }
 }
 
-class _RoleBadge extends StatelessWidget {
-  final UserRole role;
-
-  const _RoleBadge({required this.role});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: _getColor().withAlpha(25),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: _getColor().withAlpha(127)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(_getIcon(), size: 12, color: _getColor()),
-          const SizedBox(width: 4),
-          Text(
-            role.name.toUpperCase(),
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.bold,
-              color: _getColor(),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Color _getColor() {
-    switch (role) {
-      case UserRole.student:
-        return Colors.green;
-      case UserRole.staff:
-        return Colors.orange;
-      case UserRole.admin:
-        return Colors.purple;
-    }
-  }
-
-  IconData _getIcon() {
-    switch (role) {
-      case UserRole.student:
-        return Icons.school;
-      case UserRole.staff:
-        return Icons.work;
-      case UserRole.admin:
-        return Icons.admin_panel_settings;
-    }
-  }
-}
-
 class _EmptyState extends StatelessWidget {
   final bool hasFilters;
   final VoidCallback onClear;
@@ -890,19 +905,14 @@ class _EmptyState extends StatelessWidget {
           const SizedBox(height: 16),
           Text(
             hasFilters ? 'No users match your filters' : 'No users found',
-            style: TextStyle(
-              fontSize: 18,
-              color: Colors.grey.shade600,
-            ),
+            style: TextStyle(fontSize: 18, color: Colors.grey.shade600),
           ),
           const SizedBox(height: 8),
           Text(
             hasFilters
                 ? 'Try adjusting your search or filters'
                 : 'Users will appear here once registered',
-            style: TextStyle(
-              color: Colors.grey.shade500,
-            ),
+            style: TextStyle(color: Colors.grey.shade500),
           ),
           if (hasFilters) ...[
             const SizedBox(height: 16),

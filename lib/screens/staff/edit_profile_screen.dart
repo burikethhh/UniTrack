@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/validators.dart';
 import '../../providers/auth_provider.dart';
@@ -25,10 +24,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final _lastNameController = TextEditingController();
   final _positionController = TextEditingController();
   final _phoneController = TextEditingController();
-  
+
   String? _selectedDepartment;
   String? _photoUrl;
   Uint8List? _selectedPhotoBytes;
+  String? _selectedPhotoName;
   bool _isLoading = false;
   bool _isUploadingPhoto = false;
   List<DepartmentModel> _departments = [];
@@ -36,9 +36,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   @override
   void initState() {
     super.initState();
-    // Load departments first, then user data in callback
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadDepartments().then((_) => _loadUserData());
+    // Load departments first, then user data
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      try {
+        await _loadDepartments();
+      } catch (e) {
+        debugPrint('Error loading departments: $e');
+      }
+      _loadUserData();
     });
   }
 
@@ -84,8 +89,25 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       );
 
       if (result != null && result.files.single.bytes != null) {
+        final bytes = result.files.single.bytes!;
+        final fileName = result.files.single.name;
+        // Reject images larger than 2 MB
+        if (bytes.length > 2 * 1024 * 1024) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                  'Image is too large. Please select a photo under 2 MB.',
+                ),
+                backgroundColor: AppColors.error,
+              ),
+            );
+          }
+          return;
+        }
         setState(() {
-          _selectedPhotoBytes = result.files.single.bytes;
+          _selectedPhotoBytes = bytes;
+          _selectedPhotoName = fileName;
         });
       }
     } catch (e) {
@@ -107,13 +129,25 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
     try {
       final storage = FirebaseStorage.instance;
-      final fileName = 'profile_$userId.jpg';
-      final ref = storage.ref().child('profile_photos/$fileName');
+      // Detect content type from file extension
+      final ext = (_selectedPhotoName ?? '').split('.').last.toLowerCase();
+      final contentType = ext == 'png'
+          ? 'image/png'
+          : ext == 'webp'
+          ? 'image/webp'
+          : 'image/jpeg';
+      final fileExt = ext == 'png'
+          ? 'png'
+          : ext == 'webp'
+          ? 'webp'
+          : 'jpg';
+      final fileName = 'profile_$userId.$fileExt';
+      final ref = storage.ref().child('users/$userId/$fileName');
 
       // Upload bytes (works on both web and mobile)
       final TaskSnapshot uploadTask = await ref.putData(
         _selectedPhotoBytes!,
-        SettableMetadata(contentType: 'image/jpeg'),
+        SettableMetadata(contentType: contentType),
       );
 
       // Get download URL
@@ -153,41 +187,21 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         newPhotoUrl = await _uploadPhoto(user.id);
       }
 
-      // Create updated user model
-      final updatedUser = UserModel(
-        id: user.id,
-        email: user.email,
+      // Create updated user using copyWith to preserve all fields
+      final updatedUser = user.copyWith(
         firstName: _firstNameController.text.trim(),
         lastName: _lastNameController.text.trim(),
-        role: user.role,
         department: _selectedDepartment,
-        position: _positionController.text.trim().isEmpty 
-            ? null 
+        position: _positionController.text.trim().isEmpty
+            ? null
             : _positionController.text.trim(),
         photoUrl: newPhotoUrl,
-        phoneNumber: _phoneController.text.trim().isEmpty 
-            ? null 
+        phoneNumber: _phoneController.text.trim().isEmpty
+            ? null
             : _phoneController.text.trim(),
-        isActive: user.isActive,
-        createdAt: user.createdAt,
-        lastLoginAt: user.lastLoginAt,
-        campusId: user.campusId,
-        isTrackingEnabled: user.isTrackingEnabled,
-        currentStatus: user.currentStatus,
-        quickMessage: user.quickMessage,
-        officeHours: user.officeHours,
-        availabilityStatus: user.availabilityStatus,
-        customStatusMessage: user.customStatusMessage,
-        statusUpdatedAt: user.statusUpdatedAt,
       );
 
-      // Update in Firestore
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.id)
-          .set(updatedUser.toFirestore(), SetOptions(merge: true));
-
-      // Update auth provider
+      // Update via auth provider (handles both Firestore and local state)
       await authProvider.updateProfile(updatedUser);
 
       if (mounted) {
@@ -272,16 +286,16 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             width: 3,
                           ),
                           image: _selectedPhotoBytes != null
-                                  ? DecorationImage(
-                                      image: MemoryImage(_selectedPhotoBytes!),
-                                      fit: BoxFit.cover,
-                                    )
+                              ? DecorationImage(
+                                  image: MemoryImage(_selectedPhotoBytes!),
+                                  fit: BoxFit.cover,
+                                )
                               : _photoUrl != null
-                                  ? DecorationImage(
-                                      image: NetworkImage(_photoUrl!),
-                                      fit: BoxFit.cover,
-                                    )
-                                  : null,
+                              ? DecorationImage(
+                                  image: NetworkImage(_photoUrl!),
+                                  fit: BoxFit.cover,
+                                )
+                              : null,
                         ),
                         child: _selectedPhotoBytes == null && _photoUrl == null
                             ? Icon(
@@ -303,10 +317,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           decoration: BoxDecoration(
                             color: AppColors.primary,
                             shape: BoxShape.circle,
-                            border: Border.all(
-                              color: Colors.white,
-                              width: 2,
-                            ),
+                            border: Border.all(color: Colors.white, width: 2),
                           ),
                           child: const Icon(
                             Icons.camera_alt,
@@ -378,8 +389,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               // Department Dropdown
               DropdownButtonFormField<String>(
                 // Only use _selectedDepartment if it exists in the department list
-                value: _departments.any((d) => d.name == _selectedDepartment) // ignore: deprecated_member_use
-                    ? _selectedDepartment 
+                initialValue:
+                    _departments.any(
+                      (d) => d.name == _selectedDepartment,
+                    ) // ignore: deprecated_member_use
+                    ? _selectedDepartment
                     : null,
                 decoration: InputDecoration(
                   labelText: 'Department',
@@ -395,10 +409,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     value: null,
                     child: Text('Select Department'),
                   ),
-                  ..._departments.map((dept) => DropdownMenuItem<String>(
-                    value: dept.name,
-                    child: Text(dept.name),
-                  )),
+                  ..._departments.map(
+                    (dept) => DropdownMenuItem<String>(
+                      value: dept.name,
+                      child: Text(dept.name),
+                    ),
+                  ),
                 ],
                 onChanged: (value) {
                   setState(() {
@@ -433,7 +449,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 validator: (value) {
                   if (value == null || value.isEmpty) return null; // Optional
                   // Simple Philippine phone validation
-                  if (!RegExp(r'^(09|\+639)\d{9}$').hasMatch(value.replaceAll(' ', ''))) {
+                  if (!RegExp(
+                    r'^(09|\+639)\d{9}$',
+                  ).hasMatch(value.replaceAll(' ', ''))) {
                     return 'Enter a valid Philippine mobile number';
                   }
                   return null;

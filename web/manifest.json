@@ -1,15 +1,18 @@
 {
-    "name": "UniTrack - SKSU Faculty Tracker",
-    "short_name": "UniTrack",
+    "name": "iSKSUlars Track - SKSU Faculty Tracker",
+    "short_name": "iSKSUlars Track",
     "start_url": "./",
     "scope": "./",
     "display": "standalone",
-    "background_color": "#1a1a2e",
-    "theme_color": "#1a1a2e",
+    "background_color": "#0a2540",
+    "theme_color": "#00f5b8",
     "description": "Real-Time Faculty & Staff Locator for Sultan Kudarat State University",
     "orientation": "any",
     "prefer_related_applications": false,
-    "categories": ["education", "utilities"],
+    "categories": [
+        "education",
+        "utilities"
+    ],
     "lang": "en",
     "dir": "ltr",
     "icons": [

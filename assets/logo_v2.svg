@@ -1,0 +1,89 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Dark Space/Navy Gradient for App Branding -->
+    <linearGradient id="bg-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f3460" />
+      <stop offset="50%" stop-color="#16213e" />
+      <stop offset="100%" stop-color="#1a1a2e" />
+    </linearGradient>
+    
+    <!-- Deep Emerald Green Gradient for the Map Pin -->
+    <linearGradient id="pin-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#00E6A8" />
+      <stop offset="100%" stop-color="#009E75" />
+    </linearGradient>
+
+    <!-- Vibrant Teal for Highlights -->
+    <linearGradient id="accent-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4DFFD6" />
+      <stop offset="100%" stop-color="#00C896" />
+    </linearGradient>
+
+    <!-- Glow Effect for the Pin and Radar Elements -->
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="8" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+
+    <!-- Drop Shadow for Text to ensure readability -->
+    <filter id="text-shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#000000" flood-opacity="0.6" />
+    </filter>
+  </defs>
+
+  <!-- Background Canvas Squircle -->
+  <rect width="512" height="512" rx="100" fill="url(#bg-grad)" />
+
+  <!-- Radar & Target Tracking Rings -->
+  <circle cx="256" cy="190" r="140" fill="none" stroke="#00C896" stroke-width="2" opacity="0.15" />
+  <circle cx="256" cy="190" r="100" fill="none" stroke="#00C896" stroke-width="2" opacity="0.3" stroke-dasharray="8 8" />
+  <circle cx="256" cy="190" r="60" fill="none" stroke="#00C896" stroke-width="3" opacity="0.5" />
+
+  <!-- The Target/Location Pin Group -->
+  <g filter="url(#glow)">
+    <!-- Outer Glow/Pulse of the Pin -->
+    <path d="M256 60 C180 60 118 122 118 198 C118 310 256 360 256 360 C256 360 394 310 394 198 C394 122 332 60 256 60 Z" fill="url(#pin-grad)" opacity="0.2" />
+    
+    <!-- Core Map Pin -->
+    <path d="M256 80 C194 80 144 130 144 192 C144 265 204 315 256 350 C308 315 368 265 368 192 C368 130 318 80 256 80 Z" fill="url(#pin-grad)" />
+    
+    <!-- Refined Faculty/Staff Silhouette with ID Badge -->
+    <g fill="#1a1a2e">
+      <!-- Head -->
+      <circle cx="256" cy="140" r="28" />
+      <!-- Shoulders / Torso -->
+      <path d="M256 182 C210 182 178 215 172 260 C182 265 195 268 208 270 L304 270 C317 268 330 265 340 260 C334 215 302 182 256 182 Z" />
+      <!-- V-neck / Lanyard cutout (uses pin gradient to blend with the pin background) -->
+      <path d="M236 182 L256 215 L276 182 Z" fill="url(#pin-grad)" />
+      <!-- ID Badge (looks like wearing an official university ID) -->
+      <rect x="246" y="222" width="20" height="28" rx="4" fill="url(#pin-grad)" />
+      <circle cx="256" cy="228" r="3" fill="#1a1a2e" />
+    </g>
+  </g>
+
+  <!-- Active Tracking Nodes (Little "beeps" on the radar) -->
+  <circle cx="160" cy="120" r="6" fill="#4DFFD6" filter="url(#glow)" />
+  <circle cx="330" cy="240" r="8" fill="#4DFFD6" filter="url(#glow)" opacity="0.8" />
+  <circle cx="170" cy="230" r="4" fill="#00C896" opacity="0.6" />
+
+  <!-- App Typography: Bold, Modern, High-Contrast -->
+  <!-- "iSKSUlars" in crisp white -->
+  <text x="256" y="425" 
+        font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" 
+        font-size="52" 
+        font-weight="900" 
+        fill="#ffffff" 
+        text-anchor="middle" 
+        letter-spacing="1"
+        filter="url(#text-shadow)">iSKSUlars</text>
+        
+  <!-- "TRACK" in branded Emerald Green -->
+  <text x="256" y="465" 
+        font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" 
+        font-size="28" 
+        font-weight="700" 
+        fill="#00E6A8" 
+        text-anchor="middle" 
+        letter-spacing="8" 
+        filter="url(#text-shadow)">TRACK</text>
+</svg>

@@ -1,4 +1,6 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/constants/app_constants.dart';
@@ -10,9 +12,7 @@ class HelpSupportScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Help & Support'),
-      ),
+      appBar: AppBar(title: const Text('Help & Support')),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -55,10 +55,7 @@ class HelpSupportScreen extends StatelessWidget {
                         SizedBox(height: 4),
                         Text(
                           'Find answers to common questions or contact support',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.white70,
-                          ),
+                          style: TextStyle(fontSize: 14, color: Colors.white70),
                         ),
                       ],
                     ),
@@ -72,9 +69,9 @@ class HelpSupportScreen extends StatelessWidget {
             // FAQ Section
             Text(
               'Frequently Asked Questions',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),
 
@@ -126,14 +123,45 @@ class HelpSupportScreen extends StatelessWidget {
               'On the login screen, tap "Forgot Password?" and enter your email. You\'ll receive a password reset link.',
             ),
 
+            _buildFAQItem(
+              context,
+              'I\'m stuck on the login screen after signing in',
+              'This can happen on first login. Here\'s how to fix it:\n\n'
+                  'On Android:\n'
+                  '1. Close UniTrack completely (swipe it away from Recent Apps)\n'
+                  '2. Reopen UniTrack from your app drawer\n'
+                  '3. You should be automatically logged in\n\n'
+                  'On Web Browser:\n'
+                  '1. Press Ctrl+Shift+R to hard refresh the page\n'
+                  '2. Or close the tab and reopen the app URL\n\n'
+                  'If you\'re still stuck, try:\n'
+                  '• Clear the app cache (Settings > Apps > UniTrack > Clear Cache)\n'
+                  '• Uninstall and reinstall the app\n'
+                  '• Make sure you have a stable internet connection',
+            ),
+
+            _buildFAQItem(
+              context,
+              'How do I enable Location Sharing? (Students)',
+              'To share your location so admin can see you on the Live Monitor:\n\n'
+                  '1. Go to the Profile tab (person icon at bottom)\n'
+                  '2. Find the "Location Sharing" toggle\n'
+                  '3. Turn it ON\n\n'
+                  'If the toggle doesn\'t work:\n'
+                  '• Make sure Location (GPS) is turned ON in your phone Settings\n'
+                  '• Grant UniTrack location permission: go to Settings > Apps > UniTrack > Permissions > Location > Allow\n'
+                  '• If you see "Allow only while using the app", that\'s fine — it will work\n'
+                  '• On web, click "Allow" when the browser asks for location access',
+            ),
+
             const SizedBox(height: 24),
 
             // Contact Section
             Text(
               'Contact Support',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),
 
@@ -141,8 +169,8 @@ class HelpSupportScreen extends StatelessWidget {
               context,
               icon: Icons.email_outlined,
               title: 'Email Support',
-              subtitle: 'support@sksu.edu.ph',
-              onTap: () => _launchEmail('support@sksu.edu.ph'),
+              subtitle: AppConstants.supportEmail,
+              onTap: () => _launchEmail(context, AppConstants.supportEmail),
             ),
 
             _buildContactCard(
@@ -150,7 +178,7 @@ class HelpSupportScreen extends StatelessWidget {
               icon: Icons.school_outlined,
               title: 'University Website',
               subtitle: 'www.sksu.edu.ph',
-              onTap: () => _launchUrl('https://www.sksu.edu.ph'),
+              onTap: () => _launchUrl(context, 'https://www.sksu.edu.ph'),
             ),
 
             _buildContactCard(
@@ -159,9 +187,11 @@ class HelpSupportScreen extends StatelessWidget {
               title: 'Report a Bug',
               subtitle: 'Help us improve UniTrack',
               onTap: () => _launchEmail(
-                'support@sksu.edu.ph',
+                context,
+                AppConstants.supportEmail,
                 subject: 'UniTrack Bug Report - v${AppConstants.appVersion}',
-                body: 'Please describe the issue:\n\n\n\nSteps to reproduce:\n1. \n2. \n3. \n\nDevice: \nAndroid Version: ',
+                body:
+                    'Please describe the issue:\n\n\n\nSteps to reproduce:\n1. \n2. \n3. \n\nDevice: \nAndroid Version: ',
               ),
             ),
 
@@ -217,7 +247,7 @@ class HelpSupportScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    '© 2026 ${AppConstants.universityShortName}',
+                    '© ${DateTime.now().year} ${AppConstants.universityShortName}',
                     style: TextStyle(
                       color: AppColors.textSecondary,
                       fontSize: 12,
@@ -255,18 +285,11 @@ class HelpSupportScreen extends StatelessWidget {
               color: AppColors.accent.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(
-              Icons.help_outline,
-              color: AppColors.accent,
-              size: 18,
-            ),
+            child: Icon(Icons.help_outline, color: AppColors.accent, size: 18),
           ),
           title: Text(
             question,
-            style: const TextStyle(
-              fontWeight: FontWeight.w600,
-              fontSize: 14,
-            ),
+            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
           ),
           iconColor: AppColors.accent,
           collapsedIconColor: AppColors.textSecondary,
@@ -365,32 +388,78 @@ class HelpSupportScreen extends StatelessWidget {
     );
   }
 
-  Future<void> _launchEmail(String email, {String? subject, String? body}) async {
+  Future<void> _launchEmail(
+    BuildContext context,
+    String email, {
+    String? subject,
+    String? body,
+  }) async {
     final Uri emailUri = Uri(
       scheme: 'mailto',
       path: email,
       query: _encodeQueryParameters({
-        if (subject != null) 'subject': subject,
-        if (body != null) 'body': body,
+        'subject': ?subject,
+        'body': ?body,
       }),
     );
-    
-    if (await canLaunchUrl(emailUri)) {
-      await launchUrl(emailUri);
+
+    try {
+      // On web, canLaunchUrl often returns false for mailto — just try to launch
+      if (kIsWeb) {
+        await launchUrl(emailUri);
+      } else if (await canLaunchUrl(emailUri)) {
+        await launchUrl(emailUri);
+      } else {
+        // Fallback: copy email to clipboard
+        await Clipboard.setData(ClipboardData(text: email));
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Email copied to clipboard: $email')),
+          );
+        }
+      }
+    } catch (_) {
+      await Clipboard.setData(ClipboardData(text: email));
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Email copied to clipboard: $email')),
+        );
+      }
     }
   }
 
-  Future<void> _launchUrl(String url) async {
+  Future<void> _launchUrl(BuildContext context, String url) async {
     final Uri uri = Uri.parse(url);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    try {
+      if (kIsWeb) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        await Clipboard.setData(ClipboardData(text: url));
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('URL copied to clipboard: $url')),
+          );
+        }
+      }
+    } catch (_) {
+      await Clipboard.setData(ClipboardData(text: url));
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('URL copied to clipboard: $url')),
+        );
+      }
     }
   }
 
   String? _encodeQueryParameters(Map<String, String> params) {
     if (params.isEmpty) return null;
     return params.entries
-        .map((e) => '${Uri.encodeComponent(e.key)}=${Uri.encodeComponent(e.value)}')
+        .map(
+          (e) =>
+              '${Uri.encodeComponent(e.key)}=${Uri.encodeComponent(e.value)}',
+        )
         .join('&');
   }
 }

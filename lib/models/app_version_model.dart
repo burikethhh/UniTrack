@@ -4,15 +4,15 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 /// Supports backwards compatibility with older app versions
 class AppVersion {
   final String id;
-  final String versionName;      // e.g., "1.2.0"
-  final int versionCode;         // e.g., 120
-  final String downloadUrl;      // Firebase Storage URL
+  final String versionName; // e.g., "1.2.0"
+  final int versionCode; // e.g., 120
+  final String downloadUrl; // Firebase Storage URL
   final String? releaseNotes;
-  final bool isRequired;         // Force update if true
-  final bool isActive;           // Is this version available
+  final bool isRequired; // Force update if true
+  final bool isActive; // Is this version available
   final DateTime releaseDate;
   final int downloadCount;
-  final int fileSize;            // In bytes
+  final int fileSize; // In bytes
   final int minSupportedApiVersion; // Minimum API version this release supports
 
   AppVersion({
@@ -39,7 +39,8 @@ class AppVersion {
       releaseNotes: data['releaseNotes'],
       isRequired: data['isRequired'] ?? false,
       isActive: data['isActive'] ?? true,
-      releaseDate: (data['releaseDate'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      releaseDate:
+          (data['releaseDate'] as Timestamp?)?.toDate() ?? DateTime.now(),
       downloadCount: data['downloadCount'] ?? 0,
       fileSize: data['fileSize'] ?? 0,
       minSupportedApiVersion: data['minSupportedApiVersion'] ?? 1,
@@ -69,7 +70,9 @@ class AppVersion {
   /// Format file size
   String get formattedSize {
     if (fileSize < 1024) return '$fileSize B';
-    if (fileSize < 1024 * 1024) return '${(fileSize / 1024).toStringAsFixed(1)} KB';
+    if (fileSize < 1024 * 1024) {
+      return '${(fileSize / 1024).toStringAsFixed(1)} KB';
+    }
     return '${(fileSize / (1024 * 1024)).toStringAsFixed(1)} MB';
   }
 }

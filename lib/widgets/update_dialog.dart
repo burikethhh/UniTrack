@@ -45,7 +45,7 @@ class _UpdateDialogState extends State<UpdateDialog> {
     final theme = Theme.of(context);
 
     return PopScope(
-      canPop: !widget.updateResult.isRequired || _isDownloading,
+      canPop: !widget.updateResult.isRequired && !_isDownloading,
       child: AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         contentPadding: EdgeInsets.zero,
@@ -66,7 +66,9 @@ class _UpdateDialogState extends State<UpdateDialog> {
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(20),
+                  ),
                 ),
                 child: Column(
                   children: [
@@ -93,7 +95,10 @@ class _UpdateDialogState extends State<UpdateDialog> {
                     ),
                     const SizedBox(height: 8),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 6,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(20),
@@ -205,7 +210,9 @@ class _UpdateDialogState extends State<UpdateDialog> {
                             children: [
                               Text(
                                 _statusMessage,
-                                style: const TextStyle(fontWeight: FontWeight.w500),
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w500,
+                                ),
                               ),
                               Text(
                                 '${(_downloadProgress * 100).toInt()}%',
@@ -251,7 +258,10 @@ class _UpdateDialogState extends State<UpdateDialog> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: theme.colorScheme.primary,
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 12,
+                    ),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -290,9 +300,11 @@ class _UpdateDialogState extends State<UpdateDialog> {
     if (mounted) {
       if (success) {
         if (kIsWeb) {
+          // On web, just reload — don't pop the dialog (reload tears down everything)
           reloadWebPage();
+          return;
         }
-        // Installation started
+        // Mobile: installation started
         Navigator.of(context).pop(true);
         widget.onUpdate?.call();
       } else {
@@ -335,18 +347,10 @@ class _InfoTile extends StatelessWidget {
       children: [
         Text(
           label,
-          style: TextStyle(
-            fontSize: 11,
-            color: Colors.grey.shade600,
-          ),
+          style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
         ),
         const SizedBox(height: 2),
-        Text(
-          value,
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-          ),
-        ),
+        Text(value, style: const TextStyle(fontWeight: FontWeight.bold)),
       ],
     );
   }

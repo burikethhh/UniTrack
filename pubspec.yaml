@@ -1,7 +1,7 @@
 name: unitrack
-description: "UniTrack - Real-Time Faculty & Staff Locator for SKSU"
+description: "iSKSUlars Track - Real-Time Faculty & Staff Locator for SKSU"
 publish_to: 'none'
-version: 2.2.0+220
+version: 2.3.2+251
 
 environment:
   sdk: ^3.10.7
@@ -83,6 +83,12 @@ dev_dependencies:
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
   flutter_launcher_icons: ^0.14.4
+  
+  # Testing dependencies
+  mockito: ^5.4.5
+  build_runner: ^2.4.15
+  integration_test:
+    sdk: flutter
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -137,5 +143,17 @@ flutter_launcher_icons:
   ios: true
   image_path: "assets/icon.png"
   min_sdk_android: 21
-  adaptive_icon_background: "#1B5E20"
-  adaptive_icon_foreground: "assets/icon.png"
+  
+  # Highly Adaptive Android setup (Supports Square, Squircle, Circle, Teardrop automatically)
+  adaptive_icon_background: "#0a2540" # Deep navy from new design
+  adaptive_icon_foreground: "assets/icon_foreground.png" # Full iSKSUlars Track logo foreground
+  adaptive_icon_foreground_inset: 0 # Prevent shrinking; fill icon mask as much as possible
+  
+  # Android 13+ Themed/Monochrome Icons
+  adaptive_icon_monochrome: "assets/icon_monochrome.png" # Flat single-color version of the pin
+
+  web:
+    generate: true
+    image_path: "assets/icon.png"
+    background_color: "#0a2540"
+    theme_color: "#00f5b8"

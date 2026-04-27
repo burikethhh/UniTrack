@@ -7,21 +7,21 @@ class CampusSelector extends StatefulWidget {
   final String? selectedCampusId;
   final Function(String campusId) onCampusSelected;
   final bool compact;
-  
+
   const CampusSelector({
     super.key,
     this.selectedCampusId,
     required this.onCampusSelected,
     this.compact = false,
   });
-  
+
   @override
   State<CampusSelector> createState() => _CampusSelectorState();
 }
 
 class _CampusSelectorState extends State<CampusSelector> {
   bool _isExpanded = false;
-  
+
   // Campus colors for visual distinction
   static const Map<String, Color> campusColors = {
     'isulan': AppColors.primary,
@@ -32,11 +32,11 @@ class _CampusSelectorState extends State<CampusSelector> {
     'kalamansig': Colors.pink,
     'lutayan': Colors.brown,
   };
-  
+
   Color _getCampusColor(String campusId) {
     return campusColors[campusId] ?? AppColors.primary;
   }
-  
+
   @override
   Widget build(BuildContext context) {
     final campusList = AppConstants.campusList;
@@ -46,7 +46,7 @@ class _CampusSelectorState extends State<CampusSelector> {
             orElse: () => campusList.first,
           )
         : null;
-    
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -109,7 +109,7 @@ class _CampusSelectorState extends State<CampusSelector> {
               ),
             ),
           ),
-          
+
           // Dropdown list
           if (_isExpanded) ...[
             const Divider(height: 1),
@@ -121,7 +121,7 @@ class _CampusSelectorState extends State<CampusSelector> {
                   children: campusList.map((campus) {
                     final isSelected = campus['id'] == widget.selectedCampusId;
                     final color = _getCampusColor(campus['id']!);
-                    
+
                     return Material(
                       color: isSelected
                           ? color.withValues(alpha: 0.1)
@@ -195,13 +195,13 @@ class _CampusSelectorState extends State<CampusSelector> {
 class FloatingCampusSelector extends StatelessWidget {
   final String? selectedCampusId;
   final Function(String campusId) onCampusSelected;
-  
+
   const FloatingCampusSelector({
     super.key,
     this.selectedCampusId,
     required this.onCampusSelected,
   });
-  
+
   @override
   Widget build(BuildContext context) {
     return CampusSelector(
@@ -218,7 +218,7 @@ class CampusLegend extends StatelessWidget {
   final VoidCallback? onToggle;
   final String? selectedCampusId;
   final Function(String campusId)? onCampusSelected;
-  
+
   const CampusLegend({
     super.key,
     this.expanded = false,
@@ -226,7 +226,7 @@ class CampusLegend extends StatelessWidget {
     this.selectedCampusId,
     this.onCampusSelected,
   });
-  
+
   // Campus colors for visual distinction
   static const Map<String, Color> campusColors = {
     'isulan': AppColors.primary,
@@ -237,21 +237,18 @@ class CampusLegend extends StatelessWidget {
     'kalamansig': Colors.pink,
     'lutayan': Colors.brown,
   };
-  
+
   @override
   Widget build(BuildContext context) {
     final campusList = AppConstants.campusList;
-    
+
     return Container(
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.95),
         borderRadius: BorderRadius.circular(10),
         boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
-            blurRadius: 4,
-          ),
+          BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 4),
         ],
       ),
       child: Column(
@@ -290,7 +287,7 @@ class CampusLegend extends StatelessWidget {
               ],
             ),
           ),
-          
+
           // Campus items - tap to navigate
           if (expanded) ...[
             const SizedBox(height: 6),
@@ -298,14 +295,17 @@ class CampusLegend extends StatelessWidget {
               final campusId = campus['id']!;
               final color = campusColors[campusId] ?? AppColors.primary;
               final isSelected = campusId == selectedCampusId;
-              
+
               return InkWell(
-                onTap: onCampusSelected != null 
+                onTap: onCampusSelected != null
                     ? () => onCampusSelected!(campusId)
                     : null,
                 borderRadius: BorderRadius.circular(4),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 4,
+                    horizontal: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: isSelected ? color.withValues(alpha: 0.1) : null,
                     borderRadius: BorderRadius.circular(4),
@@ -318,7 +318,10 @@ class CampusLegend extends StatelessWidget {
                         height: 10,
                         decoration: BoxDecoration(
                           color: color.withValues(alpha: 0.3),
-                          border: Border.all(color: color, width: isSelected ? 2 : 1.5),
+                          border: Border.all(
+                            color: color,
+                            width: isSelected ? 2 : 1.5,
+                          ),
                           borderRadius: BorderRadius.circular(2),
                         ),
                       ),
@@ -327,7 +330,9 @@ class CampusLegend extends StatelessWidget {
                         campus['shortName']!,
                         style: TextStyle(
                           fontSize: 10,
-                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                          fontWeight: isSelected
+                              ? FontWeight.bold
+                              : FontWeight.normal,
                           color: isSelected ? color : AppColors.textPrimary,
                         ),
                       ),
@@ -359,12 +364,9 @@ class CampusLegend extends StatelessWidget {
 /// Status legend for faculty availability
 class StatusLegend extends StatelessWidget {
   final bool compact;
-  
-  const StatusLegend({
-    super.key,
-    this.compact = false,
-  });
-  
+
+  const StatusLegend({super.key, this.compact = false});
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -373,10 +375,7 @@ class StatusLegend extends StatelessWidget {
         color: Colors.white.withValues(alpha: 0.95),
         borderRadius: BorderRadius.circular(10),
         boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
-            blurRadius: 4,
-          ),
+          BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 4),
         ],
       ),
       child: Column(
@@ -404,7 +403,7 @@ class StatusLegend extends StatelessWidget {
       ),
     );
   }
-  
+
   Widget _buildLegendItem(Color color, String label) {
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -412,18 +411,12 @@ class StatusLegend extends StatelessWidget {
         Container(
           width: 10,
           height: 10,
-          decoration: BoxDecoration(
-            color: color,
-            shape: BoxShape.circle,
-          ),
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
         ),
         const SizedBox(width: 6),
         Text(
           label,
-          style: const TextStyle(
-            fontSize: 10,
-            color: AppColors.textSecondary,
-          ),
+          style: const TextStyle(fontSize: 10, color: AppColors.textSecondary),
         ),
       ],
     );

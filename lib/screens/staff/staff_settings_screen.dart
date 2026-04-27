@@ -7,6 +7,7 @@ import '../../providers/providers.dart';
 import '../../widgets/widgets.dart';
 import '../../services/update_service.dart';
 import '../../services/auth_service.dart';
+import '../../services/push_notification_service.dart';
 import '../common/privacy_policy_screen.dart';
 import '../common/help_support_screen.dart';
 import 'edit_profile_screen.dart';
@@ -14,20 +15,20 @@ import 'edit_profile_screen.dart';
 /// Settings screen for staff members
 class StaffSettingsScreen extends StatefulWidget {
   const StaffSettingsScreen({super.key});
-  
+
   @override
   State<StaffSettingsScreen> createState() => _StaffSettingsScreenState();
 }
 
 class _StaffSettingsScreenState extends State<StaffSettingsScreen> {
   bool _notificationsEnabled = true;
-  
+
   @override
   void initState() {
     super.initState();
     _loadNotificationPref();
   }
-  
+
   Future<void> _loadNotificationPref() async {
     final prefs = await SharedPreferences.getInstance();
     if (mounted) {
@@ -36,31 +37,39 @@ class _StaffSettingsScreenState extends State<StaffSettingsScreen> {
       });
     }
   }
-  
+
   Future<void> _toggleNotifications(bool value) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('notifications_enabled', value);
-    if (mounted) {
-      setState(() => _notificationsEnabled = value);
+    if (!mounted) return;
+    setState(() => _notificationsEnabled = value);
+    // Actually enable/disable push notifications
+    final authProvider = context.read<AuthProvider>();
+    final userId = authProvider.user?.id;
+    if (userId != null) {
+      final pushService = PushNotificationService();
+      if (value) {
+        // Re-register FCM token
+        await pushService.saveTokenForUser(userId);
+      } else {
+        // Remove FCM token so no pushes arrive
+        await pushService.removeTokenForUser(userId);
+      }
     }
   }
-  
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Settings'),
-      ),
+      appBar: AppBar(title: const Text('Settings')),
       body: Consumer2<AuthProvider, LocationProvider>(
         builder: (context, authProvider, locationProvider, _) {
           final user = authProvider.user;
-          
+
           if (user == null) {
-            return const Center(
-              child: Text('No user data available'),
-            );
+            return const Center(child: Text('No user data available'));
           }
-          
+
           return SingleChildScrollView(
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -83,7 +92,9 @@ class _StaffSettingsScreenState extends State<StaffSettingsScreen> {
                         onTap: () {
                           Navigator.push(
                             context,
-                            MaterialPageRoute(builder: (_) => const EditProfileScreen()),
+                            MaterialPageRoute(
+                              builder: (_) => const EditProfileScreen(),
+                            ),
                           );
                         },
                       ),
@@ -130,18 +141,14 @@ class _StaffSettingsScreenState extends State<StaffSettingsScreen> {
                           ),
                           title: const Text('Position'),
                           subtitle: Text(user.position!),
-                          trailing: const Icon(Icons.chevron_right),
-                          onTap: () {
-                            // TODO: Edit position
-                          },
                         ),
                       ],
                     ],
                   ),
                 ),
-                
+
                 const SizedBox(height: 24),
-                
+
                 // Privacy section
                 _buildSectionHeader(context, 'Privacy & Location'),
                 Card(
@@ -184,10 +191,7 @@ class _StaffSettingsScreenState extends State<StaffSettingsScreen> {
                             color: AppColors.info.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(10),
                           ),
-                          child: const Icon(
-                            Icons.timer,
-                            color: AppColors.info,
-                          ),
+                          child: const Icon(Icons.timer, color: AppColors.info),
                         ),
                         title: const Text('Auto-hide Schedule'),
                         subtitle: const Text('Hide location during off hours'),
@@ -199,9 +203,9 @@ class _StaffSettingsScreenState extends State<StaffSettingsScreen> {
                     ],
                   ),
                 ),
-                
+
                 const SizedBox(height: 24),
-                
+
                 // Notifications section
                 _buildSectionHeader(context, 'Notifications'),
                 Card(
@@ -230,9 +234,9 @@ class _StaffSettingsScreenState extends State<StaffSettingsScreen> {
                     ],
                   ),
                 ),
-                
+
                 const SizedBox(height: 24),
-                
+
                 // About section
                 _buildSectionHeader(context, 'About'),
                 Card(
@@ -275,7 +279,9 @@ class _StaffSettingsScreenState extends State<StaffSettingsScreen> {
                         onTap: () {
                           Navigator.push(
                             context,
-                            MaterialPageRoute(builder: (_) => const PrivacyPolicyScreen()),
+                            MaterialPageRoute(
+                              builder: (_) => const PrivacyPolicyScreen(),
+                            ),
                           );
                         },
                       ),
@@ -298,16 +304,18 @@ class _StaffSettingsScreenState extends State<StaffSettingsScreen> {
                         onTap: () {
                           Navigator.push(
                             context,
-                            MaterialPageRoute(builder: (_) => const HelpSupportScreen()),
+                            MaterialPageRoute(
+                              builder: (_) => const HelpSupportScreen(),
+                            ),
                           );
                         },
                       ),
                     ],
                   ),
                 ),
-                
+
                 const SizedBox(height: 24),
-                
+
                 // Account section
                 _buildSectionHeader(context, 'Account'),
                 Card(
@@ -361,7 +369,7 @@ class _StaffSettingsScreenState extends State<StaffSettingsScreen> {
                     ],
                   ),
                 ),
-                
+
                 const SizedBox(height: 24),
               ],
             ),
@@ -370,7 +378,7 @@ class _StaffSettingsScreenState extends State<StaffSettingsScreen> {
       ),
     );
   }
-  
+
   Widget _buildSectionHeader(BuildContext context, String title) {
     return Padding(
       padding: const EdgeInsets.only(left: 4, bottom: 8),
@@ -383,7 +391,7 @@ class _StaffSettingsScreenState extends State<StaffSettingsScreen> {
       ),
     );
   }
-  
+
   void _showScheduleDialog(BuildContext context) {
     // Load saved schedule from SharedPreferences
     SharedPreferences.getInstance().then((prefs) {
@@ -393,12 +401,12 @@ class _StaffSettingsScreenState extends State<StaffSettingsScreen> {
       final endMinute = prefs.getInt('autohide_end_minute') ?? 0;
       final hideWeekends = prefs.getBool('autohide_weekends') ?? true;
       final scheduleEnabled = prefs.getBool('autohide_enabled') ?? false;
-      
+
       TimeOfDay startTime = TimeOfDay(hour: startHour, minute: startMinute);
       TimeOfDay endTime = TimeOfDay(hour: endHour, minute: endMinute);
       bool weekends = hideWeekends;
       bool enabled = scheduleEnabled;
-      
+
       if (!context.mounted) return;
       showDialog(
         context: context,
@@ -411,7 +419,9 @@ class _StaffSettingsScreenState extends State<StaffSettingsScreen> {
                 SwitchListTile(
                   title: const Text('Enable Schedule'),
                   subtitle: Text(
-                    enabled ? 'Location auto-hides on schedule' : 'Schedule is disabled',
+                    enabled
+                        ? 'Location auto-hides on schedule'
+                        : 'Schedule is disabled',
                   ),
                   value: enabled,
                   onChanged: (value) {
@@ -476,9 +486,9 @@ class _StaffSettingsScreenState extends State<StaffSettingsScreen> {
                   await prefs.setInt('autohide_end_hour', endTime.hour);
                   await prefs.setInt('autohide_end_minute', endTime.minute);
                   await prefs.setBool('autohide_weekends', weekends);
-                  
+
                   if (dialogContext.mounted) Navigator.pop(dialogContext);
-                  
+
                   if (dialogCtx.mounted) {
                     ScaffoldMessenger.of(dialogCtx).showSnackBar(
                       SnackBar(
@@ -486,7 +496,9 @@ class _StaffSettingsScreenState extends State<StaffSettingsScreen> {
                           children: [
                             const Icon(Icons.check_circle, color: Colors.white),
                             const SizedBox(width: 8),
-                            Text(enabled ? 'Schedule saved' : 'Schedule disabled'),
+                            Text(
+                              enabled ? 'Schedule saved' : 'Schedule disabled',
+                            ),
                           ],
                         ),
                         backgroundColor: AppColors.accent,
@@ -503,7 +515,7 @@ class _StaffSettingsScreenState extends State<StaffSettingsScreen> {
       );
     });
   }
-  
+
   void _showSignOutDialog(BuildContext context) {
     final authProvider = context.read<AuthProvider>();
     showDialog(
@@ -517,9 +529,7 @@ class _StaffSettingsScreenState extends State<StaffSettingsScreen> {
             Text('Sign Out'),
           ],
         ),
-        content: const Text(
-          'Are you sure you want to sign out?',
-        ),
+        content: const Text('Are you sure you want to sign out?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
@@ -540,117 +550,132 @@ class _StaffSettingsScreenState extends State<StaffSettingsScreen> {
       ),
     );
   }
-  
+
   void _showDeleteAccountDialog(BuildContext context) {
     final passwordController = TextEditingController();
     bool isDeleting = false;
-    
+
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Row(
-            children: [
-              Icon(Icons.warning, color: AppColors.error),
-              SizedBox(width: 8),
-              Text('Delete Account'),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Are you sure you want to delete your account? This action cannot be undone and all your data will be permanently removed.',
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: passwordController,
-                obscureText: true,
-                decoration: InputDecoration(
-                  labelText: 'Confirm your password',
-                  hintText: 'Enter your password',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  prefixIcon: const Icon(Icons.lock),
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: isDeleting ? null : () => Navigator.pop(dialogContext),
-              child: const Text('Cancel'),
+        builder: (sbContext, setDialogState) {
+          return AlertDialog(
+            title: const Row(
+              children: [
+                Icon(Icons.warning, color: AppColors.error),
+                SizedBox(width: 8),
+                Text('Delete Account'),
+              ],
             ),
-            ElevatedButton(
-              onPressed: isDeleting
-                  ? null
-                  : () async {
-                      if (passwordController.text.isEmpty) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Please enter your password')),
-                        );
-                        return;
-                      }
-                      setDialogState(() => isDeleting = true);
-                      try {
-                        final authProvider = context.read<AuthProvider>();
-                        final user = authProvider.user;
-                        if (user == null) return;
-                        
-                        // Re-authenticate first
-                        final authService = AuthService();
-                        await authService.reauthenticate(
-                          user.email,
-                          passwordController.text,
-                        );
-                        
-                        // Delete the account
-                        await authService.deleteAccount();
-                        
-                        if (dialogContext.mounted) Navigator.pop(dialogContext);
-                        
-                        // Sign out and go to login
-                        await authProvider.signOut();
-                      } catch (e) {
-                        setDialogState(() => isDeleting = false);
-                        if (dialogContext.mounted) {
-                          ScaffoldMessenger.of(dialogContext).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                e.toString().contains('wrong-password') || e.toString().contains('invalid-credential')
-                                    ? 'Incorrect password. Please try again.'
-                                    : 'Error: $e',
-                              ),
-                              backgroundColor: AppColors.error,
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Are you sure you want to delete your account? This action cannot be undone and all your data will be permanently removed.',
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: passwordController,
+                  obscureText: true,
+                  decoration: InputDecoration(
+                    labelText: 'Confirm your password',
+                    hintText: 'Enter your password',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    prefixIcon: const Icon(Icons.lock),
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: isDeleting
+                    ? null
+                    : () => Navigator.pop(dialogContext),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: isDeleting
+                    ? null
+                    : () async {
+                        if (passwordController.text.isEmpty) {
+                          ScaffoldMessenger.of(sbContext).showSnackBar(
+                            const SnackBar(
+                              content: Text('Please enter your password'),
                             ),
                           );
+                          return;
                         }
-                      }
-                    },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.error,
+                        setDialogState(() => isDeleting = true);
+                        try {
+                          final authProvider = sbContext.read<AuthProvider>();
+                          final user = authProvider.user;
+                          if (user == null) return;
+
+                          // Re-authenticate first
+                          final authService = AuthService();
+                          await authService.reauthenticate(
+                            user.email,
+                            passwordController.text,
+                          );
+
+                          // Delete the account
+                          await authService.deleteAccount();
+
+                          // Close dialog first before signing out
+                          if (dialogContext.mounted) {
+                            Navigator.pop(dialogContext);
+                          }
+
+                          // Sign out — this will trigger AuthWrapper navigation
+                          try {
+                            await authProvider.signOut();
+                          } catch (_) {
+                            // Auth already deleted, sign-out may fail — that's OK
+                          }
+                        } catch (e) {
+                          setDialogState(() => isDeleting = false);
+                          if (dialogContext.mounted) {
+                            ScaffoldMessenger.of(dialogContext).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  e.toString().contains('wrong-password') ||
+                                          e.toString().contains(
+                                            'invalid-credential',
+                                          )
+                                      ? 'Incorrect password. Please try again.'
+                                      : 'Error: $e',
+                                ),
+                                backgroundColor: AppColors.error,
+                              ),
+                            );
+                          }
+                        }
+                      },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.error,
+                ),
+                child: isDeleting
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Colors.white,
+                          ),
+                        ),
+                      )
+                    : const Text('Delete'),
               ),
-              child: isDeleting
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                      ),
-                    )
-                  : const Text('Delete'),
-            ),
-          ],
-        ),
+            ],
+          );
+        },
       ),
-    );
-    
-    // Dispose controller when dialog closes
-    // (StatefulBuilder keeps it alive until dialog pops)
+    ).then((_) => passwordController.dispose());
   }
 }
 

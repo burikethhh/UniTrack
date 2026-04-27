@@ -2,10 +2,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 /// Types of notifications
 enum NotificationType {
-  lookingForYou,  // Student is looking for staff
+  lookingForYou, // Student is looking for staff
   locationUpdate, // Staff location changed
-  statusChange,   // Staff status changed
-  system,         // System notification
+  statusChange, // Staff status changed
+  system, // System notification
 }
 
 /// Notification model for student-staff communication

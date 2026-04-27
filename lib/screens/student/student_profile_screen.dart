@@ -1,6 +1,8 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:geolocator/geolocator.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/constants/app_constants.dart';
 import '../../providers/auth_provider.dart';
@@ -15,23 +17,19 @@ import '../staff/edit_profile_screen.dart';
 /// Profile screen for students
 class StudentProfileScreen extends StatelessWidget {
   const StudentProfileScreen({super.key});
-  
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Profile'),
-      ),
+      appBar: AppBar(title: const Text('Profile')),
       body: Consumer<AuthProvider>(
         builder: (context, authProvider, _) {
           final user = authProvider.user;
-          
+
           if (user == null) {
-            return const Center(
-              child: Text('No user data available'),
-            );
+            return const Center(child: Text('No user data available'));
           }
-          
+
           return SingleChildScrollView(
             padding: const EdgeInsets.all(20),
             child: Column(
@@ -63,7 +61,9 @@ class StudentProfileScreen extends StatelessWidget {
                                 onTap: () {
                                   Navigator.push(
                                     context,
-                                    MaterialPageRoute(builder: (_) => const EditProfileScreen()),
+                                    MaterialPageRoute(
+                                      builder: (_) => const EditProfileScreen(),
+                                    ),
                                   );
                                 },
                                 child: Container(
@@ -71,7 +71,10 @@ class StudentProfileScreen extends StatelessWidget {
                                   decoration: BoxDecoration(
                                     color: AppColors.primary,
                                     shape: BoxShape.circle,
-                                    border: Border.all(color: Colors.white, width: 2),
+                                    border: Border.all(
+                                      color: Colors.white,
+                                      width: 2,
+                                    ),
                                   ),
                                   child: const Icon(
                                     Icons.edit,
@@ -86,9 +89,8 @@ class StudentProfileScreen extends StatelessWidget {
                         const SizedBox(height: 14),
                         Text(
                           user.fullName,
-                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
+                          style: Theme.of(context).textTheme.titleLarge
+                              ?.copyWith(fontWeight: FontWeight.bold),
                         ),
                         const SizedBox(height: 4),
                         Text(
@@ -132,9 +134,9 @@ class StudentProfileScreen extends StatelessWidget {
                     ),
                   ),
                 ),
-                
+
                 const SizedBox(height: 20),
-                
+
                 // Location sharing toggle
                 Consumer<LocationProvider>(
                   builder: (context, locationProvider, _) {
@@ -156,8 +158,12 @@ class StudentProfileScreen extends StatelessWidget {
                                   height: 44,
                                   decoration: BoxDecoration(
                                     color: locationProvider.isTracking
-                                        ? AppColors.accent.withValues(alpha: 0.1)
-                                        : AppColors.textSecondary.withValues(alpha: 0.1),
+                                        ? AppColors.accent.withValues(
+                                            alpha: 0.1,
+                                          )
+                                        : AppColors.textSecondary.withValues(
+                                            alpha: 0.1,
+                                          ),
                                     borderRadius: BorderRadius.circular(12),
                                   ),
                                   child: Icon(
@@ -172,13 +178,17 @@ class StudentProfileScreen extends StatelessWidget {
                                 const SizedBox(width: 14),
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         'Location Sharing',
-                                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                          fontWeight: FontWeight.w600,
-                                        ),
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .titleMedium
+                                            ?.copyWith(
+                                              fontWeight: FontWeight.w600,
+                                            ),
                                       ),
                                       Text(
                                         locationProvider.isTracking
@@ -194,15 +204,23 @@ class StudentProfileScreen extends StatelessWidget {
                                 ),
                                 Switch(
                                   value: locationProvider.isTracking,
-                                  onChanged: (value) {
+                                  onChanged: (value) async {
                                     if (value) {
-                                      locationProvider.startTracking();
+                                      final success = await locationProvider
+                                          .startTracking();
+                                      if (!success && context.mounted) {
+                                        _showLocationPermissionHelp(context);
+                                      }
                                     } else {
                                       locationProvider.stopTracking();
                                     }
                                   },
-                                  activeTrackColor: AppColors.accent.withValues(alpha: 0.5),
-                                  thumbColor: WidgetStateProperty.resolveWith((states) {
+                                  activeTrackColor: AppColors.accent.withValues(
+                                    alpha: 0.5,
+                                  ),
+                                  thumbColor: WidgetStateProperty.resolveWith((
+                                    states,
+                                  ) {
                                     if (states.contains(WidgetState.selected)) {
                                       return AppColors.accent;
                                     }
@@ -211,6 +229,38 @@ class StudentProfileScreen extends StatelessWidget {
                                 ),
                               ],
                             ),
+                            // Permission help hint when not tracking
+                            if (!locationProvider.isTracking) ...[
+                              const Divider(height: 24),
+                              GestureDetector(
+                                onTap: () =>
+                                    _showLocationPermissionHelp(context),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.info_outline,
+                                      color: AppColors.info,
+                                      size: 16,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        'Having trouble? Tap here for help enabling location.',
+                                        style: TextStyle(
+                                          color: AppColors.info,
+                                          fontSize: 13,
+                                        ),
+                                      ),
+                                    ),
+                                    Icon(
+                                      Icons.chevron_right,
+                                      color: AppColors.info,
+                                      size: 16,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
                             if (locationProvider.isTracking) ...[
                               const Divider(height: 24),
                               Row(
@@ -245,7 +295,7 @@ class StudentProfileScreen extends StatelessWidget {
                 ),
 
                 const SizedBox(height: 20),
-                
+
                 // Settings section card
                 _buildSectionCard(
                   context,
@@ -260,7 +310,9 @@ class StudentProfileScreen extends StatelessWidget {
                       onTap: () {
                         Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (_) => const EditProfileScreen()),
+                          MaterialPageRoute(
+                            builder: (_) => const EditProfileScreen(),
+                          ),
                         );
                       },
                     ),
@@ -277,11 +329,15 @@ class StudentProfileScreen extends StatelessWidget {
                     const Divider(height: 1, indent: 56),
                     _buildMenuTile(
                       icon: Icons.favorite_outline,
-                      iconColor: Colors.pink,
+                      iconColor: Colors.pink.withValues(alpha: 0.4),
                       title: 'Favorites',
-                      subtitle: 'View saved faculty members',
+                      subtitle: 'Coming soon',
                       onTap: () {
-                        _showFavoritesInfo(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Favorites is coming soon!'),
+                          ),
+                        );
                       },
                     ),
                     const Divider(height: 1, indent: 56),
@@ -296,9 +352,9 @@ class StudentProfileScreen extends StatelessWidget {
                     ),
                   ],
                 ),
-                
+
                 const SizedBox(height: 16),
-                
+
                 // About section card
                 _buildSectionCard(
                   context,
@@ -325,7 +381,9 @@ class StudentProfileScreen extends StatelessWidget {
                       onTap: () {
                         Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (_) => const PrivacyPolicyScreen()),
+                          MaterialPageRoute(
+                            builder: (_) => const PrivacyPolicyScreen(),
+                          ),
                         );
                       },
                     ),
@@ -338,15 +396,17 @@ class StudentProfileScreen extends StatelessWidget {
                       onTap: () {
                         Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (_) => const HelpSupportScreen()),
+                          MaterialPageRoute(
+                            builder: (_) => const HelpSupportScreen(),
+                          ),
                         );
                       },
                     ),
                   ],
                 ),
-                
+
                 const SizedBox(height: 24),
-                
+
                 // Sign out button
                 SizedBox(
                   width: double.infinity,
@@ -367,12 +427,12 @@ class StudentProfileScreen extends StatelessWidget {
                     ),
                   ),
                 ),
-                
+
                 const SizedBox(height: 20),
-                
+
                 // Footer
                 Text(
-                  '© 2026 ${AppConstants.universityShortName}',
+                  '© ${DateTime.now().year} ${AppConstants.universityShortName}',
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
               ],
@@ -382,7 +442,147 @@ class StudentProfileScreen extends StatelessWidget {
       ),
     );
   }
-  
+
+  void _showLocationPermissionHelp(BuildContext context) {
+    final isWeb = kIsWeb;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(Icons.location_off, color: Colors.orange.shade700, size: 24),
+            const SizedBox(width: 10),
+            const Expanded(
+              child: Text(
+                'Location Permission Needed',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'UniTrack needs location access to share your position on the campus map.',
+                style: TextStyle(fontSize: 14),
+              ),
+              const SizedBox(height: 14),
+              if (isWeb) ...[
+                _buildPermissionStep(
+                  '1',
+                  'Click the lock/location icon in your browser address bar',
+                ),
+                _buildPermissionStep('2', 'Set Location to "Allow"'),
+                _buildPermissionStep('3', 'Refresh the page and try again'),
+              ] else ...[
+                _buildPermissionStep('1', 'Open your phone Settings'),
+                _buildPermissionStep(
+                  '2',
+                  'Go to Apps → UniTrack → Permissions',
+                ),
+                _buildPermissionStep(
+                  '3',
+                  'Tap Location and select "Allow while using the app"',
+                ),
+                _buildPermissionStep(
+                  '4',
+                  'Come back and toggle Location Sharing on',
+                ),
+              ],
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.info_outline,
+                      color: Colors.blue.shade700,
+                      size: 16,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Also make sure GPS/Location is turned ON in your device settings.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.blue.shade800,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          if (!isWeb)
+            TextButton(
+              onPressed: () async {
+                Navigator.of(ctx).pop();
+                await Geolocator.openLocationSettings();
+              },
+              child: const Text('Open Settings'),
+            ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(
+              'OK',
+              style: TextStyle(
+                color: AppColors.primary,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPermissionStep(String number, String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 22,
+            height: 22,
+            decoration: BoxDecoration(
+              color: AppColors.primary,
+              borderRadius: BorderRadius.circular(11),
+            ),
+            child: Center(
+              child: Text(
+                number,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(fontSize: 13, color: Colors.grey[800]),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildSectionCard(
     BuildContext context, {
     required String title,
@@ -422,7 +622,7 @@ class StudentProfileScreen extends StatelessWidget {
       ),
     );
   }
-  
+
   Widget _buildMenuTile({
     required IconData icon,
     required Color iconColor,
@@ -452,7 +652,7 @@ class StudentProfileScreen extends StatelessWidget {
       onTap: onTap,
     );
   }
-  
+
   void _showAboutDialog(BuildContext context) {
     showDialog(
       context: context,
@@ -507,7 +707,7 @@ class StudentProfileScreen extends StatelessWidget {
       ),
     );
   }
-  
+
   void _showNotificationSettings(BuildContext context) {
     showModalBottomSheet(
       context: context,
@@ -516,60 +716,7 @@ class StudentProfileScreen extends StatelessWidget {
       builder: (context) => const _NotificationSettingsSheet(),
     );
   }
-  
-  void _showFavoritesInfo(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        icon: Icon(
-          Icons.favorite_outline,
-          size: 48,
-          color: Colors.pink.withValues(alpha: 0.7),
-        ),
-        title: const Text('Favorites'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'Save your favorite faculty members for quick access.',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: AppColors.textSecondary),
-            ),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.pink.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.info_outline, color: Colors.pink, size: 20),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Coming soon in a future update!',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Colors.pink.shade700,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Got it'),
-          ),
-        ],
-      ),
-    );
-  }
-  
+
   void _showAppearanceSettings(BuildContext context) {
     showModalBottomSheet(
       context: context,
@@ -597,7 +744,7 @@ class StudentProfileScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 20),
-            
+
             // Title
             Row(
               children: [
@@ -615,15 +762,12 @@ class StudentProfileScreen extends StatelessWidget {
                 const SizedBox(width: 12),
                 const Text(
                   'Appearance',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                 ),
               ],
             ),
             const SizedBox(height: 24),
-            
+
             // Theme options
             const Text(
               'Theme',
@@ -634,7 +778,7 @@ class StudentProfileScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 12),
-            
+
             // Light theme (current)
             _buildThemeOption(
               context,
@@ -644,38 +788,24 @@ class StudentProfileScreen extends StatelessWidget {
               isSelected: true,
               onTap: () {},
             ),
-            const SizedBox(height: 8),
-            
-            // Dark theme (coming soon)
-            _buildThemeOption(
-              context,
-              icon: Icons.dark_mode,
-              title: 'Dark',
-              subtitle: 'Coming soon',
-              isSelected: false,
-              isDisabled: true,
-              onTap: () {},
+
+            const SizedBox(height: 16),
+            Text(
+              'More themes coming soon',
+              style: TextStyle(
+                fontSize: 13,
+                color: AppColors.textSecondary.withValues(alpha: 0.7),
+                fontStyle: FontStyle.italic,
+              ),
             ),
-            const SizedBox(height: 8),
-            
-            // System theme (coming soon)
-            _buildThemeOption(
-              context,
-              icon: Icons.brightness_auto,
-              title: 'System',
-              subtitle: 'Follow device settings - Coming soon',
-              isSelected: false,
-              isDisabled: true,
-              onTap: () {},
-            ),
-            
+
             const SizedBox(height: 20),
           ],
         ),
       ),
     );
   }
-  
+
   Widget _buildThemeOption(
     BuildContext context, {
     required IconData icon,
@@ -694,8 +824,8 @@ class StudentProfileScreen extends StatelessWidget {
           color: isSelected
               ? AppColors.primary.withValues(alpha: 0.1)
               : isDisabled
-                  ? AppColors.border.withValues(alpha: 0.3)
-                  : Colors.transparent,
+              ? AppColors.border.withValues(alpha: 0.3)
+              : Colors.transparent,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isSelected ? AppColors.primary : AppColors.border,
@@ -709,8 +839,8 @@ class StudentProfileScreen extends StatelessWidget {
               color: isSelected
                   ? AppColors.primary
                   : isDisabled
-                      ? AppColors.textSecondary.withValues(alpha: 0.5)
-                      : AppColors.textSecondary,
+                  ? AppColors.textSecondary.withValues(alpha: 0.5)
+                  : AppColors.textSecondary,
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -739,18 +869,16 @@ class StudentProfileScreen extends StatelessWidget {
               ),
             ),
             if (isSelected)
-              const Icon(
-                Icons.check_circle,
-                color: AppColors.primary,
-              ),
+              const Icon(Icons.check_circle, color: AppColors.primary),
           ],
         ),
       ),
     );
   }
-  
+
   void _showLogoutDialog(BuildContext context) {
     final authProvider = context.read<AuthProvider>();
+    final locationProvider = context.read<LocationProvider>();
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -764,11 +892,13 @@ class StudentProfileScreen extends StatelessWidget {
           ElevatedButton(
             onPressed: () async {
               Navigator.pop(dialogContext);
+              // Stop location tracking before signing out
+              try {
+                locationProvider.stopTracking();
+              } catch (_) {}
               await authProvider.signOut();
             },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.error,
-            ),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
             child: const Text('Sign Out'),
           ),
         ],
@@ -855,27 +985,31 @@ class _NotificationSettingsSheet extends StatefulWidget {
   const _NotificationSettingsSheet();
 
   @override
-  State<_NotificationSettingsSheet> createState() => _NotificationSettingsSheetState();
+  State<_NotificationSettingsSheet> createState() =>
+      _NotificationSettingsSheetState();
 }
 
-class _NotificationSettingsSheetState extends State<_NotificationSettingsSheet> {
+class _NotificationSettingsSheetState
+    extends State<_NotificationSettingsSheet> {
   bool _isLoading = true;
   bool _notificationsEnabled = false;
   AuthorizationStatus _authStatus = AuthorizationStatus.notDetermined;
-  
+
   @override
   void initState() {
     super.initState();
     _loadNotificationStatus();
   }
-  
+
   Future<void> _loadNotificationStatus() async {
     try {
-      final settings = await PushNotificationService().getNotificationSettings();
+      final settings = await PushNotificationService()
+          .getNotificationSettings();
       if (mounted) {
         setState(() {
           _authStatus = settings.authorizationStatus;
-          _notificationsEnabled = settings.authorizationStatus == AuthorizationStatus.authorized ||
+          _notificationsEnabled =
+              settings.authorizationStatus == AuthorizationStatus.authorized ||
               settings.authorizationStatus == AuthorizationStatus.provisional;
           _isLoading = false;
         });
@@ -888,7 +1022,7 @@ class _NotificationSettingsSheetState extends State<_NotificationSettingsSheet> 
       }
     }
   }
-  
+
   String _getStatusText() {
     switch (_authStatus) {
       case AuthorizationStatus.authorized:
@@ -901,7 +1035,7 @@ class _NotificationSettingsSheetState extends State<_NotificationSettingsSheet> 
         return 'Not set';
     }
   }
-  
+
   Color _getStatusColor() {
     switch (_authStatus) {
       case AuthorizationStatus.authorized:
@@ -938,7 +1072,7 @@ class _NotificationSettingsSheetState extends State<_NotificationSettingsSheet> 
             ),
           ),
           const SizedBox(height: 20),
-          
+
           // Title
           Row(
             children: [
@@ -956,15 +1090,12 @@ class _NotificationSettingsSheetState extends State<_NotificationSettingsSheet> 
               const SizedBox(width: 12),
               const Text(
                 'Notifications',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
               ),
             ],
           ),
           const SizedBox(height: 24),
-          
+
           // Status card
           Container(
             padding: const EdgeInsets.all(16),
@@ -1017,7 +1148,7 @@ class _NotificationSettingsSheetState extends State<_NotificationSettingsSheet> 
             ),
           ),
           const SizedBox(height: 16),
-          
+
           // Info text
           Text(
             'Receive notifications when:',
@@ -1040,9 +1171,9 @@ class _NotificationSettingsSheetState extends State<_NotificationSettingsSheet> 
             icon: Icons.update,
             text: 'App updates are available',
           ),
-          
+
           const SizedBox(height: 20),
-          
+
           // Note
           if (_authStatus == AuthorizationStatus.denied)
             Container(
@@ -1053,7 +1184,11 @@ class _NotificationSettingsSheetState extends State<_NotificationSettingsSheet> 
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.info_outline, color: Colors.orange, size: 20),
+                  const Icon(
+                    Icons.info_outline,
+                    color: Colors.orange,
+                    size: 20,
+                  ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -1067,14 +1202,17 @@ class _NotificationSettingsSheetState extends State<_NotificationSettingsSheet> 
                 ],
               ),
             ),
-          
+
           const SizedBox(height: 12),
         ],
       ),
     );
   }
-  
-  Widget _buildNotificationItem({required IconData icon, required String text}) {
+
+  Widget _buildNotificationItem({
+    required IconData icon,
+    required String text,
+  }) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
@@ -1084,10 +1222,7 @@ class _NotificationSettingsSheetState extends State<_NotificationSettingsSheet> 
           Expanded(
             child: Text(
               text,
-              style: TextStyle(
-                fontSize: 13,
-                color: AppColors.textSecondary,
-              ),
+              style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
             ),
           ),
         ],

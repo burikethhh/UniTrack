@@ -27,8 +27,10 @@ class UpdateService {
   /// This method is designed to work with all app versions (v1.0.0+)
   Future<UpdateCheckResult> checkForUpdate() async {
     try {
-      debugPrint('🔍 Checking for updates (current: v$currentVersionName, code: $currentVersionCode)');
-      
+      debugPrint(
+        '🔍 Checking for updates (current: v$currentVersionName, code: $currentVersionCode)',
+      );
+
       // Get latest active version
       final snapshot = await _firestore
           .collection('app_versions')
@@ -46,7 +48,9 @@ class UpdateService {
       }
 
       final latestVersion = AppVersion.fromFirestore(snapshot.docs.first);
-      debugPrint('📦 Latest version: v${latestVersion.versionName} (code: ${latestVersion.versionCode})');
+      debugPrint(
+        '📦 Latest version: v${latestVersion.versionName} (code: ${latestVersion.versionCode})',
+      );
 
       if (latestVersion.isNewerThan(currentVersionCode)) {
         debugPrint('✨ Update available!');
@@ -80,7 +84,7 @@ class UpdateService {
     try {
       final configDoc = await _firestore.collection('config').doc('api').get();
       if (!configDoc.exists) return true; // If no config, assume supported
-      
+
       final minSupported = configDoc.data()?['minSupportedApiVersion'] ?? 1;
       return currentApiVersion >= minSupported;
     } catch (e) {
@@ -97,7 +101,7 @@ class UpdateService {
           .where('versionCode', isEqualTo: versionCode)
           .limit(1)
           .get();
-      
+
       if (snapshot.docs.isEmpty) return null;
       return AppVersion.fromFirestore(snapshot.docs.first);
     } catch (e) {
@@ -133,11 +137,11 @@ class UpdateService {
       debugPrint('🌐 Web update: triggering page reload');
       return true; // Signal success; caller handles the reload
     }
-    
+
     // Mobile: use platform-specific download & install
     return await _mobileDownloadAndInstall(version, onProgress: onProgress);
   }
-  
+
   /// Mobile-only APK download and install (uses dart:io)
   Future<bool> _mobileDownloadAndInstall(
     AppVersion version, {
@@ -147,24 +151,24 @@ class UpdateService {
       // Dynamic import of platform-specific packages
       final io = await _getIOModule();
       if (io == null) return false;
-      
+
       // The actual mobile download logic is handled via platform channels
       // and the packages we import conditionally
       debugPrint('📥 Downloading APK from: ${version.downloadUrl}');
-      
+
       // Download via HTTP
       final client = http.Client();
       try {
         var currentUrl = version.downloadUrl;
         http.StreamedResponse? response;
         int maxRedirects = 5;
-        
+
         for (int i = 0; i < maxRedirects; i++) {
           final request = http.Request('GET', Uri.parse(currentUrl));
           request.followRedirects = false;
-          
+
           response = await client.send(request);
-          
+
           if (response.statusCode >= 300 && response.statusCode < 400) {
             final location = response.headers['location'];
             if (location != null) {
@@ -176,15 +180,17 @@ class UpdateService {
           }
           break;
         }
-        
+
         if (response == null || response.statusCode != 200) {
-          throw Exception('Download failed with status: ${response?.statusCode}');
+          throw Exception(
+            'Download failed with status: ${response?.statusCode}',
+          );
         }
-        
+
         final contentLength = response.contentLength ?? 0;
         int downloadedBytes = 0;
         final chunks = <int>[];
-        
+
         await for (final chunk in response.stream) {
           chunks.addAll(chunk);
           downloadedBytes += chunk.length;
@@ -192,17 +198,19 @@ class UpdateService {
             onProgress?.call(downloadedBytes / contentLength);
           }
         }
-        
-        debugPrint('✅ Downloaded ${(downloadedBytes / 1024 / 1024).toStringAsFixed(2)} MB');
-        
+
+        debugPrint(
+          '✅ Downloaded ${(downloadedBytes / 1024 / 1024).toStringAsFixed(2)} MB',
+        );
+
         if (downloadedBytes < 1024 * 1024) {
           debugPrint('❌ Downloaded file too small');
           return false;
         }
-        
+
         // Increment download count
         await _incrementDownloadCount(version.id);
-        
+
         return true;
       } finally {
         client.close();
@@ -212,7 +220,7 @@ class UpdateService {
       return false;
     }
   }
-  
+
   /// Get IO module (returns null on web)
   Future<dynamic> _getIOModule() async {
     if (kIsWeb) return null;
@@ -243,10 +251,12 @@ class UpdateService {
   }) async {
     try {
       final ref = _storage.ref('apk_releases/$fileName');
-      
+
       final uploadTask = ref.putData(
         Uint8List.fromList(fileBytes),
-        SettableMetadata(contentType: 'application/vnd.android.package-archive'),
+        SettableMetadata(
+          contentType: 'application/vnd.android.package-archive',
+        ),
       );
 
       uploadTask.snapshotEvents.listen((event) {
@@ -340,24 +350,27 @@ class UpdateService {
           .where('isActive', isEqualTo: true)
           .get();
 
-      // Create notification for each user
-      final batch = _firestore.batch();
-      
-      for (final userDoc in usersSnapshot.docs) {
-        final notifRef = _firestore.collection('notifications').doc();
-        batch.set(notifRef, {
-          'recipientId': userDoc.id,
-          'title': title,
-          'body': message,
-          'type': 'app_update',
-          'data': {'versionName': versionName},
-          'isRead': false,
-          'createdAt': FieldValue.serverTimestamp(),
-        });
+      // Create notification for each user — batch in chunks of 499 (limit is 500)
+      final docs = usersSnapshot.docs;
+      for (int i = 0; i < docs.length; i += 499) {
+        final batch = _firestore.batch();
+        final chunk = docs.skip(i).take(499);
+        for (final userDoc in chunk) {
+          final notifRef = _firestore.collection('notifications').doc();
+          batch.set(notifRef, {
+            'recipientId': userDoc.id,
+            'title': title,
+            'body': message,
+            'type': 'app_update',
+            'data': {'versionName': versionName},
+            'isRead': false,
+            'createdAt': FieldValue.serverTimestamp(),
+          });
+        }
+        await batch.commit();
       }
 
-      await batch.commit();
-      debugPrint('Sent update notification to ${usersSnapshot.docs.length} users');
+      debugPrint('Sent update notification to ${docs.length} users');
       return true;
     } catch (e) {
       debugPrint('Error sending update notification: $e');

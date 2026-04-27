@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Single-color icon for Android 13+ themed monochrome icons -->
+  <g fill="#FFFFFF">
+    <!-- Core map pin silhouette -->
+    <path d="M256 88 C196 88 148 136 148 196 C148 266 206 314 256 346 C306 314 364 266 364 196 C364 136 316 88 256 88 Z" />
+
+    <!-- Head -->
+    <circle cx="256" cy="146" r="24" />
+
+    <!-- Shoulders/Torso -->
+    <path d="M256 184 C216 184 189 213 183 251 L329 251 C323 213 296 184 256 184 Z" />
+
+    <!-- ID badge detail (still single-color for themed icon compliance) -->
+    <rect x="246" y="218" width="20" height="26" rx="4" />
+  </g>
+</svg>

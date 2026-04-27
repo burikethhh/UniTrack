@@ -65,5 +65,4 @@ class DefaultFirebaseOptions {
     projectId: 'unitrack-sksu-app',
     storageBucket: 'unitrack-sksu-app.firebasestorage.app',
   );
-
 }

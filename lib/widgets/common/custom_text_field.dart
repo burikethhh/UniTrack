@@ -19,7 +19,7 @@ class CustomTextField extends StatelessWidget {
   final String? Function(String?)? validator;
   final int maxLines;
   final bool autofocus;
-  
+
   const CustomTextField({
     super.key,
     this.controller,
@@ -39,7 +39,7 @@ class CustomTextField extends StatelessWidget {
     this.maxLines = 1,
     this.autofocus = false,
   });
-  
+
   @override
   Widget build(BuildContext context) {
     return TextFormField(
@@ -54,10 +54,7 @@ class CustomTextField extends StatelessWidget {
       onChanged: onChanged,
       onFieldSubmitted: onSubmitted,
       validator: validator,
-      style: const TextStyle(
-        fontSize: 16,
-        color: AppColors.textPrimary,
-      ),
+      style: const TextStyle(fontSize: 16, color: AppColors.textPrimary),
       decoration: InputDecoration(
         labelText: label,
         hintText: hint,
@@ -81,7 +78,7 @@ class PasswordTextField extends StatefulWidget {
   final Function(String)? onSubmitted;
   final String? Function(String?)? validator;
   final TextInputAction textInputAction;
-  
+
   const PasswordTextField({
     super.key,
     this.controller,
@@ -93,14 +90,14 @@ class PasswordTextField extends StatefulWidget {
     this.validator,
     this.textInputAction = TextInputAction.done,
   });
-  
+
   @override
   State<PasswordTextField> createState() => _PasswordTextFieldState();
 }
 
 class _PasswordTextFieldState extends State<PasswordTextField> {
   bool _obscureText = true;
-  
+
   @override
   Widget build(BuildContext context) {
     return CustomTextField(

@@ -13,7 +13,7 @@ class FacultyMapBottomSheet extends StatelessWidget {
   final VoidCallback? onNavigate;
   final VoidCallback? onClose;
   final VoidCallback? onPing;
-  
+
   const FacultyMapBottomSheet({
     super.key,
     required this.faculty,
@@ -23,7 +23,7 @@ class FacultyMapBottomSheet extends StatelessWidget {
     this.onClose,
     this.onPing,
   });
-  
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -52,7 +52,7 @@ class FacultyMapBottomSheet extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 20),
-          
+
           // Faculty info row
           Row(
             children: [
@@ -106,7 +106,7 @@ class FacultyMapBottomSheet extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 16),
-          
+
           // Status
           Row(
             children: [
@@ -121,7 +121,7 @@ class FacultyMapBottomSheet extends StatelessWidget {
               ),
             ],
           ),
-          
+
           // Quick message
           if (faculty.location?.quickMessage != null) ...[
             const SizedBox(height: 12),
@@ -150,7 +150,7 @@ class FacultyMapBottomSheet extends StatelessWidget {
               ),
             ),
           ],
-          
+
           // Distance info
           if (distanceText != null || walkingTimeText != null) ...[
             const SizedBox(height: 16),
@@ -174,7 +174,7 @@ class FacultyMapBottomSheet extends StatelessWidget {
               ],
             ),
           ],
-          
+
           // Action buttons
           if (onNavigate != null && faculty.isOnline) ...[
             const SizedBox(height: 20),
@@ -203,14 +203,14 @@ class FacultyMapBottomSheet extends StatelessWidget {
               ],
             ),
           ],
-          
+
           // Safe area padding
           SizedBox(height: MediaQuery.of(context).padding.bottom),
         ],
       ),
     );
   }
-  
+
   Widget _buildInfoItem({
     required IconData icon,
     required String label,
@@ -230,20 +230,17 @@ class FacultyMapBottomSheet extends StatelessWidget {
         ),
         Text(
           label,
-          style: const TextStyle(
-            fontSize: 12,
-            color: AppColors.textSecondary,
-          ),
+          style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
         ),
       ],
     );
   }
-  
+
   /// Build campus badge with color coding
   Widget _buildCampusBadge(String campusId) {
     final campus = AppConstants.getCampusById(campusId);
     final campusName = campus?['shortName'] ?? 'Unknown';
-    
+
     // Campus-specific colors
     Color badgeColor;
     switch (campusId) {
@@ -259,7 +256,7 @@ class FacultyMapBottomSheet extends StatelessWidget {
       default:
         badgeColor = Colors.grey;
     }
-    
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
@@ -270,11 +267,7 @@ class FacultyMapBottomSheet extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            Icons.location_city,
-            size: 14,
-            color: badgeColor,
-          ),
+          Icon(Icons.location_city, size: 14, color: badgeColor),
           const SizedBox(width: 4),
           Text(
             campusName,
@@ -316,10 +309,7 @@ class _ActionButton extends StatelessWidget {
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [
-                color,
-                color.withValues(alpha: 0.85),
-              ],
+              colors: [color, color.withValues(alpha: 0.85)],
             ),
             borderRadius: BorderRadius.circular(16),
             boxShadow: [

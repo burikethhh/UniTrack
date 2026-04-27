@@ -35,7 +35,7 @@ extension AvailabilityStatusExtension on AvailabilityStatus {
         return 'Do Not Disturb';
     }
   }
-  
+
   IconData get icon {
     switch (this) {
       case AvailabilityStatus.available:
@@ -54,7 +54,7 @@ extension AvailabilityStatusExtension on AvailabilityStatus {
         return Icons.do_not_disturb;
     }
   }
-  
+
   Color get color {
     switch (this) {
       case AvailabilityStatus.available:
@@ -89,21 +89,21 @@ class UserModel {
   final bool isActive;
   final DateTime createdAt;
   final DateTime? lastLoginAt;
-  
+
   // Campus field - determines user's default campus
   final String campusId; // 'isulan', 'tacurong', or 'access'
-  
+
   // Staff-specific fields
   final bool? isTrackingEnabled;
   final String? currentStatus;
   final String? quickMessage;
   final List<String>? officeHours;
-  
+
   // Availability status
   final AvailabilityStatus? availabilityStatus;
   final String? customStatusMessage;
   final DateTime? statusUpdatedAt;
-  
+
   UserModel({
     required this.id,
     required this.email,
@@ -126,10 +126,10 @@ class UserModel {
     this.customStatusMessage,
     this.statusUpdatedAt,
   });
-  
+
   /// Full name getter
   String get fullName => '$firstName $lastName';
-  
+
   /// Initials for avatar
   String get initials {
     String initials = '';
@@ -137,13 +137,13 @@ class UserModel {
     if (lastName.isNotEmpty) initials += lastName[0].toUpperCase();
     return initials;
   }
-  
+
   /// Check if user is staff
   bool get isStaff => role == UserRole.staff || role == UserRole.admin;
-  
+
   /// Check if user is admin
   bool get isAdmin => role == UserRole.admin;
-  
+
   /// Get role as string
   String get roleString {
     switch (role) {
@@ -155,14 +155,14 @@ class UserModel {
         return 'Student';
     }
   }
-  
+
   /// Create from Firestore document (handles legacy/old user documents)
   factory UserModel.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>? ?? {};
-    
+
     // Handle email - required field, fallback to empty string
     final email = (data['email'] as String?) ?? '';
-    
+
     // Handle names - extract from email if not present
     String firstName = (data['firstName'] as String?) ?? '';
     String lastName = (data['lastName'] as String?) ?? '';
@@ -172,7 +172,7 @@ class UserModel {
     if (firstName.isEmpty) {
       firstName = 'User';
     }
-    
+
     return UserModel(
       id: doc.id,
       email: email,
@@ -186,19 +186,23 @@ class UserModel {
       isActive: (data['isActive'] as bool?) ?? true,
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       lastLoginAt: (data['lastLoginAt'] as Timestamp?)?.toDate(),
-      campusId: (data['campusId'] as String?) ?? 'isulan', // Default to Isulan if not set
+      campusId:
+          (data['campusId'] as String?) ??
+          'isulan', // Default to Isulan if not set
       isTrackingEnabled: data['isTrackingEnabled'] as bool?,
       currentStatus: data['currentStatus'] as String?,
       quickMessage: data['quickMessage'] as String?,
-      officeHours: data['officeHours'] != null 
-          ? List<String>.from(data['officeHours'] as List) 
+      officeHours: data['officeHours'] != null
+          ? List<String>.from(data['officeHours'] as List)
           : null,
-      availabilityStatus: _parseAvailabilityStatus(data['availabilityStatus'] as String?),
+      availabilityStatus: _parseAvailabilityStatus(
+        data['availabilityStatus'] as String?,
+      ),
       customStatusMessage: data['customStatusMessage'] as String?,
       statusUpdatedAt: (data['statusUpdatedAt'] as Timestamp?)?.toDate(),
     );
   }
-  
+
   /// Convert to Firestore document
   Map<String, dynamic> toFirestore() {
     return {
@@ -212,7 +216,9 @@ class UserModel {
       'phoneNumber': phoneNumber,
       'isActive': isActive,
       'createdAt': Timestamp.fromDate(createdAt),
-      'lastLoginAt': lastLoginAt != null ? Timestamp.fromDate(lastLoginAt!) : null,
+      'lastLoginAt': lastLoginAt != null
+          ? Timestamp.fromDate(lastLoginAt!)
+          : null,
       'campusId': campusId,
       'isTrackingEnabled': isTrackingEnabled,
       'currentStatus': currentStatus,
@@ -220,10 +226,12 @@ class UserModel {
       'officeHours': officeHours,
       'availabilityStatus': availabilityStatus?.name,
       'customStatusMessage': customStatusMessage,
-      'statusUpdatedAt': statusUpdatedAt != null ? Timestamp.fromDate(statusUpdatedAt!) : null,
+      'statusUpdatedAt': statusUpdatedAt != null
+          ? Timestamp.fromDate(statusUpdatedAt!)
+          : null,
     };
   }
-  
+
   /// Create a copy with updated fields
   UserModel copyWith({
     String? id,
@@ -270,7 +278,7 @@ class UserModel {
       statusUpdatedAt: statusUpdatedAt ?? this.statusUpdatedAt,
     );
   }
-  
+
   /// Parse role from string
   static UserRole _parseRole(String? roleString) {
     switch (roleString?.toLowerCase()) {
@@ -283,7 +291,7 @@ class UserModel {
         return UserRole.student;
     }
   }
-  
+
   /// Parse availability status from string
   static AvailabilityStatus? _parseAvailabilityStatus(String? statusString) {
     if (statusString == null) return null;
@@ -306,7 +314,7 @@ class UserModel {
         return null;
     }
   }
-  
+
   @override
   String toString() {
     return 'UserModel(id: $id, email: $email, name: $fullName, role: ${role.name})';

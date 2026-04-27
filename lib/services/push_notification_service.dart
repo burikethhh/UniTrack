@@ -17,30 +17,34 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
 /// Service for managing push notifications via Firebase Cloud Messaging
 class PushNotificationService {
-  static final PushNotificationService _instance = PushNotificationService._internal();
+  static final PushNotificationService _instance =
+      PushNotificationService._internal();
   factory PushNotificationService() => _instance;
   PushNotificationService._internal();
 
   // Lazy init — avoid accessing platform-specific instances on web
   late final FirebaseMessaging _fcm = FirebaseMessaging.instance;
-  late final FlutterLocalNotificationsPlugin _localNotifications = FlutterLocalNotificationsPlugin();
+  late final FlutterLocalNotificationsPlugin _localNotifications =
+      FlutterLocalNotificationsPlugin();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  
+
   StreamSubscription<RemoteMessage>? _foregroundSubscription;
   StreamSubscription<RemoteMessage>? _messageOpenedSubscription;
-  
+  StreamSubscription<String>? _tokenRefreshSubscription;
+
   String? _fcmToken;
   String? get fcmToken => _fcmToken;
-  
+
   // Notification channel for Android (lazy to avoid web crash)
-  static AndroidNotificationChannel get _channel => const AndroidNotificationChannel(
-    'unitrack_notifications',
-    'UniTrack Notifications',
-    description: 'Notifications for faculty updates and alerts',
-    importance: Importance.high,
-    enableVibration: true,
-    playSound: true,
-  );
+  static AndroidNotificationChannel get _channel =>
+      const AndroidNotificationChannel(
+        'unitrack_notifications',
+        'UniTrack Notifications',
+        description: 'Notifications for faculty updates and alerts',
+        importance: Importance.high,
+        enableVibration: true,
+        playSound: true,
+      );
 
   /// Initialize the push notification service
   Future<void> initialize() async {
@@ -89,11 +93,17 @@ class PushNotificationService {
     }
 
     // Listen for token refresh
-    _fcm.onTokenRefresh.listen((newToken) {
+    _tokenRefreshSubscription?.cancel();
+    _tokenRefreshSubscription = _fcm.onTokenRefresh.listen((newToken) {
       debugPrint('🔄 FCM Token refreshed: $newToken');
       _fcmToken = newToken;
       _saveTokenToFirestore(newToken);
     });
+
+    // Save the initial token to Firestore if we have a logged-in user
+    if (_fcmToken != null) {
+      _saveTokenToFirestore(_fcmToken!);
+    }
 
     // Set background message handler (mobile only — web uses service worker)
     if (!kIsWeb) {
@@ -103,8 +113,10 @@ class PushNotificationService {
 
   Future<void> _initializeLocalNotifications() async {
     // Android initialization
-    const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
-    
+    const androidSettings = AndroidInitializationSettings(
+      '@mipmap/ic_launcher',
+    );
+
     // iOS initialization
     const iosSettings = DarwinInitializationSettings(
       requestAlertPermission: true,
@@ -124,16 +136,22 @@ class PushNotificationService {
 
     // Create notification channel for Android
     await _localNotifications
-        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >()
         ?.createNotificationChannel(_channel);
   }
 
   void _setupMessageHandlers() {
     // Handle foreground messages
-    _foregroundSubscription = FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
+    _foregroundSubscription = FirebaseMessaging.onMessage.listen(
+      _handleForegroundMessage,
+    );
 
     // Handle when app is opened from notification
-    _messageOpenedSubscription = FirebaseMessaging.onMessageOpenedApp.listen(_handleMessageOpenedApp);
+    _messageOpenedSubscription = FirebaseMessaging.onMessageOpenedApp.listen(
+      _handleMessageOpenedApp,
+    );
 
     // Check for initial message (app opened from terminated state)
     _checkInitialMessage();
@@ -149,7 +167,7 @@ class PushNotificationService {
 
   void _handleForegroundMessage(RemoteMessage message) {
     debugPrint('📬 Foreground message: ${message.notification?.title}');
-    
+
     final notification = message.notification;
 
     if (notification == null) return;
@@ -162,36 +180,38 @@ class PushNotificationService {
       );
       return;
     }
-    
+
     final android = message.notification?.android;
 
     // Show local notification when app is in foreground (mobile)
     _localNotifications.show(
-        notification.hashCode,
-        notification.title,
-        notification.body,
-        NotificationDetails(
-          android: AndroidNotificationDetails(
-            _channel.id,
-            _channel.name,
-            channelDescription: _channel.description,
-            importance: Importance.high,
-            priority: Priority.high,
-            icon: android?.smallIcon ?? '@mipmap/ic_launcher',
-            color: const Color(0xFF3EB489),
-          ),
-          iOS: const DarwinNotificationDetails(
-            presentAlert: true,
-            presentBadge: true,
-            presentSound: true,
-          ),
+      notification.hashCode,
+      notification.title,
+      notification.body,
+      NotificationDetails(
+        android: AndroidNotificationDetails(
+          _channel.id,
+          _channel.name,
+          channelDescription: _channel.description,
+          importance: Importance.high,
+          priority: Priority.high,
+          icon: android?.smallIcon ?? '@mipmap/ic_launcher',
+          color: const Color(0xFF3EB489),
         ),
-        payload: jsonEncode(message.data),
-      );
+        iOS: const DarwinNotificationDetails(
+          presentAlert: true,
+          presentBadge: true,
+          presentSound: true,
+        ),
+      ),
+      payload: jsonEncode(message.data),
+    );
   }
 
   void _handleMessageOpenedApp(RemoteMessage message) {
-    debugPrint('📬 App opened via notification: ${message.notification?.title}');
+    debugPrint(
+      '📬 App opened via notification: ${message.notification?.title}',
+    );
     _handleNotificationData(message.data);
   }
 
@@ -223,17 +243,17 @@ class PushNotificationService {
   /// Save FCM token to Firestore for the current user
   Future<void> saveTokenForUser(String userId) async {
     if (_fcmToken == null) return;
-    
+
     try {
       await _firestore.collection('users').doc(userId).set({
         'fcmTokens': FieldValue.arrayUnion([_fcmToken]),
         'lastTokenUpdate': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
-      
+
       // Also save locally
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('fcm_token', _fcmToken!);
-      
+
       debugPrint('✅ FCM token saved for user: $userId');
     } catch (e) {
       debugPrint('❌ Error saving FCM token: $e');
@@ -243,7 +263,7 @@ class PushNotificationService {
   Future<void> _saveTokenToFirestore(String token) async {
     final prefs = await SharedPreferences.getInstance();
     final userId = prefs.getString('current_user_id');
-    
+
     if (userId != null) {
       await saveTokenForUser(userId);
     }
@@ -252,7 +272,7 @@ class PushNotificationService {
   /// Remove FCM token when user logs out
   Future<void> removeTokenForUser(String userId) async {
     if (_fcmToken == null) return;
-    
+
     try {
       await _firestore.collection('users').doc(userId).set({
         'fcmTokens': FieldValue.arrayRemove([_fcmToken]),
@@ -350,7 +370,7 @@ class PushNotificationService {
   Future<bool> areNotificationsEnabled() async {
     final settings = await getNotificationSettings();
     return settings.authorizationStatus == AuthorizationStatus.authorized ||
-           settings.authorizationStatus == AuthorizationStatus.provisional;
+        settings.authorizationStatus == AuthorizationStatus.provisional;
   }
 
   /// Clear all pending notifications
@@ -360,7 +380,10 @@ class PushNotificationService {
   }
 
   /// Show an in-app overlay notification for web
-  void _showWebOverlayNotification({required String title, required String body}) {
+  void _showWebOverlayNotification({
+    required String title,
+    required String body,
+  }) {
     // Import the navigator key from notification_service.dart
     final overlayState = notificationNavigatorKey.currentState?.overlay;
     if (overlayState == null) {
@@ -379,22 +402,43 @@ class PushNotificationService {
           borderRadius: BorderRadius.circular(12),
           color: const Color(0xFF1565C0),
           child: InkWell(
-            onTap: () { if (entry.mounted) entry.remove(); },
+            onTap: () {
+              if (entry.mounted) entry.remove();
+            },
             borderRadius: BorderRadius.circular(12),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               child: Row(
                 children: [
-                  const Icon(Icons.notifications, color: Colors.white, size: 24),
+                  const Icon(
+                    Icons.notifications,
+                    color: Colors.white,
+                    size: 24,
+                  ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+                        Text(
+                          title,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
                         const SizedBox(height: 2),
-                        Text(body, style: const TextStyle(color: Colors.white70, fontSize: 12), maxLines: 2, overflow: TextOverflow.ellipsis),
+                        Text(
+                          body,
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 12,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ],
                     ),
                   ),
@@ -416,5 +460,6 @@ class PushNotificationService {
   void dispose() {
     _foregroundSubscription?.cancel();
     _messageOpenedSubscription?.cancel();
+    _tokenRefreshSubscription?.cancel();
   }
 }

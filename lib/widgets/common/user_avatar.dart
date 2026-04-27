@@ -9,7 +9,7 @@ class UserAvatar extends StatelessWidget {
   final Color? backgroundColor;
   final bool showBorder;
   final Widget? badge;
-  
+
   const UserAvatar({
     super.key,
     this.imageUrl,
@@ -19,7 +19,7 @@ class UserAvatar extends StatelessWidget {
     this.showBorder = false,
     this.badge,
   });
-  
+
   @override
   Widget build(BuildContext context) {
     return Stack(
@@ -57,16 +57,11 @@ class UserAvatar extends StatelessWidget {
                 )
               : _buildInitials(),
         ),
-        if (badge != null)
-          Positioned(
-            right: 0,
-            bottom: 0,
-            child: badge!,
-          ),
+        if (badge != null) Positioned(right: 0, bottom: 0, child: badge!),
       ],
     );
   }
-  
+
   Widget _buildInitials() {
     return Center(
       child: Text(
@@ -87,7 +82,7 @@ class FacultyAvatar extends StatelessWidget {
   final String initials;
   final bool isOnline;
   final double size;
-  
+
   const FacultyAvatar({
     super.key,
     this.imageUrl,
@@ -95,7 +90,7 @@ class FacultyAvatar extends StatelessWidget {
     required this.isOnline,
     this.size = 48,
   });
-  
+
   @override
   Widget build(BuildContext context) {
     return Stack(
@@ -104,7 +99,9 @@ class FacultyAvatar extends StatelessWidget {
           imageUrl: imageUrl,
           initials: initials,
           size: size,
-          backgroundColor: isOnline ? AppColors.accent : AppColors.textSecondary,
+          backgroundColor: isOnline
+              ? AppColors.accent
+              : AppColors.textSecondary,
         ),
         Positioned(
           right: 0,
@@ -113,7 +110,9 @@ class FacultyAvatar extends StatelessWidget {
             width: size * 0.3,
             height: size * 0.3,
             decoration: BoxDecoration(
-              color: isOnline ? AppColors.statusAvailable : AppColors.statusUnavailable,
+              color: isOnline
+                  ? AppColors.statusAvailable
+                  : AppColors.statusUnavailable,
               shape: BoxShape.circle,
               border: Border.all(color: Colors.white, width: 2),
             ),

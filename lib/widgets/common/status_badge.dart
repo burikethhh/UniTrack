@@ -6,18 +6,18 @@ class StatusBadge extends StatelessWidget {
   final String status;
   final bool showDot;
   final double? fontSize;
-  
+
   const StatusBadge({
     super.key,
     required this.status,
     this.showDot = true,
     this.fontSize,
   });
-  
+
   @override
   Widget build(BuildContext context) {
     final color = AppColors.getStatusColor(status);
-    
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
@@ -32,10 +32,7 @@ class StatusBadge extends StatelessWidget {
             Container(
               width: 8,
               height: 8,
-              decoration: BoxDecoration(
-                color: color,
-                shape: BoxShape.circle,
-              ),
+              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
             ),
             const SizedBox(width: 6),
           ],
@@ -57,26 +54,27 @@ class StatusBadge extends StatelessWidget {
 class OnlineIndicator extends StatelessWidget {
   final bool isOnline;
   final double size;
-  
-  const OnlineIndicator({
-    super.key,
-    required this.isOnline,
-    this.size = 12,
-  });
-  
+
+  const OnlineIndicator({super.key, required this.isOnline, this.size = 12});
+
   @override
   Widget build(BuildContext context) {
     return Container(
       width: size,
       height: size,
       decoration: BoxDecoration(
-        color: isOnline ? AppColors.statusAvailable : AppColors.statusUnavailable,
+        color: isOnline
+            ? AppColors.statusAvailable
+            : AppColors.statusUnavailable,
         shape: BoxShape.circle,
         border: Border.all(color: Colors.white, width: 2),
         boxShadow: [
           BoxShadow(
-            color: (isOnline ? AppColors.statusAvailable : AppColors.statusUnavailable)
-                .withValues(alpha: 0.4),
+            color:
+                (isOnline
+                        ? AppColors.statusAvailable
+                        : AppColors.statusUnavailable)
+                    .withValues(alpha: 0.4),
             blurRadius: 4,
             spreadRadius: 1,
           ),
@@ -90,13 +88,13 @@ class OnlineIndicator extends StatelessWidget {
 class PulsingOnlineIndicator extends StatefulWidget {
   final bool isOnline;
   final double size;
-  
+
   const PulsingOnlineIndicator({
     super.key,
     required this.isOnline,
     this.size = 12,
   });
-  
+
   @override
   State<PulsingOnlineIndicator> createState() => _PulsingOnlineIndicatorState();
 }
@@ -105,7 +103,7 @@ class _PulsingOnlineIndicatorState extends State<PulsingOnlineIndicator>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _animation;
-  
+
   @override
   void initState() {
     super.initState();
@@ -113,15 +111,16 @@ class _PulsingOnlineIndicatorState extends State<PulsingOnlineIndicator>
       duration: const Duration(milliseconds: 1500),
       vsync: this,
     );
-    _animation = Tween<double>(begin: 0.8, end: 1.2).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
-    );
-    
+    _animation = Tween<double>(
+      begin: 0.8,
+      end: 1.2,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
+
     if (widget.isOnline) {
       _controller.repeat(reverse: true);
     }
   }
-  
+
   @override
   void didUpdateWidget(PulsingOnlineIndicator oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -132,19 +131,19 @@ class _PulsingOnlineIndicatorState extends State<PulsingOnlineIndicator>
       _controller.reset();
     }
   }
-  
+
   @override
   void dispose() {
     _controller.dispose();
     super.dispose();
   }
-  
+
   @override
   Widget build(BuildContext context) {
     if (!widget.isOnline) {
       return OnlineIndicator(isOnline: false, size: widget.size);
     }
-    
+
     return AnimatedBuilder(
       animation: _animation,
       builder: (context, child) {

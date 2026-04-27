@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../../models/models.dart';
 import '../../providers/providers.dart';
 import '../../core/constants/app_constants.dart';
+import '../../core/utils/helpers.dart';
+import '../../services/offline_cache_service.dart';
 import 'user_management_screen.dart';
 import 'user_detail_screen.dart';
 import 'version_management_screen.dart';
@@ -48,8 +51,8 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard>
 
   @override
   Widget build(BuildContext context) {
-    context.watch<AuthProvider>(); // Watch for auth changes
-    
+    // Auth changes handled by AuthWrapper, no need for watch here
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Super Admin Dashboard'),
@@ -73,7 +76,10 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard>
               style: OutlinedButton.styleFrom(
                 foregroundColor: Colors.red.shade700,
                 side: BorderSide(color: Colors.red.shade300),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
               ),
             ),
           ),
@@ -82,7 +88,9 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard>
           controller: _tabController,
           indicatorColor: Theme.of(context).colorScheme.primary,
           labelColor: Theme.of(context).colorScheme.onPrimaryContainer,
-          unselectedLabelColor: Theme.of(context).colorScheme.onPrimaryContainer.withAlpha(153),
+          unselectedLabelColor: Theme.of(
+            context,
+          ).colorScheme.onPrimaryContainer.withAlpha(153),
           isScrollable: true,
           tabs: const [
             Tab(icon: Icon(Icons.dashboard), text: 'Overview'),
@@ -122,11 +130,11 @@ class _SuperAdminDashboardState extends State<SuperAdminDashboard>
       ),
     );
   }
-  
+
   /// Show logout confirmation dialog
   void _showLogoutDialog(BuildContext context) {
     final authProvider = context.read<AuthProvider>();
-    
+
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -209,7 +217,11 @@ class _OverviewTab extends StatelessWidget {
                   const CircleAvatar(
                     radius: 30,
                     backgroundColor: Colors.white,
-                    child: Icon(Icons.admin_panel_settings, size: 36, color: Colors.deepPurple),
+                    child: Icon(
+                      Icons.admin_panel_settings,
+                      size: 36,
+                      color: Colors.deepPurple,
+                    ),
                   ),
                   const SizedBox(width: 16),
                   Expanded(
@@ -268,14 +280,16 @@ class _OverviewTab extends StatelessWidget {
                   value: '${stats.totalStudents}',
                   icon: Icons.school,
                   color: Colors.green,
-                  subtitle: '${_percentage(stats.totalStudents, stats.totalUsers)}%',
+                  subtitle:
+                      '${_percentage(stats.totalStudents, stats.totalUsers)}%',
                 ),
                 _StatCard(
                   title: 'Staff',
                   value: '${stats.totalStaff}',
                   icon: Icons.work,
                   color: Colors.orange,
-                  subtitle: '${_percentage(stats.totalStaff, stats.totalUsers)}%',
+                  subtitle:
+                      '${_percentage(stats.totalStaff, stats.totalUsers)}%',
                 ),
                 _StatCard(
                   title: 'Admins',
@@ -440,7 +454,7 @@ class _UsersTab extends StatelessWidget {
                 onChanged: adminProvider.search,
               ),
               const SizedBox(height: 12),
-              
+
               // Filter Chips Row
               SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
@@ -455,21 +469,24 @@ class _UsersTab extends StatelessWidget {
                     FilterChip(
                       label: const Text('Students'),
                       selected: adminProvider.roleFilter == UserRole.student,
-                      onSelected: (_) => adminProvider.setRoleFilter(UserRole.student),
+                      onSelected: (_) =>
+                          adminProvider.setRoleFilter(UserRole.student),
                       avatar: const Icon(Icons.school, size: 18),
                     ),
                     const SizedBox(width: 8),
                     FilterChip(
                       label: const Text('Staff'),
                       selected: adminProvider.roleFilter == UserRole.staff,
-                      onSelected: (_) => adminProvider.setRoleFilter(UserRole.staff),
+                      onSelected: (_) =>
+                          adminProvider.setRoleFilter(UserRole.staff),
                       avatar: const Icon(Icons.work, size: 18),
                     ),
                     const SizedBox(width: 8),
                     FilterChip(
                       label: const Text('Admins'),
                       selected: adminProvider.roleFilter == UserRole.admin,
-                      onSelected: (_) => adminProvider.setRoleFilter(UserRole.admin),
+                      onSelected: (_) =>
+                          adminProvider.setRoleFilter(UserRole.admin),
                       avatar: const Icon(Icons.admin_panel_settings, size: 18),
                     ),
                     const SizedBox(width: 8),
@@ -478,7 +495,9 @@ class _UsersTab extends StatelessWidget {
                       selected: adminProvider.showBannedOnly,
                       onSelected: adminProvider.setShowBannedOnly,
                       avatar: const Icon(Icons.block, size: 18),
-                      backgroundColor: adminProvider.showBannedOnly ? Colors.red.shade100 : null,
+                      backgroundColor: adminProvider.showBannedOnly
+                          ? Colors.red.shade100
+                          : null,
                     ),
                   ],
                 ),
@@ -495,9 +514,9 @@ class _UsersTab extends StatelessWidget {
             children: [
               Text(
                 '${adminProvider.filteredUsers.length} users found',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Colors.grey.shade600,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(color: Colors.grey.shade600),
               ),
               TextButton.icon(
                 icon: const Icon(Icons.tune, size: 18),
@@ -520,7 +539,11 @@ class _UsersTab extends StatelessWidget {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.search_off, size: 64, color: Colors.grey.shade400),
+                      Icon(
+                        Icons.search_off,
+                        size: 64,
+                        color: Colors.grey.shade400,
+                      ),
                       const SizedBox(height: 16),
                       Text(
                         'No users found',
@@ -659,7 +682,8 @@ class _AnalyticsTab extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  if (stats.usersByDepartment.isEmpty)
+                  if (stats.usersByDepartment.isEmpty ||
+                      stats.usersByDepartment.values.every((v) => v == 0))
                     const Center(
                       child: Padding(
                         padding: EdgeInsets.all(20),
@@ -679,20 +703,22 @@ class _AnalyticsTab extends StatelessWidget {
                               .asMap()
                               .entries
                               .map((e) {
-                            final color = Colors.primaries[
-                                e.value.key.hashCode % Colors.primaries.length];
-                            return PieChartSectionData(
-                              value: e.value.value.toDouble(),
-                              title: '${e.value.value}',
-                              color: color,
-                              radius: 50,
-                              titleStyle: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            );
-                          }).toList(),
+                                final color =
+                                    Colors.primaries[e.value.key.hashCode %
+                                        Colors.primaries.length];
+                                return PieChartSectionData(
+                                  value: e.value.value.toDouble(),
+                                  title: '${e.value.value}',
+                                  color: color,
+                                  radius: 50,
+                                  titleStyle: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                );
+                              })
+                              .toList(),
                         ),
                       ),
                     ),
@@ -700,11 +726,12 @@ class _AnalyticsTab extends StatelessWidget {
                     Wrap(
                       spacing: 12,
                       runSpacing: 6,
-                      children: stats.usersByDepartment.entries
-                          .take(8)
-                          .map((entry) {
-                        final color = Colors.primaries[
-                            entry.key.hashCode % Colors.primaries.length];
+                      children: stats.usersByDepartment.entries.take(8).map((
+                        entry,
+                      ) {
+                        final color =
+                            Colors.primaries[entry.key.hashCode %
+                                Colors.primaries.length];
                         return _ChartLegend(
                           color: color,
                           label: entry.key.length > 20
@@ -748,11 +775,13 @@ class _AnalyticsTab extends StatelessWidget {
                       child: BarChart(
                         BarChartData(
                           alignment: BarChartAlignment.spaceAround,
-                          maxY: (stats.usersByCampus.values.isEmpty
-                                  ? 1
-                                  : stats.usersByCampus.values
-                                      .reduce((a, b) => a > b ? a : b))
-                              .toDouble() *
+                          maxY:
+                              (stats.usersByCampus.values.isEmpty
+                                      ? 1
+                                      : stats.usersByCampus.values.reduce(
+                                          (a, b) => a > b ? a : b,
+                                        ))
+                                  .toDouble() *
                               1.2,
                           barTouchData: BarTouchData(
                             touchTooltipData: BarTouchTooltipData(
@@ -760,7 +789,7 @@ class _AnalyticsTab extends StatelessWidget {
                                 final campus = stats.usersByCampus.keys
                                     .elementAt(group.x.toInt());
                                 return BarTooltipItem(
-                                  '${_formatCampusName(campus)}\n${rod.toY.toInt()} users',
+                                  '${formatCampusName(campus)}\n${rod.toY.toInt()} users',
                                   const TextStyle(
                                     color: Colors.white,
                                     fontSize: 12,
@@ -770,8 +799,12 @@ class _AnalyticsTab extends StatelessWidget {
                             ),
                           ),
                           titlesData: FlTitlesData(
-                            topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                            rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                            topTitles: const AxisTitles(
+                              sideTitles: SideTitles(showTitles: false),
+                            ),
+                            rightTitles: const AxisTitles(
+                              sideTitles: SideTitles(showTitles: false),
+                            ),
                             leftTitles: AxisTitles(
                               sideTitles: SideTitles(
                                 showTitles: true,
@@ -792,10 +825,12 @@ class _AnalyticsTab extends StatelessWidget {
                                 showTitles: true,
                                 getTitlesWidget: (value, meta) {
                                   final idx = value.toInt();
-                                  if (idx < 0 || idx >= stats.usersByCampus.length) {
+                                  if (idx < 0 ||
+                                      idx >= stats.usersByCampus.length) {
                                     return const SizedBox.shrink();
                                   }
-                                  final campus = stats.usersByCampus.keys.elementAt(idx);
+                                  final campus = stats.usersByCampus.keys
+                                      .elementAt(idx);
                                   final shortName = campus.length > 6
                                       ? '${campus.substring(0, 5)}.'
                                       : campus;
@@ -820,22 +855,24 @@ class _AnalyticsTab extends StatelessWidget {
                               .asMap()
                               .entries
                               .map((e) {
-                            final color = Colors.primaries[
-                                e.value.key.hashCode % Colors.primaries.length];
-                            return BarChartGroupData(
-                              x: e.key,
-                              barRods: [
-                                BarChartRodData(
-                                  toY: e.value.value.toDouble(),
-                                  color: color,
-                                  width: 22,
-                                  borderRadius: const BorderRadius.vertical(
-                                    top: Radius.circular(6),
-                                  ),
-                                ),
-                              ],
-                            );
-                          }).toList(),
+                                final color =
+                                    Colors.primaries[e.value.key.hashCode %
+                                        Colors.primaries.length];
+                                return BarChartGroupData(
+                                  x: e.key,
+                                  barRods: [
+                                    BarChartRodData(
+                                      toY: e.value.value.toDouble(),
+                                      color: color,
+                                      width: 22,
+                                      borderRadius: const BorderRadius.vertical(
+                                        top: Radius.circular(6),
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              })
+                              .toList(),
                         ),
                       ),
                     ),
@@ -911,29 +948,6 @@ class _AnalyticsTab extends StatelessWidget {
       ),
     );
   }
-
-  String _formatCampusName(String campusId) {
-    switch (campusId) {
-      case 'access':
-        return 'ACCESS Campus';
-      case 'main':
-        return 'Main Campus';
-      case 'tacurong':
-        return 'Tacurong Campus';
-      case 'isulan':
-        return 'Isulan Campus';
-      case 'kalamansig':
-        return 'Kalamansig Campus';
-      case 'lutayan':
-        return 'Lutayan Campus';
-      case 'palimbang':
-        return 'Palimbang Campus';
-      case 'bagumbayan':
-        return 'Bagumbayan Campus';
-      default:
-        return campusId.toUpperCase();
-    }
-  }
 }
 
 /// Activity Tab - Recent activity logs
@@ -1001,7 +1015,7 @@ class _ActivityTab extends StatelessWidget {
               ],
             ),
             trailing: Text(
-              _formatTime(activity.timestamp),
+              formatRelativeTime(activity.timestamp),
               style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
             ),
           ),
@@ -1054,17 +1068,6 @@ class _ActivityTab extends StatelessWidget {
         return action.replaceAll('_', ' ');
     }
   }
-
-  String _formatTime(DateTime time) {
-    final now = DateTime.now();
-    final diff = now.difference(time);
-
-    if (diff.inMinutes < 1) return 'Just now';
-    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
-    if (diff.inHours < 24) return '${diff.inHours}h ago';
-    if (diff.inDays < 7) return '${diff.inDays}d ago';
-    return '${time.day}/${time.month}/${time.year}';
-  }
 }
 
 /// System Tab - Broadcast notifications, data export, system health
@@ -1080,7 +1083,7 @@ class _SystemTabState extends State<_SystemTab> {
   final _bodyController = TextEditingController();
   bool _isSending = false;
   String _selectedAudience = 'all';
-  
+
   // System stats
   int _totalDocuments = 0;
   bool _isLoadingStats = true;
@@ -1102,16 +1105,23 @@ class _SystemTabState extends State<_SystemTab> {
     setState(() => _isLoadingStats = true);
     try {
       final firestore = FirebaseFirestore.instance;
-      
+
       // Count documents in main collections
       final usersCount = await firestore.collection('users').count().get();
-      final notificationsCount = await firestore.collection('notifications').count().get();
-      final versionsCount = await firestore.collection('app_versions').count().get();
-      
+      final notificationsCount = await firestore
+          .collection('notifications')
+          .count()
+          .get();
+      final versionsCount = await firestore
+          .collection('app_versions')
+          .count()
+          .get();
+
       setState(() {
-        _totalDocuments = (usersCount.count ?? 0) + 
-                          (notificationsCount.count ?? 0) + 
-                          (versionsCount.count ?? 0);
+        _totalDocuments =
+            (usersCount.count ?? 0) +
+            (notificationsCount.count ?? 0) +
+            (versionsCount.count ?? 0);
         _isLoadingStats = false;
       });
     } catch (e) {
@@ -1143,7 +1153,10 @@ class _SystemTabState extends State<_SystemTab> {
           children: [
             Text('Send notification to: ${_getAudienceLabel()}'),
             const SizedBox(height: 12),
-            Text('Title: ${_titleController.text}', style: const TextStyle(fontWeight: FontWeight.bold)),
+            Text(
+              'Title: ${_titleController.text}',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
             Text('Message: ${_bodyController.text}'),
           ],
         ),
@@ -1168,7 +1181,7 @@ class _SystemTabState extends State<_SystemTab> {
 
     try {
       final firestore = FirebaseFirestore.instance;
-      
+
       // Get users based on audience
       Query<Map<String, dynamic>> query = firestore.collection('users');
       if (_selectedAudience == 'students') {
@@ -1181,13 +1194,16 @@ class _SystemTabState extends State<_SystemTab> {
 
       final users = await query.get();
       int sentCount = 0;
-      
+
       // Firestore batch limit is 500, so chunk if needed
       final chunks = <List<QueryDocumentSnapshot<Map<String, dynamic>>>>[];
       for (var i = 0; i < users.docs.length; i += 400) {
-        chunks.add(users.docs.sublist(
-          i, i + 400 > users.docs.length ? users.docs.length : i + 400,
-        ));
+        chunks.add(
+          users.docs.sublist(
+            i,
+            i + 400 > users.docs.length ? users.docs.length : i + 400,
+          ),
+        );
       }
 
       for (final chunk in chunks) {
@@ -1195,7 +1211,7 @@ class _SystemTabState extends State<_SystemTab> {
         for (final userDoc in chunk) {
           // Write to top-level 'notifications' collection with correct model fields
           final notifRef = firestore.collection('notifications').doc();
-          
+
           batch.set(notifRef, {
             'senderId': 'system',
             'senderName': 'UniTrack Admin',
@@ -1239,10 +1255,14 @@ class _SystemTabState extends State<_SystemTab> {
 
   String _getAudienceLabel() {
     switch (_selectedAudience) {
-      case 'students': return 'All Students';
-      case 'staff': return 'All Staff';
-      case 'admins': return 'All Admins';
-      default: return 'All Users';
+      case 'students':
+        return 'All Students';
+      case 'staff':
+        return 'All Staff';
+      case 'admins':
+        return 'All Admins';
+      default:
+        return 'All Users';
     }
   }
 
@@ -1264,7 +1284,10 @@ class _SystemTabState extends State<_SystemTab> {
                 children: [
                   Row(
                     children: [
-                      Icon(Icons.info_outline, color: theme.colorScheme.primary),
+                      Icon(
+                        Icons.info_outline,
+                        color: theme.colorScheme.primary,
+                      ),
                       const SizedBox(width: 8),
                       Text(
                         'System Information',
@@ -1296,7 +1319,7 @@ class _SystemTabState extends State<_SystemTab> {
                   _SystemInfoRow(
                     icon: Icons.cloud,
                     label: 'Firebase Project',
-                    value: 'unitrack-sksu-app',
+                    value: Firebase.app().options.projectId,
                   ),
                 ],
               ),
@@ -1330,7 +1353,7 @@ class _SystemTabState extends State<_SystemTab> {
                     style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
                   ),
                   const SizedBox(height: 16),
-                  
+
                   // Audience selector
                   Text('Target Audience', style: theme.textTheme.labelLarge),
                   const SizedBox(height: 8),
@@ -1340,26 +1363,30 @@ class _SystemTabState extends State<_SystemTab> {
                       ChoiceChip(
                         label: const Text('All Users'),
                         selected: _selectedAudience == 'all',
-                        onSelected: (_) => setState(() => _selectedAudience = 'all'),
+                        onSelected: (_) =>
+                            setState(() => _selectedAudience = 'all'),
                       ),
                       ChoiceChip(
                         label: const Text('Students'),
                         selected: _selectedAudience == 'students',
-                        onSelected: (_) => setState(() => _selectedAudience = 'students'),
+                        onSelected: (_) =>
+                            setState(() => _selectedAudience = 'students'),
                       ),
                       ChoiceChip(
                         label: const Text('Staff'),
                         selected: _selectedAudience == 'staff',
-                        onSelected: (_) => setState(() => _selectedAudience = 'staff'),
+                        onSelected: (_) =>
+                            setState(() => _selectedAudience = 'staff'),
                       ),
                       ChoiceChip(
                         label: const Text('Admins'),
                         selected: _selectedAudience == 'admins',
-                        onSelected: (_) => setState(() => _selectedAudience = 'admins'),
+                        onSelected: (_) =>
+                            setState(() => _selectedAudience = 'admins'),
                       ),
                     ],
                   ),
-                  
+
                   const SizedBox(height: 16),
                   TextField(
                     controller: _titleController,
@@ -1388,7 +1415,7 @@ class _SystemTabState extends State<_SystemTab> {
                     width: double.infinity,
                     child: ElevatedButton.icon(
                       onPressed: _isSending ? null : _sendBroadcastNotification,
-                      icon: _isSending 
+                      icon: _isSending
                           ? const SizedBox(
                               width: 20,
                               height: 20,
@@ -1459,9 +1486,36 @@ class _SystemTabState extends State<_SystemTab> {
                         label: 'Clear Cache',
                         color: Colors.purple,
                         onTap: () async {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Cache cleared')),
-                          );
+                          try {
+                            await OfflineCacheService().clearCache();
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Row(
+                                    children: [
+                                      Icon(
+                                        Icons.check_circle,
+                                        color: Colors.white,
+                                        size: 20,
+                                      ),
+                                      SizedBox(width: 8),
+                                      Text('Cache cleared successfully'),
+                                    ],
+                                  ),
+                                  backgroundColor: Colors.green,
+                                ),
+                              );
+                            }
+                          } catch (e) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Failed to clear cache: $e'),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                            }
+                          }
                         },
                       ),
                     ],
@@ -1496,9 +1550,9 @@ class _SystemTabState extends State<_SystemTab> {
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    'Platform: Android\n'
-                    'Architecture: arm64-v8a / x86_64\n'
-                    'Minification: Disabled\n'
+                    'Platform: Web (PWA)\n'
+                    'Renderer: CanvasKit\n'
+                    'Hosting: Firebase\n'
                     'Firebase: Enabled',
                     style: TextStyle(
                       fontFamily: 'monospace',
@@ -1536,10 +1590,7 @@ class _SystemInfoRow extends StatelessWidget {
           Icon(icon, size: 20, color: Colors.grey.shade600),
           const SizedBox(width: 12),
           Expanded(child: Text(label)),
-          Text(
-            value,
-            style: const TextStyle(fontWeight: FontWeight.w600),
-          ),
+          Text(value, style: const TextStyle(fontWeight: FontWeight.w600)),
         ],
       ),
     );
@@ -1576,10 +1627,7 @@ class _QuickActionButton extends StatelessWidget {
               const SizedBox(width: 8),
               Text(
                 label,
-                style: TextStyle(
-                  color: color,
-                  fontWeight: FontWeight.w600,
-                ),
+                style: TextStyle(color: color, fontWeight: FontWeight.w600),
               ),
             ],
           ),
@@ -1638,19 +1686,11 @@ class _StatCard extends StatelessWidget {
               ],
             ),
             const Spacer(),
-            Text(
-              title,
-              style: const TextStyle(
-                fontWeight: FontWeight.w500,
-              ),
-            ),
+            Text(title, style: const TextStyle(fontWeight: FontWeight.w500)),
             if (subtitle != null)
               Text(
                 subtitle!,
-                style: TextStyle(
-                  fontSize: 11,
-                  color: Colors.grey.shade600,
-                ),
+                style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
               ),
           ],
         ),
@@ -1715,7 +1755,9 @@ class _UserListTile extends StatelessWidget {
             CircleAvatar(
               backgroundColor: _getRoleColor(user.role).withAlpha(25),
               child: Text(
-                user.firstName.isNotEmpty ? user.firstName[0].toUpperCase() : '?',
+                user.firstName.isNotEmpty
+                    ? user.firstName[0].toUpperCase()
+                    : '?',
                 style: TextStyle(
                   color: _getRoleColor(user.role),
                   fontWeight: FontWeight.bold,
@@ -1749,7 +1791,7 @@ class _UserListTile extends StatelessWidget {
                 ),
               ),
             ),
-            _RoleBadge(role: user.role),
+            RoleBadge(role: user.role),
           ],
         ),
         subtitle: Column(
@@ -1767,7 +1809,9 @@ class _UserListTile extends StatelessWidget {
                 user.department!,
                 style: TextStyle(
                   fontSize: 11,
-                  color: isActive ? theme.colorScheme.primary : Colors.grey.shade400,
+                  color: isActive
+                      ? theme.colorScheme.primary
+                      : Colors.grey.shade400,
                 ),
               ),
           ],
@@ -1789,9 +1833,7 @@ class _UserListTile extends StatelessWidget {
         ),
         onTap: () => Navigator.push(
           context,
-          MaterialPageRoute(
-            builder: (_) => UserDetailScreen(userId: user.id),
-          ),
+          MaterialPageRoute(builder: (_) => UserDetailScreen(userId: user.id)),
         ),
       ),
     );
@@ -1815,9 +1857,7 @@ class _UserListTile extends StatelessWidget {
       case 'view':
         Navigator.push(
           context,
-          MaterialPageRoute(
-            builder: (_) => UserDetailScreen(userId: user.id),
-          ),
+          MaterialPageRoute(builder: (_) => UserDetailScreen(userId: user.id)),
         );
         break;
       case 'ban':
@@ -1865,20 +1905,27 @@ class _UserListTile extends StatelessWidget {
               Navigator.pop(ctx);
               final success = await adminProvider.banUser(
                 user.id,
-                reason: reasonController.text.isNotEmpty ? reasonController.text : null,
+                reason: reasonController.text.isNotEmpty
+                    ? reasonController.text
+                    : null,
               );
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text(
-                      success ? 'User banned successfully' : 'Failed to ban user',
+                      success
+                          ? 'User banned successfully'
+                          : 'Failed to ban user',
                     ),
                     backgroundColor: success ? Colors.green : Colors.red,
                   ),
                 );
               }
             },
-            child: const Text('Ban User', style: TextStyle(color: Colors.white)),
+            child: const Text(
+              'Ban User',
+              style: TextStyle(color: Colors.white),
+            ),
           ),
         ],
       ),
@@ -1905,7 +1952,9 @@ class _UserListTile extends StatelessWidget {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text(
-                      success ? 'User unbanned successfully' : 'Failed to unban user',
+                      success
+                          ? 'User unbanned successfully'
+                          : 'Failed to unban user',
                     ),
                     backgroundColor: success ? Colors.green : Colors.red,
                   ),
@@ -1955,7 +2004,9 @@ class _UserListTile extends StatelessWidget {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text(
-                      success ? 'User deleted permanently' : 'Failed to delete user',
+                      success
+                          ? 'User deleted permanently'
+                          : 'Failed to delete user',
                     ),
                     backgroundColor: success ? Colors.green : Colors.red,
                   ),
@@ -1967,44 +2018,6 @@ class _UserListTile extends StatelessWidget {
         ],
       ),
     );
-  }
-}
-
-class _RoleBadge extends StatelessWidget {
-  final UserRole role;
-
-  const _RoleBadge({required this.role});
-
-  @override
-  Widget build(BuildContext context) {
-    final color = _getColor();
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(
-        color: color.withAlpha(25),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withAlpha(127)),
-      ),
-      child: Text(
-        role.name.toUpperCase(),
-        style: TextStyle(
-          fontSize: 10,
-          fontWeight: FontWeight.bold,
-          color: color,
-        ),
-      ),
-    );
-  }
-
-  Color _getColor() {
-    switch (role) {
-      case UserRole.student:
-        return Colors.green;
-      case UserRole.staff:
-        return Colors.orange;
-      case UserRole.admin:
-        return Colors.purple;
-    }
   }
 }
 
@@ -2042,13 +2055,15 @@ class _RecentUsersSection extends StatelessWidget {
                   leading: CircleAvatar(
                     backgroundColor: Colors.blue.shade100,
                     child: Text(
-                      user.firstName.isNotEmpty ? user.firstName[0].toUpperCase() : '?',
+                      user.firstName.isNotEmpty
+                          ? user.firstName[0].toUpperCase()
+                          : '?',
                       style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
                   ),
                   title: Text(user.fullName),
                   subtitle: Text(user.email),
-                  trailing: _RoleBadge(role: user.role),
+                  trailing: RoleBadge(role: user.role),
                 );
               }).toList(),
             ),
@@ -2072,10 +2087,7 @@ class _ChartLegend extends StatelessWidget {
         Container(
           width: 12,
           height: 12,
-          decoration: BoxDecoration(
-            color: color,
-            shape: BoxShape.circle,
-          ),
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
         ),
         const SizedBox(width: 4),
         Text(
@@ -2129,10 +2141,7 @@ class _StatChip extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             label,
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey.shade600,
-            ),
+            style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
           ),
         ],
       ),

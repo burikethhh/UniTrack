@@ -17,14 +17,45 @@ import 'services/services.dart';
 import 'models/models.dart';
 import 'screens/screens.dart';
 import 'screens/onboarding/onboarding_screen.dart';
+import 'widgets/common/offline_banner.dart';
 
 // Demo mode flag - set to false to use Firebase
 const bool kDemoMode = false;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   // Catch and log all initialization errors (helpful for web debugging)
+  // Set a friendly global error widget instead of red screen of death
+  ErrorWidget.builder = (FlutterErrorDetails details) {
+    return Material(
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.error_outline, color: Colors.red, size: 48),
+              const SizedBox(height: 16),
+              const Text(
+                'Something went wrong',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                kDebugMode
+                    ? details.exceptionAsString()
+                    : 'Please restart the app.',
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 14, color: Colors.grey),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  };
+
   try {
     await _initializeApp();
   } catch (e, stack) {
@@ -32,25 +63,27 @@ void main() async {
     debugPrint('$stack');
     // On web, show a visible error instead of white screen
     if (kIsWeb) {
-      runApp(MaterialApp(
-        home: Scaffold(
-          body: Center(
-            child: Padding(
-              padding: const EdgeInsets.all(32),
-              child: Text(
-                'App initialization error:\n$e',
-                style: const TextStyle(color: Colors.red, fontSize: 16),
-                textAlign: TextAlign.center,
+      runApp(
+        MaterialApp(
+          home: Scaffold(
+            body: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(32),
+                child: Text(
+                  'App initialization error:\n$e',
+                  style: const TextStyle(color: Colors.red, fontSize: 16),
+                  textAlign: TextAlign.center,
+                ),
               ),
             ),
           ),
         ),
-      ));
+      );
       return;
     }
     rethrow;
   }
-  
+
   runApp(const UniTrackApp());
 }
 
@@ -61,7 +94,7 @@ Future<void> _initializeApp() async {
       DeviceOrientation.portraitUp,
       DeviceOrientation.portraitDown,
     ]);
-    
+
     // Set system UI overlay style
     SystemChrome.setSystemUIOverlayStyle(
       const SystemUiOverlayStyle(
@@ -72,12 +105,10 @@ Future<void> _initializeApp() async {
       ),
     );
   }
-  
+
   // Initialize Firebase
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
-  
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
   // Configure Firestore settings for web to avoid SDK internal errors
   if (kIsWeb) {
     FirebaseFirestore.instance.settings = const Settings(
@@ -85,23 +116,36 @@ Future<void> _initializeApp() async {
       cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
     );
   }
-  
+
   // Initialize connectivity monitoring (works on all platforms)
   ConnectivityService().startMonitoring();
-  
+
   // Initialize offline cache service (SharedPreferences on web, sqflite on mobile)
   try {
-    await OfflineCacheService().initialize();
+    await OfflineCacheService().initialize().timeout(
+      const Duration(seconds: 5),
+      onTimeout: () {
+        debugPrint('⚠️ Offline cache init timed out (non-fatal)');
+      },
+    );
   } catch (e) {
     debugPrint('⚠️ Offline cache init error (non-fatal): $e');
   }
-  
-  // Initialize push notifications (FCM on web, local notifications on mobile)
-  try {
-    await PushNotificationService().initialize();
-  } catch (e) {
-    debugPrint('⚠️ Push notification init error (non-fatal): $e');
-  }
+
+  // Initialize push notifications — fire and forget to avoid blocking app start
+  // (FCM can hang on web if Tracking Prevention blocks Firebase storage)
+  PushNotificationService()
+      .initialize()
+      .timeout(
+        const Duration(seconds: 5),
+        onTimeout: () {
+          debugPrint('⚠️ Push notification init timed out (non-fatal)');
+        },
+      )
+      .catchError((e) {
+        debugPrint('⚠️ Push notification init error (non-fatal): $e');
+        return null;
+      });
 }
 
 /// Custom scroll behavior that enables drag scrolling on all devices (web + touch)
@@ -117,31 +161,21 @@ class AppScrollBehavior extends MaterialScrollBehavior {
 
 class UniTrackApp extends StatelessWidget {
   const UniTrackApp({super.key});
-  
+
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
         // Services
-        Provider<AuthService>(
-          create: (_) => AuthService(),
-        ),
-        Provider<LocationService>(
-          create: (_) => LocationService(),
-        ),
-        Provider<DatabaseService>(
-          create: (_) => DatabaseService(),
-        ),
-        Provider<NotificationService>(
-          create: (_) => NotificationService(),
-        ),
-        Provider<OfflineCacheService>(
-          create: (_) => OfflineCacheService(),
-        ),
+        Provider<AuthService>(create: (_) => AuthService()),
+        Provider<LocationService>(create: (_) => LocationService()),
+        Provider<DatabaseService>(create: (_) => DatabaseService()),
+        Provider<NotificationService>(create: (_) => NotificationService()),
+        Provider<OfflineCacheService>(create: (_) => OfflineCacheService()),
         Provider<PushNotificationService>(
           create: (_) => PushNotificationService(),
         ),
-        
+
         // Providers
         ChangeNotifierProvider<AuthProvider>(
           create: (context) => AuthProvider(
@@ -155,28 +189,26 @@ class UniTrackApp extends StatelessWidget {
           ),
         ),
         ChangeNotifierProvider<FacultyProvider>(
-          create: (context) => FacultyProvider(
-            databaseService: context.read<DatabaseService>(),
-          ),
+          create: (context) =>
+              FacultyProvider(databaseService: context.read<DatabaseService>()),
         ),
         ChangeNotifierProxyProvider<AuthProvider, NotificationProvider>(
-          create: (context) => NotificationProvider(
-            context.read<NotificationService>(),
-          ),
+          create: (context) =>
+              NotificationProvider(context.read<NotificationService>()),
           update: (context, authProvider, notificationProvider) {
             final userId = authProvider.user?.id;
             if (userId != null && notificationProvider != null) {
               notificationProvider.initialize(userId);
+            } else if (notificationProvider != null) {
+              // User logged out — cancel Firestore listeners for old user
+              notificationProvider.stopListening();
             }
-            return notificationProvider ?? NotificationProvider(
-              context.read<NotificationService>(),
-            );
+            return notificationProvider ??
+                NotificationProvider(context.read<NotificationService>());
           },
         ),
         // Admin Provider for super admin features
-        ChangeNotifierProvider<AdminProvider>(
-          create: (_) => AdminProvider(),
-        ),
+        ChangeNotifierProvider<AdminProvider>(create: (_) => AdminProvider()),
       ],
       child: MaterialApp(
         title: AppConstants.appName,
@@ -189,14 +221,28 @@ class UniTrackApp extends StatelessWidget {
           '/login': (context) => const LoginScreen(),
           '/onboarding': (context) => const OnboardingScreen(),
         },
-        // Responsive wrapper: constrain max width on tablets/desktops
+        // Responsive wrapper: adaptive layout based on screen size
+        // Mobile: full width (max 600px)
+        // Tablet: centered content (max 840px)
+        // Desktop: full width (content handles its own constraints)
         builder: (context, child) {
-          return Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 480),
-              child: child,
-            ),
-          );
+          final screenWidth = MediaQuery.sizeOf(context).width;
+
+          // On mobile, constrain to phone-like width
+          if (screenWidth < 600) {
+            return OfflineModeBanner(
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 480),
+                  child: child,
+                ),
+              ),
+            );
+          }
+
+          // On tablet/desktop, let screens handle their own layout
+          // Individual screens will use ResponsiveBuilder for adaptive layouts
+          return OfflineModeBanner(child: child ?? const SizedBox.shrink());
         },
       ),
     );
@@ -206,7 +252,7 @@ class UniTrackApp extends StatelessWidget {
 /// App entry point with splash screen and onboarding check
 class AppEntry extends StatefulWidget {
   const AppEntry({super.key});
-  
+
   @override
   State<AppEntry> createState() => _AppEntryState();
 }
@@ -214,22 +260,23 @@ class AppEntry extends StatefulWidget {
 class _AppEntryState extends State<AppEntry> {
   bool _showSplash = true;
   bool? _hasSeenOnboarding;
-  
+
   @override
   void initState() {
     super.initState();
     _checkOnboardingStatus();
   }
-  
+
   Future<void> _checkOnboardingStatus() async {
     final prefs = await SharedPreferences.getInstance();
     if (mounted) {
       setState(() {
-        _hasSeenOnboarding = prefs.getBool(OnboardingScreen.hasSeenOnboardingKey) ?? false;
+        _hasSeenOnboarding =
+            prefs.getBool(OnboardingScreen.hasSeenOnboardingKey) ?? false;
       });
     }
   }
-  
+
   @override
   Widget build(BuildContext context) {
     // Skip Flutter splash on web — HTML splash already handles loading UX
@@ -242,19 +289,17 @@ class _AppEntryState extends State<AppEntry> {
         },
       );
     }
-    
+
     // Still checking onboarding status
     if (_hasSeenOnboarding == null) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
-    
+
     // Show onboarding for first-time users
     if (!_hasSeenOnboarding!) {
       return const OnboardingScreen();
     }
-    
+
     return const AuthWrapper();
   }
 }
@@ -262,7 +307,7 @@ class _AppEntryState extends State<AppEntry> {
 /// Demo mode screen to select which role to preview
 class DemoModeSelector extends StatelessWidget {
   const DemoModeSelector({super.key});
-  
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -272,9 +317,9 @@ class DemoModeSelector extends StatelessWidget {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              Color(0xFFE8A87C),  // Peach
-              Color(0xFF85DCBA),  // Light Mint Green
-              Color(0xFF41B3A3),  // Sage Green
+              Color(0xFFE8A87C), // Peach
+              Color(0xFF85DCBA), // Light Mint Green
+              Color(0xFF41B3A3), // Sage Green
             ],
           ),
         ),
@@ -284,7 +329,7 @@ class DemoModeSelector extends StatelessWidget {
             child: Column(
               children: [
                 const SizedBox(height: 40),
-                
+
                 // Logo
                 Container(
                   width: 100,
@@ -303,11 +348,11 @@ class DemoModeSelector extends StatelessWidget {
                   child: const Icon(
                     Icons.location_on,
                     size: 50,
-                    color: Color(0xFFE8A87C),  // Peach
+                    color: Color(0xFFE8A87C), // Peach
                   ),
                 ),
                 const SizedBox(height: 24),
-                
+
                 const Text(
                   'UniTrack',
                   style: TextStyle(
@@ -327,7 +372,10 @@ class DemoModeSelector extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.orange,
                     borderRadius: BorderRadius.circular(20),
@@ -341,18 +389,15 @@ class DemoModeSelector extends StatelessWidget {
                     ),
                   ),
                 ),
-                
+
                 const SizedBox(height: 48),
-                
+
                 const Text(
                   'Select a role to preview:',
-                  style: TextStyle(
-                    fontSize: 18,
-                    color: Colors.white,
-                  ),
+                  style: TextStyle(fontSize: 18, color: Colors.white),
                 ),
                 const SizedBox(height: 24),
-                
+
                 // Role buttons
                 _buildRoleButton(
                   context,
@@ -362,11 +407,13 @@ class DemoModeSelector extends StatelessWidget {
                   Colors.blue,
                   () => Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (_) => const StudentHomeScreen()),
+                    MaterialPageRoute(
+                      builder: (_) => const StudentHomeScreen(),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 16),
-                
+
                 _buildRoleButton(
                   context,
                   'Faculty / Staff',
@@ -375,11 +422,13 @@ class DemoModeSelector extends StatelessWidget {
                   Colors.green,
                   () => Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (_) => const StaffDashboardScreen()),
+                    MaterialPageRoute(
+                      builder: (_) => const StaffDashboardScreen(),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 16),
-                
+
                 _buildRoleButton(
                   context,
                   'Admin',
@@ -388,14 +437,16 @@ class DemoModeSelector extends StatelessWidget {
                   Colors.purple,
                   () => Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (_) => const SuperAdminDashboard()),
+                    MaterialPageRoute(
+                      builder: (_) => const SuperAdminDashboard(),
+                    ),
                   ),
                 ),
-                
+
                 const Spacer(),
-                
+
                 Text(
-                  '© 2026 SKSU • Version ${AppConstants.appVersion}',
+                  '© ${DateTime.now().year} SKSU • Version ${AppConstants.appVersion}',
                   style: TextStyle(
                     color: Colors.white.withValues(alpha: 0.6),
                     fontSize: 12,
@@ -409,7 +460,7 @@ class DemoModeSelector extends StatelessWidget {
       ),
     );
   }
-  
+
   Widget _buildRoleButton(
     BuildContext context,
     String title,
@@ -453,19 +504,12 @@ class DemoModeSelector extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(
                       subtitle,
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Colors.grey[600],
-                      ),
+                      style: TextStyle(fontSize: 13, color: Colors.grey[600]),
                     ),
                   ],
                 ),
               ),
-              Icon(
-                Icons.arrow_forward_ios,
-                color: Colors.grey[400],
-                size: 18,
-              ),
+              Icon(Icons.arrow_forward_ios, color: Colors.grey[400], size: 18),
             ],
           ),
         ),
@@ -477,7 +521,7 @@ class DemoModeSelector extends StatelessWidget {
 /// Wrapper that handles auth state and routes to appropriate screen
 class AuthWrapper extends StatefulWidget {
   const AuthWrapper({super.key});
-  
+
   @override
   State<AuthWrapper> createState() => _AuthWrapperState();
 }
@@ -490,9 +534,11 @@ class _AuthWrapperState extends State<AuthWrapper> {
     return Consumer<AuthProvider>(
       builder: (context, authProvider, _) {
         if (kDebugMode) {
-          debugPrint('🔄 AuthWrapper: isLoading=${authProvider.isLoading}, isAuth=${authProvider.isAuthenticated}, user=${authProvider.user?.email}');
+          debugPrint(
+            '🔄 AuthWrapper: isLoading=${authProvider.isLoading}, isAuth=${authProvider.isAuthenticated}, user=${authProvider.user?.email}',
+          );
         }
-        
+
         // Show loading while checking auth state
         if (authProvider.isLoading) {
           if (kDebugMode) debugPrint('🔄 AuthWrapper: Showing LOADING screen');
@@ -509,28 +555,32 @@ class _AuthWrapperState extends State<AuthWrapper> {
             ),
           );
         }
-        
+
         // Not authenticated - show login
         if (!authProvider.isAuthenticated) {
           if (kDebugMode) debugPrint('🔄 AuthWrapper: Showing LOGIN screen');
           return const LoginScreen();
         }
-        
+
         // Authenticated - route based on role
         final user = authProvider.user;
         if (user == null) {
-          if (kDebugMode) debugPrint('🔄 AuthWrapper: user is null, showing LOGIN');
+          if (kDebugMode) {
+            debugPrint('🔄 AuthWrapper: user is null, showing LOGIN');
+          }
           return const LoginScreen();
         }
-        
-        if (kDebugMode) debugPrint('🔄 AuthWrapper: Showing HOME for ${user.role}');
-        
+
+        if (kDebugMode) {
+          debugPrint('🔄 AuthWrapper: Showing HOME for ${user.role}');
+        }
+
         // Check for updates on first authenticated build
         if (!_hasCheckedForUpdates) {
           _hasCheckedForUpdates = true;
           _checkForUpdates();
         }
-        
+
         switch (user.role) {
           case UserRole.admin:
             return const SuperAdminDashboard();
@@ -546,14 +596,14 @@ class _AuthWrapperState extends State<AuthWrapper> {
   Future<void> _checkForUpdates() async {
     // Delay slightly to allow the home screen to build first
     await Future.delayed(const Duration(seconds: 2));
-    
+
     if (!mounted) return;
-    
+
     final updateService = UpdateService();
     final result = await updateService.checkForUpdate();
-    
+
     if (!mounted) return;
-    
+
     if (result.hasUpdate && result.latestVersion != null) {
       // Show update dialog
       // ignore: use_build_context_synchronously
@@ -565,7 +615,6 @@ class _AuthWrapperState extends State<AuthWrapper> {
     }
   }
 }
-
 
 /// Startup update dialog shown after app launch
 class _StartupUpdateDialog extends StatefulWidget {
@@ -589,7 +638,7 @@ class _StartupUpdateDialogState extends State<_StartupUpdateDialog> {
     final theme = Theme.of(context);
 
     return PopScope(
-      canPop: !widget.updateResult.isRequired || _isDownloading,
+      canPop: !widget.updateResult.isRequired && !_isDownloading,
       child: AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         contentPadding: EdgeInsets.zero,
@@ -610,7 +659,9 @@ class _StartupUpdateDialogState extends State<_StartupUpdateDialog> {
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(20),
+                  ),
                 ),
                 child: Column(
                   children: [
@@ -637,7 +688,10 @@ class _StartupUpdateDialogState extends State<_StartupUpdateDialog> {
                     ),
                     const SizedBox(height: 8),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 6,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(20),
@@ -693,11 +747,19 @@ class _StartupUpdateDialogState extends State<_StartupUpdateDialog> {
                       children: [
                         Column(
                           children: [
-                            const Text('Current', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                            const Text(
+                              'Current',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey,
+                              ),
+                            ),
                             const SizedBox(height: 4),
                             Text(
                               'v${_updateService.currentVersionName}',
-                              style: const TextStyle(fontWeight: FontWeight.bold),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ],
                         ),
@@ -707,7 +769,13 @@ class _StartupUpdateDialogState extends State<_StartupUpdateDialog> {
                         ),
                         Column(
                           children: [
-                            const Text('New', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                            const Text(
+                              'New',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey,
+                              ),
+                            ),
                             const SizedBox(height: 4),
                             Text(
                               'v${version.versionName}',
@@ -756,7 +824,9 @@ class _StartupUpdateDialogState extends State<_StartupUpdateDialog> {
                             children: [
                               Text(
                                 _statusMessage,
-                                style: const TextStyle(fontWeight: FontWeight.w500),
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w500,
+                                ),
                               ),
                               Text(
                                 '${(_downloadProgress * 100).toInt()}%',
@@ -799,7 +869,10 @@ class _StartupUpdateDialogState extends State<_StartupUpdateDialog> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: theme.colorScheme.primary,
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 12,
+                    ),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -838,7 +911,9 @@ class _StartupUpdateDialogState extends State<_StartupUpdateDialog> {
     if (mounted) {
       if (success) {
         if (kIsWeb) {
+          // On web, just reload — don't pop the dialog (reload tears down everything)
           reloadWebPage();
+          return;
         }
         Navigator.of(context).pop();
       } else {

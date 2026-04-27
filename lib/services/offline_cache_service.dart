@@ -15,34 +15,38 @@ import '../models/location_model.dart';
 class OfflineCacheService {
   static Database? _database;
   static final OfflineCacheService _instance = OfflineCacheService._internal();
-  
+
   factory OfflineCacheService() => _instance;
   OfflineCacheService._internal();
-  
+
   final Connectivity _connectivity = Connectivity();
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
   final _connectivityController = StreamController<bool>.broadcast();
-  
+
   bool _isOnline = true;
   bool get isOnline => _isOnline;
   Stream<bool> get connectivityStream => _connectivityController.stream;
-  
+
   // Web in-memory cache
   List<UserModel>? _webFacultyCache;
   Map<String, LocationModel>? _webLocationCache;
-  
+
   /// Initialize the database (or connectivity monitoring on web)
   Future<Database> get database async {
-    if (kIsWeb) throw UnsupportedError('SQLite not available on web — use web-specific methods');
+    if (kIsWeb) {
+      throw UnsupportedError(
+        'SQLite not available on web — use web-specific methods',
+      );
+    }
     if (_database != null) return _database!;
     _database = await _initDatabase();
     return _database!;
   }
-  
+
   Future<Database> _initDatabase() async {
     final dbPath = await getDatabasesPath();
     final path = join(dbPath, 'unitrack_cache.db');
-    
+
     return await openDatabase(
       path,
       version: 3,
@@ -50,7 +54,7 @@ class OfflineCacheService {
       onUpgrade: _upgradeTables,
     );
   }
-  
+
   Future<void> _createTables(Database db, int version) async {
     // Faculty/Staff cache table
     await db.execute('''
@@ -71,7 +75,7 @@ class OfflineCacheService {
         cached_at INTEGER
       )
     ''');
-    
+
     // Location cache table
     await db.execute('''
       CREATE TABLE location_cache (
@@ -88,7 +92,7 @@ class OfflineCacheService {
         cached_at INTEGER
       )
     ''');
-    
+
     // Last sync timestamp
     await db.execute('''
       CREATE TABLE sync_meta (
@@ -96,7 +100,7 @@ class OfflineCacheService {
         value TEXT
       )
     ''');
-    
+
     // Pending offline write operations
     await db.execute('''
       CREATE TABLE pending_operations (
@@ -110,12 +114,20 @@ class OfflineCacheService {
       )
     ''');
   }
-  
-  Future<void> _upgradeTables(Database db, int oldVersion, int newVersion) async {
+
+  Future<void> _upgradeTables(
+    Database db,
+    int oldVersion,
+    int newVersion,
+  ) async {
     if (oldVersion < 2) {
       // Add availability status columns
-      await db.execute('ALTER TABLE faculty_cache ADD COLUMN availability_status TEXT');
-      await db.execute('ALTER TABLE faculty_cache ADD COLUMN custom_status_message TEXT');
+      await db.execute(
+        'ALTER TABLE faculty_cache ADD COLUMN availability_status TEXT',
+      );
+      await db.execute(
+        'ALTER TABLE faculty_cache ADD COLUMN custom_status_message TEXT',
+      );
     }
     if (oldVersion < 3) {
       // Add pending operations table for offline write queue
@@ -132,23 +144,44 @@ class OfflineCacheService {
       ''');
     }
   }
-  
+
   /// Initialize connectivity monitoring
   Future<void> initialize() async {
+    // Restore pending operations from SharedPreferences on web
+    if (kIsWeb) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final stored = prefs.getString('pending_operations');
+        if (stored != null) {
+          final decoded = jsonDecode(stored) as List;
+          _webPendingOps.addAll(decoded.cast<Map<String, dynamic>>());
+          debugPrint(
+            '📦 Restored ${_webPendingOps.length} pending operations from storage',
+          );
+        }
+      } catch (e) {
+        debugPrint('⚠️ Error restoring pending operations: $e');
+      }
+    }
+
     // Check initial connectivity
     final results = await _connectivity.checkConnectivity();
     _isOnline = !results.contains(ConnectivityResult.none);
     _connectivityController.add(_isOnline);
-    
+
     // Listen for changes
-    _connectivitySubscription = _connectivity.onConnectivityChanged.listen((results) {
+    _connectivitySubscription = _connectivity.onConnectivityChanged.listen((
+      results,
+    ) {
       final wasOnline = _isOnline;
       _isOnline = !results.contains(ConnectivityResult.none);
-      
+
       if (wasOnline != _isOnline) {
         _connectivityController.add(_isOnline);
-        debugPrint('📶 Connectivity changed: ${_isOnline ? "Online" : "Offline"}');
-        
+        debugPrint(
+          '📶 Connectivity changed: ${_isOnline ? "Online" : "Offline"}',
+        );
+
         // Auto-sync pending operations when coming back online
         if (_isOnline && !wasOnline) {
           syncPendingOperations();
@@ -156,15 +189,15 @@ class OfflineCacheService {
       }
     });
   }
-  
+
   /// Dispose resources
   void dispose() {
     _connectivitySubscription?.cancel();
     _connectivityController.close();
   }
-  
+
   // ==================== FACULTY CACHE ====================
-  
+
   /// Cache a list of faculty members
   Future<void> cacheFacultyList(List<UserModel> faculty) async {
     if (kIsWeb) {
@@ -180,39 +213,35 @@ class OfflineCacheService {
       debugPrint('💾 Web-cached ${faculty.length} faculty members');
       return;
     }
-    
+
     final db = await database;
     final batch = db.batch();
     final now = DateTime.now().millisecondsSinceEpoch;
-    
+
     for (final user in faculty) {
-      batch.insert(
-        'faculty_cache',
-        {
-          'id': user.id,
-          'email': user.email,
-          'first_name': user.firstName,
-          'last_name': user.lastName,
-          'role': user.role.name,
-          'department': user.department,
-          'position': user.position,
-          'photo_url': user.photoUrl,
-          'phone_number': user.phoneNumber,
-          'campus_id': user.campusId,
-          'availability_status': user.availabilityStatus?.name,
-          'custom_status_message': user.customStatusMessage,
-          'is_tracking_enabled': user.isTrackingEnabled == true ? 1 : 0,
-          'cached_at': now,
-        },
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
+      batch.insert('faculty_cache', {
+        'id': user.id,
+        'email': user.email,
+        'first_name': user.firstName,
+        'last_name': user.lastName,
+        'role': user.role.name,
+        'department': user.department,
+        'position': user.position,
+        'photo_url': user.photoUrl,
+        'phone_number': user.phoneNumber,
+        'campus_id': user.campusId,
+        'availability_status': user.availabilityStatus?.name,
+        'custom_status_message': user.customStatusMessage,
+        'is_tracking_enabled': user.isTrackingEnabled == true ? 1 : 0,
+        'cached_at': now,
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
-    
+
     await batch.commit(noResult: true);
     await _updateSyncMeta('faculty_last_sync', now.toString());
     debugPrint('💾 Cached ${faculty.length} faculty members');
   }
-  
+
   /// Get cached faculty list
   Future<List<UserModel>> getCachedFaculty() async {
     if (kIsWeb) {
@@ -223,7 +252,9 @@ class OfflineCacheService {
         final jsonStr = prefs.getString('faculty_cache');
         if (jsonStr != null) {
           final jsonList = jsonDecode(jsonStr) as List;
-          _webFacultyCache = jsonList.map((j) => _userFromJson(j as Map<String, dynamic>)).toList();
+          _webFacultyCache = jsonList
+              .map((j) => _userFromJson(j as Map<String, dynamic>))
+              .toList();
           return _webFacultyCache!;
         }
       } catch (e) {
@@ -231,38 +262,42 @@ class OfflineCacheService {
       }
       return [];
     }
-    
+
     final db = await database;
     final results = await db.query('faculty_cache', orderBy: 'last_name ASC');
-    
+
     return results.map((row) => _userFromRow(row)).toList();
   }
-  
+
   /// Search cached faculty
   Future<List<UserModel>> searchCachedFaculty(String query) async {
     if (kIsWeb) {
       final allFaculty = await getCachedFaculty();
       final q = query.toLowerCase();
-      return allFaculty.where((u) =>
-        u.firstName.toLowerCase().contains(q) ||
-        u.lastName.toLowerCase().contains(q) ||
-        (u.department?.toLowerCase().contains(q) ?? false)
-      ).toList();
+      return allFaculty
+          .where(
+            (u) =>
+                u.firstName.toLowerCase().contains(q) ||
+                u.lastName.toLowerCase().contains(q) ||
+                (u.department?.toLowerCase().contains(q) ?? false),
+          )
+          .toList();
     }
-    
+
     final db = await database;
     final queryLower = '%${query.toLowerCase()}%';
-    
+
     final results = await db.query(
       'faculty_cache',
-      where: 'LOWER(first_name) LIKE ? OR LOWER(last_name) LIKE ? OR LOWER(department) LIKE ?',
+      where:
+          'LOWER(first_name) LIKE ? OR LOWER(last_name) LIKE ? OR LOWER(department) LIKE ?',
       whereArgs: [queryLower, queryLower, queryLower],
       orderBy: 'last_name ASC',
     );
-    
+
     return results.map((row) => _userFromRow(row)).toList();
   }
-  
+
   UserModel _userFromRow(Map<String, dynamic> row) {
     return UserModel(
       id: row['id'] as String,
@@ -275,21 +310,26 @@ class OfflineCacheService {
       photoUrl: row['photo_url'] as String?,
       phoneNumber: row['phone_number'] as String?,
       campusId: row['campus_id'] as String? ?? 'isulan',
-      availabilityStatus: _parseAvailabilityStatus(row['availability_status'] as String?),
+      availabilityStatus: _parseAvailabilityStatus(
+        row['availability_status'] as String?,
+      ),
       customStatusMessage: row['custom_status_message'] as String?,
       isTrackingEnabled: (row['is_tracking_enabled'] as int?) == 1,
       createdAt: DateTime.now(),
     );
   }
-  
+
   UserRole _parseRole(String? role) {
     switch (role) {
-      case 'admin': return UserRole.admin;
-      case 'staff': return UserRole.staff;
-      default: return UserRole.student;
+      case 'admin':
+        return UserRole.admin;
+      case 'staff':
+        return UserRole.staff;
+      default:
+        return UserRole.student;
     }
   }
-  
+
   AvailabilityStatus? _parseAvailabilityStatus(String? status) {
     if (status == null) return null;
     return AvailabilityStatus.values.firstWhere(
@@ -297,9 +337,9 @@ class OfflineCacheService {
       orElse: () => AvailabilityStatus.available,
     );
   }
-  
+
   // ==================== LOCATION CACHE ====================
-  
+
   /// Cache location for a user
   Future<void> cacheLocation(String userId, LocationModel location) async {
     if (kIsWeb) {
@@ -307,14 +347,42 @@ class OfflineCacheService {
       _webLocationCache![userId] = location;
       return;
     }
-    
+
     final db = await database;
     final now = DateTime.now().millisecondsSinceEpoch;
-    
-    await db.insert(
-      'location_cache',
-      {
-        'user_id': userId,
+
+    await db.insert('location_cache', {
+      'user_id': userId,
+      'latitude': location.latitude,
+      'longitude': location.longitude,
+      'accuracy': location.accuracy,
+      'status': location.status,
+      'quick_message': location.quickMessage,
+      'is_within_campus': location.isWithinCampus ? 1 : 0,
+      'is_moving': location.isMoving ? 1 : 0,
+      'is_manual_pin': location.isManualPin ? 1 : 0,
+      'timestamp': location.timestamp.millisecondsSinceEpoch,
+      'cached_at': now,
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  /// Cache multiple locations
+  Future<void> cacheLocations(Map<String, LocationModel> locations) async {
+    if (kIsWeb) {
+      _webLocationCache ??= {};
+      _webLocationCache!.addAll(locations);
+      debugPrint('💾 Web-cached ${locations.length} locations');
+      return;
+    }
+
+    final db = await database;
+    final batch = db.batch();
+    final now = DateTime.now().millisecondsSinceEpoch;
+
+    for (final entry in locations.entries) {
+      final location = entry.value;
+      batch.insert('location_cache', {
+        'user_id': entry.key,
         'latitude': location.latitude,
         'longitude': location.longitude,
         'accuracy': location.accuracy,
@@ -325,55 +393,19 @@ class OfflineCacheService {
         'is_manual_pin': location.isManualPin ? 1 : 0,
         'timestamp': location.timestamp.millisecondsSinceEpoch,
         'cached_at': now,
-      },
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
-  }
-  
-  /// Cache multiple locations
-  Future<void> cacheLocations(Map<String, LocationModel> locations) async {
-    if (kIsWeb) {
-      _webLocationCache ??= {};
-      _webLocationCache!.addAll(locations);
-      debugPrint('💾 Web-cached ${locations.length} locations');
-      return;
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
-    
-    final db = await database;
-    final batch = db.batch();
-    final now = DateTime.now().millisecondsSinceEpoch;
-    
-    for (final entry in locations.entries) {
-      final location = entry.value;
-      batch.insert(
-        'location_cache',
-        {
-          'user_id': entry.key,
-          'latitude': location.latitude,
-          'longitude': location.longitude,
-          'accuracy': location.accuracy,
-          'status': location.status,
-          'quick_message': location.quickMessage,
-          'is_within_campus': location.isWithinCampus ? 1 : 0,
-          'is_moving': location.isMoving ? 1 : 0,
-          'is_manual_pin': location.isManualPin ? 1 : 0,
-          'timestamp': location.timestamp.millisecondsSinceEpoch,
-          'cached_at': now,
-        },
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
-    }
-    
+
     await batch.commit(noResult: true);
     debugPrint('💾 Cached ${locations.length} locations');
   }
-  
+
   /// Get cached location for a user
   Future<LocationModel?> getCachedLocation(String userId) async {
     if (kIsWeb) {
       return _webLocationCache?[userId];
     }
-    
+
     final db = await database;
     final results = await db.query(
       'location_cache',
@@ -381,27 +413,27 @@ class OfflineCacheService {
       whereArgs: [userId],
       limit: 1,
     );
-    
+
     if (results.isEmpty) return null;
     return _locationFromRow(results.first);
   }
-  
+
   /// Get all cached locations
   Future<Map<String, LocationModel>> getAllCachedLocations() async {
     if (kIsWeb) {
       return _webLocationCache ?? {};
     }
-    
+
     final db = await database;
     final results = await db.query('location_cache');
-    
+
     final Map<String, LocationModel> locations = {};
     for (final row in results) {
       locations[row['user_id'] as String] = _locationFromRow(row);
     }
     return locations;
   }
-  
+
   LocationModel _locationFromRow(Map<String, dynamic> row) {
     return LocationModel(
       userId: row['user_id'] as String,
@@ -416,18 +448,17 @@ class OfflineCacheService {
       timestamp: DateTime.fromMillisecondsSinceEpoch(row['timestamp'] as int),
     );
   }
-  
+
   // ==================== SYNC METADATA ====================
-  
+
   Future<void> _updateSyncMeta(String key, String value) async {
     final db = await database;
-    await db.insert(
-      'sync_meta',
-      {'key': key, 'value': value},
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
+    await db.insert('sync_meta', {
+      'key': key,
+      'value': value,
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
   }
-  
+
   Future<String?> getSyncMeta(String key) async {
     final db = await database;
     final results = await db.query(
@@ -436,29 +467,31 @@ class OfflineCacheService {
       whereArgs: [key],
       limit: 1,
     );
-    
+
     if (results.isEmpty) return null;
     return results.first['value'] as String?;
   }
-  
+
   /// Get last sync time for faculty
   Future<DateTime?> getLastFacultySync() async {
     if (kIsWeb) {
       try {
         final prefs = await SharedPreferences.getInstance();
         final value = prefs.getString('faculty_last_sync');
-        if (value != null) return DateTime.fromMillisecondsSinceEpoch(int.parse(value));
+        if (value != null) {
+          return DateTime.fromMillisecondsSinceEpoch(int.parse(value));
+        }
       } catch (_) {}
       return null;
     }
-    
+
     final value = await getSyncMeta('faculty_last_sync');
     if (value == null) return null;
     return DateTime.fromMillisecondsSinceEpoch(int.parse(value));
   }
-  
+
   // ==================== WEB JSON HELPERS ====================
-  
+
   /// Convert UserModel to JSON map for web caching
   Map<String, dynamic> _userToJson(UserModel user) {
     return {
@@ -477,7 +510,7 @@ class OfflineCacheService {
       'isTrackingEnabled': user.isTrackingEnabled,
     };
   }
-  
+
   /// Create UserModel from JSON map for web cache
   UserModel _userFromJson(Map<String, dynamic> json) {
     return UserModel(
@@ -491,13 +524,15 @@ class OfflineCacheService {
       photoUrl: json['photoUrl'] as String?,
       phoneNumber: json['phoneNumber'] as String?,
       campusId: json['campusId'] as String? ?? 'isulan',
-      availabilityStatus: _parseAvailabilityStatus(json['availabilityStatus'] as String?),
+      availabilityStatus: _parseAvailabilityStatus(
+        json['availabilityStatus'] as String?,
+      ),
       customStatusMessage: json['customStatusMessage'] as String?,
       isTrackingEnabled: json['isTrackingEnabled'] as bool? ?? false,
       createdAt: DateTime.now(),
     );
   }
-  
+
   /// Clear all cached data
   Future<void> clearCache() async {
     if (kIsWeb) {
@@ -512,7 +547,7 @@ class OfflineCacheService {
       debugPrint('🗑️ Web cache cleared');
       return;
     }
-    
+
     final db = await database;
     await db.delete('faculty_cache');
     await db.delete('location_cache');
@@ -525,7 +560,7 @@ class OfflineCacheService {
 
   // Web in-memory pending operations
   final List<Map<String, dynamic>> _webPendingOps = [];
-  
+
   /// Queue a Firestore write operation for later sync
   /// [collection] — Firestore collection name
   /// [docId] — Document ID (null for auto-generated)
@@ -541,13 +576,15 @@ class OfflineCacheService {
     if (_isOnline) {
       try {
         await _executeFirestoreOp(collection, docId, operation, data);
-        debugPrint('✅ Executed operation immediately: $operation on $collection/$docId');
+        debugPrint(
+          '✅ Executed operation immediately: $operation on $collection/$docId',
+        );
         return;
       } catch (e) {
         debugPrint('⚠️ Immediate write failed, queuing: $e');
       }
     }
-    
+
     final entry = {
       'collection': collection,
       'doc_id': docId,
@@ -566,26 +603,28 @@ class OfflineCacheService {
       debugPrint('📝 Queued operation (web): $operation on $collection/$docId');
       return;
     }
-    
+
     final db = await database;
     await db.insert('pending_operations', entry);
     debugPrint('📝 Queued operation: $operation on $collection/$docId');
   }
-  
+
   /// Get count of pending operations
   Future<int> getPendingCount() async {
     if (kIsWeb) return _webPendingOps.length;
     final db = await database;
-    final result = await db.rawQuery('SELECT COUNT(*) as cnt FROM pending_operations');
+    final result = await db.rawQuery(
+      'SELECT COUNT(*) as cnt FROM pending_operations',
+    );
     return Sqflite.firstIntValue(result) ?? 0;
   }
-  
+
   /// Sync all pending operations to Firestore
   Future<int> syncPendingOperations() async {
     if (!_isOnline) return 0;
-    
+
     int synced = 0;
-    
+
     if (kIsWeb) {
       final ops = List<Map<String, dynamic>>.from(_webPendingOps);
       for (final op in ops) {
@@ -614,16 +653,19 @@ class OfflineCacheService {
         if (_webPendingOps.isEmpty) {
           await prefs.remove('pending_operations');
         } else {
-          await prefs.setString('pending_operations', jsonEncode(_webPendingOps));
+          await prefs.setString(
+            'pending_operations',
+            jsonEncode(_webPendingOps),
+          );
         }
       } catch (_) {}
       debugPrint('🔄 Web sync complete: $synced operations synced');
       return synced;
     }
-    
+
     final db = await database;
     final ops = await db.query('pending_operations', orderBy: 'created_at ASC');
-    
+
     for (final op in ops) {
       try {
         final data = jsonDecode(op['data'] as String) as Map<String, dynamic>;
@@ -633,13 +675,21 @@ class OfflineCacheService {
           op['operation'] as String,
           data,
         );
-        await db.delete('pending_operations', where: 'id = ?', whereArgs: [op['id']]);
+        await db.delete(
+          'pending_operations',
+          where: 'id = ?',
+          whereArgs: [op['id']],
+        );
         synced++;
       } catch (e) {
         debugPrint('⚠️ Sync failed for op ${op['id']}: $e');
         final retries = (op['retries'] as int? ?? 0) + 1;
         if (retries >= 5) {
-          await db.delete('pending_operations', where: 'id = ?', whereArgs: [op['id']]);
+          await db.delete(
+            'pending_operations',
+            where: 'id = ?',
+            whereArgs: [op['id']],
+          );
           debugPrint('🗑️ Dropped op ${op['id']} after 5 retries');
         } else {
           await db.update(
@@ -651,11 +701,11 @@ class OfflineCacheService {
         }
       }
     }
-    
+
     debugPrint('🔄 Sync complete: $synced/${ops.length} operations synced');
     return synced;
   }
-  
+
   /// Execute a single Firestore operation
   Future<void> _executeFirestoreOp(
     String collection,
@@ -664,11 +714,14 @@ class OfflineCacheService {
     Map<String, dynamic> data,
   ) async {
     final firestore = FirebaseFirestore.instance;
-    
+
     switch (operation) {
       case 'set':
         if (docId != null) {
-          await firestore.collection(collection).doc(docId).set(data, SetOptions(merge: true));
+          await firestore
+              .collection(collection)
+              .doc(docId)
+              .set(data, SetOptions(merge: true));
         } else {
           await firestore.collection(collection).add(data);
         }

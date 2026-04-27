@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user_model.dart';
 import '../services/auth_service.dart';
 import '../services/database_service.dart';
@@ -7,22 +9,21 @@ import '../services/database_service.dart';
 /// Authentication Provider for state management
 class AuthProvider extends ChangeNotifier {
   final AuthService _authService;
-  // ignore: unused_field
-  final DatabaseService _databaseService;
   StreamSubscription? _authStateSubscription;
-  
+  bool _isSigningIn =
+      false; // Guard to prevent auth listener interference during sign-in
+
   AuthProvider({
     required AuthService authService,
-    required DatabaseService databaseService,
-  }) : _authService = authService,
-       _databaseService = databaseService {
+    DatabaseService? databaseService, // kept for backward compatibility
+  }) : _authService = authService {
     _init();
   }
-  
+
   UserModel? _user;
   bool _isLoading = true;
   String? _error;
-  
+
   // Getters
   UserModel? get user => _user;
   bool get isLoading => _isLoading;
@@ -32,36 +33,50 @@ class AuthProvider extends ChangeNotifier {
   bool get isStaff => _user?.isStaff ?? false;
   bool get isAdmin => _user?.isAdmin ?? false;
   UserRole? get role => _user?.role;
-  
+
   /// Reset loading state (useful for timeout recovery)
   void resetLoading() {
     _isLoading = false;
     notifyListeners();
   }
-  
+
   /// Initialize - check if user is already logged in and listen for auth changes
   void _init() {
     _checkAuthState();
     _listenToAuthChanges();
   }
-  
-  /// Listen to Firebase Auth state changes as a safety net
-  /// If signIn() hangs but Firebase Auth succeeds, this picks it up
+
+  /// Listen to Firebase Auth state changes as a safety net.
+  /// Always refreshes the user profile from Firestore when Firebase auth
+  /// fires, ensuring stale or fallback user data is corrected.
   void _listenToAuthChanges() {
-    _authStateSubscription = _authService.authStateChanges.listen((firebaseUser) async {
-      if (firebaseUser != null && _user == null && !_isLoading) {
-        // Firebase says we're authenticated but provider doesn't know yet
-        debugPrint('Auth state listener: Firebase user detected, loading profile...');
+    _authStateSubscription = _authService.authStateChanges.listen((
+      firebaseUser,
+    ) async {
+      // Skip if we're in the middle of signIn() — it handles its own state
+      if (_isSigningIn) {
+        debugPrint('Auth state listener: skipping (signIn in progress)');
+        return;
+      }
+      if (firebaseUser != null && !_isLoading) {
+        // Always refresh profile from Firestore — this corrects stale/fallback data
+        debugPrint(
+          'Auth state listener: Firebase user detected, refreshing profile...',
+        );
         try {
-          _user = await _authService.getCurrentUserModel().timeout(
-            const Duration(seconds: 8),
+          final freshUser = await _authService.getCurrentUserModel().timeout(
+            const Duration(seconds: 10),
             onTimeout: () {
               debugPrint('Auth listener: getCurrentUserModel timed out');
               return null;
             },
           );
-          if (_user != null) {
-            debugPrint('Auth listener: Profile loaded for ${_user!.fullName}');
+          if (freshUser != null &&
+              (freshUser.role != _user?.role || _user == null)) {
+            _user = freshUser;
+            debugPrint(
+              'Auth listener: Profile refreshed for ${_user!.fullName} (role: ${_user!.role})',
+            );
             notifyListeners();
           }
         } catch (e) {
@@ -74,11 +89,11 @@ class AuthProvider extends ChangeNotifier {
       }
     });
   }
-  
+
   Future<void> _checkAuthState() async {
     _isLoading = true;
     notifyListeners();
-    
+
     try {
       final firebaseUser = _authService.currentUser;
       if (firebaseUser != null) {
@@ -90,15 +105,17 @@ class AuthProvider extends ChangeNotifier {
             return null;
           },
         );
-        
+
         // If user document doesn't exist, create one (legacy user migration)
-        _user ??= await _authService.createUserDocumentForLegacyUser(firebaseUser).timeout(
-            const Duration(seconds: 10),
-            onTimeout: () {
-              debugPrint('createUserDocumentForLegacyUser timed out');
-              return null;
-            },
-          );
+        _user ??= await _authService
+            .createUserDocumentForLegacyUser(firebaseUser)
+            .timeout(
+              const Duration(seconds: 10),
+              onTimeout: () {
+                debugPrint('createUserDocumentForLegacyUser timed out');
+                return null;
+              },
+            );
       }
     } catch (e) {
       _error = e.toString();
@@ -108,32 +125,44 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
     }
   }
-  
+
   /// Sign in with email and password
-  Future<bool> signIn({
-    required String email,
-    required String password,
-  }) async {
+  Future<bool> signIn({required String email, required String password}) async {
     _isLoading = true;
+    _isSigningIn = true;
     _error = null;
     notifyListeners();
-    
+
     try {
       _user = await _authService.signInWithEmailPassword(
         email: email,
         password: password,
       );
       _isLoading = false;
+      _isSigningIn = false;
       notifyListeners();
+
+      // Web workaround: Firebase's internal credential change handler fires
+      // synchronously during signIn, which can cause Provider's rebuild
+      // notification to be dropped on the same microtask. Schedule a guaranteed
+      // post-frame re-notification to ensure AuthWrapper Consumer rebuilds.
+      if (_user != null && kIsWeb) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          debugPrint('🔄 Post-frame notifyListeners (web workaround)');
+          notifyListeners();
+        });
+      }
+
       return _user != null;
     } catch (e) {
       _error = e.toString();
       _isLoading = false;
+      _isSigningIn = false;
       notifyListeners();
       return false;
     }
   }
-  
+
   /// Register new user
   Future<bool> register({
     required String email,
@@ -146,9 +175,10 @@ class AuthProvider extends ChangeNotifier {
     String campusId = 'isulan', // Default campus
   }) async {
     _isLoading = true;
+    _isSigningIn = true;
     _error = null;
     notifyListeners();
-    
+
     try {
       _user = await _authService.registerWithEmailPassword(
         email: email,
@@ -161,16 +191,25 @@ class AuthProvider extends ChangeNotifier {
         campusId: campusId,
       );
       _isLoading = false;
+      _isSigningIn = false;
       notifyListeners();
+
+      if (_user != null && kIsWeb) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          notifyListeners();
+        });
+      }
+
       return _user != null;
     } catch (e) {
       _error = e.toString();
       _isLoading = false;
+      _isSigningIn = false;
       notifyListeners();
       return false;
     }
   }
-  
+
   /// Update user profile
   Future<void> updateProfile(UserModel updatedUser) async {
     try {
@@ -182,13 +221,13 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
     }
   }
-  
+
   /// Send password reset email
   Future<bool> sendPasswordReset(String email) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
-    
+
     try {
       await _authService.sendPasswordResetEmail(email);
       _isLoading = false;
@@ -201,29 +240,38 @@ class AuthProvider extends ChangeNotifier {
       return false;
     }
   }
-  
+
   /// Sign out
   Future<void> signOut() async {
     await _authService.signOut();
     _user = null;
     _error = null;
+    // Reset first-login flag so next login gets a clean restart
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('has_logged_in_before');
     notifyListeners();
   }
-  
+
   /// Clear error
   void clearError() {
     _error = null;
     notifyListeners();
   }
-  
+
   /// Refresh user data
   Future<void> refreshUser() async {
     if (_authService.currentUser != null) {
       _user = await _authService.getCurrentUserModel();
+      // Force sign out if user was banned while logged in
+      if (_user != null && !_user!.isActive) {
+        debugPrint('User is banned — forcing sign out');
+        await signOut();
+        return;
+      }
       notifyListeners();
     }
   }
-  
+
   @override
   void dispose() {
     _authStateSubscription?.cancel();

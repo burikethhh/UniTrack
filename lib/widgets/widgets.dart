@@ -7,6 +7,7 @@ export 'common/faculty_card.dart';
 export 'common/loading_widget.dart' hide FacultyCardSkeleton;
 export 'common/skeleton_loaders.dart';
 export 'common/offline_banner.dart';
+export 'common/adaptive_scaffold.dart';
 export 'map/campus_map.dart';
 export 'map/campus_map_3d.dart';
 export 'map/faculty_map_sheet.dart';

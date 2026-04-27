@@ -11,34 +11,38 @@ class ConnectivityService {
 
   final _connectivityController = StreamController<bool>.broadcast();
   Stream<bool> get connectivityStream => _connectivityController.stream;
-  
+
   bool _isConnected = true;
   bool get isConnected => _isConnected;
-  
+
   Timer? _checkTimer;
   final Connectivity _connectivity = Connectivity();
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
-  
+
   /// Start monitoring connectivity (works on both web and mobile)
   void startMonitoring() {
     _checkConnectivity();
-    
+
     // Use connectivity_plus for real-time monitoring (supports web)
-    _connectivitySubscription = _connectivity.onConnectivityChanged.listen((results) {
+    _connectivitySubscription = _connectivity.onConnectivityChanged.listen((
+      results,
+    ) {
       final connected = !results.contains(ConnectivityResult.none);
       if (_isConnected != connected) {
         _isConnected = connected;
         _connectivityController.add(connected);
-        debugPrint('📶 Connectivity changed: ${connected ? "Online" : "Offline"}');
+        debugPrint(
+          '📶 Connectivity changed: ${connected ? "Online" : "Offline"}',
+        );
       }
     });
-    
+
     // Periodic check as backup
     _checkTimer = Timer.periodic(const Duration(seconds: 30), (_) {
       _checkConnectivity();
     });
   }
-  
+
   /// Stop monitoring
   void stopMonitoring() {
     _checkTimer?.cancel();
@@ -46,13 +50,13 @@ class ConnectivityService {
     _connectivitySubscription?.cancel();
     _connectivitySubscription = null;
   }
-  
+
   /// Check current connectivity using connectivity_plus (works on web)
   Future<bool> _checkConnectivity() async {
     try {
       final results = await _connectivity.checkConnectivity();
       final connected = !results.contains(ConnectivityResult.none);
-      
+
       if (_isConnected != connected) {
         _isConnected = connected;
         _connectivityController.add(connected);
@@ -63,10 +67,10 @@ class ConnectivityService {
       return _isConnected;
     }
   }
-  
+
   /// Force check connectivity now
   Future<bool> checkNow() => _checkConnectivity();
-  
+
   void dispose() {
     stopMonitoring();
     _connectivityController.close();
@@ -84,9 +88,9 @@ class OfflineBanner extends StatelessWidget {
       initialData: ConnectivityService().isConnected,
       builder: (context, snapshot) {
         final isOnline = snapshot.data ?? true;
-        
+
         if (isOnline) return const SizedBox.shrink();
-        
+
         return Container(
           width: double.infinity,
           padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
@@ -119,29 +123,29 @@ class OfflineBanner extends StatelessWidget {
 mixin ConnectivityAware<T extends StatefulWidget> on State<T> {
   StreamSubscription<bool>? _connectivitySubscription;
   bool _isOnline = true;
-  
+
   bool get isOnline => _isOnline;
-  
+
   @override
   void initState() {
     super.initState();
     _isOnline = ConnectivityService().isConnected;
-    _connectivitySubscription = ConnectivityService()
-        .connectivityStream
-        .listen((connected) {
-      if (mounted) {
-        setState(() => _isOnline = connected);
-        onConnectivityChanged(connected);
-      }
-    });
+    _connectivitySubscription = ConnectivityService().connectivityStream.listen(
+      (connected) {
+        if (mounted) {
+          setState(() => _isOnline = connected);
+          onConnectivityChanged(connected);
+        }
+      },
+    );
   }
-  
+
   @override
   void dispose() {
     _connectivitySubscription?.cancel();
     super.dispose();
   }
-  
+
   /// Override to handle connectivity changes
   void onConnectivityChanged(bool isConnected) {}
 }

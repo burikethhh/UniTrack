@@ -1,6 +1,4 @@
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
-import 'package:file_picker/file_picker.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../models/app_version_model.dart';
 import '../../services/update_service.dart';
@@ -11,15 +9,14 @@ class VersionManagementScreen extends StatefulWidget {
   const VersionManagementScreen({super.key});
 
   @override
-  State<VersionManagementScreen> createState() => _VersionManagementScreenState();
+  State<VersionManagementScreen> createState() =>
+      _VersionManagementScreenState();
 }
 
 class _VersionManagementScreenState extends State<VersionManagementScreen> {
   final UpdateService _updateService = UpdateService();
   List<AppVersion> _versions = [];
   bool _isLoading = true;
-  bool _isUploading = false;
-  double _uploadProgress = 0;
 
   @override
   void initState() {
@@ -87,7 +84,8 @@ class _VersionManagementScreenState extends State<VersionManagementScreen> {
           'versionName': '1.0.0',
           'versionCode': 100,
           'downloadUrl': '',
-          'releaseNotes': 'Initial release of UniTrack.\n- Real-time faculty location tracking\n- Student directory\n- Staff dashboard\n- Admin panel',
+          'releaseNotes':
+              'Initial release of UniTrack.\n- Real-time faculty location tracking\n- Student directory\n- Staff dashboard\n- Admin panel',
           'isRequired': false,
           'isActive': false,
           'releaseDate': Timestamp.fromDate(DateTime(2025, 12, 1)),
@@ -98,8 +96,10 @@ class _VersionManagementScreenState extends State<VersionManagementScreen> {
         {
           'versionName': '2.0.0',
           'versionCode': 200,
-          'downloadUrl': 'https://github.com/burikethhh/UniTrack/releases/download/v2.0.0/unitrack-latest.apk',
-          'releaseNotes': 'UniTrack 2.0 - Complete Overhaul!\n\n✨ New Features:\n- Animated splash screen\n- Enhanced location accuracy\n- Network connectivity monitoring\n- Password strength indicator\n\n🔧 Improvements:\n- Faster faculty refresh\n- Adaptive location tracking\n- Improved UI/UX',
+          'downloadUrl':
+              'https://github.com/burikethhh/UniTrack/releases/download/v2.0.0/unitrack-latest.apk',
+          'releaseNotes':
+              'UniTrack 2.0 - Complete Overhaul!\n\n✨ New Features:\n- Animated splash screen\n- Enhanced location accuracy\n- Network connectivity monitoring\n- Password strength indicator\n\n🔧 Improvements:\n- Faster faculty refresh\n- Adaptive location tracking\n- Improved UI/UX',
           'isRequired': false,
           'isActive': false,
           'releaseDate': Timestamp.fromDate(DateTime(2026, 1, 15)),
@@ -110,8 +110,10 @@ class _VersionManagementScreenState extends State<VersionManagementScreen> {
         {
           'versionName': '2.0.1',
           'versionCode': 201,
-          'downloadUrl': 'https://github.com/burikethhh/UniTrack/releases/download/v2.0.1/UniTrack-v2.0.1.apk',
-          'releaseNotes': 'UniTrack 2.0.1 - New Features!\n\n✨ New Features:\n- Offline Mode with SQLite caching\n- Faculty Availability Status\n- Onboarding Tutorial\n- Skeleton Loading animations\n- Push Notifications (FCM)',
+          'downloadUrl':
+              'https://github.com/burikethhh/UniTrack/releases/download/v2.0.1/UniTrack-v2.0.1.apk',
+          'releaseNotes':
+              'UniTrack 2.0.1 - New Features!\n\n✨ New Features:\n- Offline Mode with SQLite caching\n- Faculty Availability Status\n- Onboarding Tutorial\n- Skeleton Loading animations\n- Push Notifications (FCM)',
           'isRequired': false,
           'isActive': false,
           'releaseDate': Timestamp.fromDate(DateTime(2026, 2, 1)),
@@ -122,8 +124,10 @@ class _VersionManagementScreenState extends State<VersionManagementScreen> {
         {
           'versionName': '2.0.2',
           'versionCode': 202,
-          'downloadUrl': 'https://github.com/burikethhh/UniTrack/releases/download/v2.0.2/UniTrack-v2.0.2.apk',
-          'releaseNotes': '🔧 Hotfix Release\n\n- Fixed login crash caused by service initialization\n- Services now initialize gracefully with error handling',
+          'downloadUrl':
+              'https://github.com/burikethhh/UniTrack/releases/download/v2.0.2/UniTrack-v2.0.2.apk',
+          'releaseNotes':
+              '🔧 Hotfix Release\n\n- Fixed login crash caused by service initialization\n- Services now initialize gracefully with error handling',
           'isRequired': false,
           'isActive': false,
           'releaseDate': Timestamp.fromDate(DateTime(2026, 2, 1)),
@@ -134,8 +138,10 @@ class _VersionManagementScreenState extends State<VersionManagementScreen> {
         {
           'versionName': '2.0.3',
           'versionCode': 203,
-          'downloadUrl': 'https://github.com/burikethhh/UniTrack/releases/download/v2.0.3/UniTrack-v2.0.3.apk',
-          'releaseNotes': '🔧 Download Fix Release\n\n- In-app update download now works with GitHub releases\n- Properly handles HTTP redirects\n- Added file validation after download\n- Better error handling and logging',
+          'downloadUrl':
+              'https://github.com/burikethhh/UniTrack/releases/download/v2.0.3/UniTrack-v2.0.3.apk',
+          'releaseNotes':
+              '🔧 Download Fix Release\n\n- In-app update download now works with GitHub releases\n- Properly handles HTTP redirects\n- Added file validation after download\n- Better error handling and logging',
           'isRequired': false,
           'isActive': true,
           'releaseDate': Timestamp.fromDate(DateTime(2026, 2, 1)),
@@ -283,10 +289,14 @@ class _VersionManagementScreenState extends State<VersionManagementScreen> {
                               return _VersionCard(
                                 version: _versions[index],
                                 isLatest: index == 0,
-                                onToggleActive: () => _toggleActive(_versions[index]),
-                                onToggleRequired: () => _toggleRequired(_versions[index]),
-                                onSendNotification: () => _showNotificationDialog(_versions[index]),
-                                onDelete: () => _deleteVersion(_versions[index]),
+                                onToggleActive: () =>
+                                    _toggleActive(_versions[index]),
+                                onToggleRequired: () =>
+                                    _toggleRequired(_versions[index]),
+                                onSendNotification: () =>
+                                    _showNotificationDialog(_versions[index]),
+                                onDelete: () =>
+                                    _deleteVersion(_versions[index]),
                               );
                             },
                           ),
@@ -294,26 +304,12 @@ class _VersionManagementScreenState extends State<VersionManagementScreen> {
                 ),
               ],
             ),
-      floatingActionButton: _isUploading
-          ? FloatingActionButton.extended(
-              onPressed: null,
-              icon: SizedBox(
-                width: 24,
-                height: 24,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  value: _uploadProgress,
-                  color: Colors.white,
-                ),
-              ),
-              label: const Text('Adding...'),
-            )
-          : FloatingActionButton.extended(
-              heroTag: 'addVersion',
-              onPressed: _showAddVersionDialog,
-              icon: const Icon(Icons.add),
-              label: const Text('Add Version'),
-            ),
+      floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'addVersion',
+        onPressed: _showAddVersionDialog,
+        icon: const Icon(Icons.add),
+        label: const Text('Add Version'),
+      ),
     );
   }
 
@@ -332,7 +328,7 @@ class _VersionManagementScreenState extends State<VersionManagementScreen> {
     if (_versions.isNotEmpty) {
       final latestCode = _versions.first.versionCode;
       versionCodeController.text = (latestCode + 1).toString();
-      
+
       // Suggest next version name
       final latestName = _versions.first.versionName;
       final parts = latestName.split('.');
@@ -370,7 +366,10 @@ class _VersionManagementScreenState extends State<VersionManagementScreen> {
                     children: [
                       const Text(
                         'Download Source',
-                        style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 12,
+                        ),
                       ),
                       const SizedBox(height: 8),
                       Row(
@@ -381,7 +380,8 @@ class _VersionManagementScreenState extends State<VersionManagementScreen> {
                               label: 'GitHub',
                               sublabel: 'Free & Recommended',
                               isSelected: sourceType == 'github',
-                              onTap: () => setDialogState(() => sourceType = 'github'),
+                              onTap: () =>
+                                  setDialogState(() => sourceType = 'github'),
                             ),
                           ),
                           const SizedBox(width: 8),
@@ -396,7 +396,9 @@ class _VersionManagementScreenState extends State<VersionManagementScreen> {
                                 // Show coming soon message
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(
-                                    content: Text('Firebase Storage upload coming in future update!'),
+                                    content: Text(
+                                      'Firebase Storage upload coming in future update!',
+                                    ),
                                     duration: Duration(seconds: 2),
                                   ),
                                 );
@@ -413,6 +415,7 @@ class _VersionManagementScreenState extends State<VersionManagementScreen> {
                 // Version Name
                 TextField(
                   controller: versionNameController,
+                  onChanged: (_) => setDialogState(() {}),
                   decoration: const InputDecoration(
                     labelText: 'Version Name *',
                     hintText: 'e.g., 2.0.4',
@@ -426,12 +429,13 @@ class _VersionManagementScreenState extends State<VersionManagementScreen> {
                 TextField(
                   controller: versionCodeController,
                   keyboardType: TextInputType.number,
+                  onChanged: (_) => setDialogState(() {}),
                   decoration: InputDecoration(
                     labelText: 'Version Code *',
                     hintText: 'e.g., 204',
                     border: const OutlineInputBorder(),
                     prefixIcon: const Icon(Icons.code),
-                    helperText: _versions.isNotEmpty 
+                    helperText: _versions.isNotEmpty
                         ? 'Current latest: ${_versions.first.versionCode}'
                         : 'Must be higher than previous version',
                   ),
@@ -441,9 +445,11 @@ class _VersionManagementScreenState extends State<VersionManagementScreen> {
                 // GitHub Download URL
                 TextField(
                   controller: downloadUrlController,
+                  onChanged: (_) => setDialogState(() {}),
                   decoration: InputDecoration(
                     labelText: 'GitHub Release URL *',
-                    hintText: 'https://github.com/.../releases/download/v.../app.apk',
+                    hintText:
+                        'https://github.com/.../releases/download/v.../app.apk',
                     border: const OutlineInputBorder(),
                     prefixIcon: const Icon(Icons.download),
                     helperText: 'Direct APK download link from GitHub Releases',
@@ -471,7 +477,9 @@ class _VersionManagementScreenState extends State<VersionManagementScreen> {
                 // Required Update Toggle
                 SwitchListTile(
                   title: const Text('Required Update'),
-                  subtitle: const Text('Force users to update before using app'),
+                  subtitle: const Text(
+                    'Force users to update before using app',
+                  ),
                   value: isRequired,
                   onChanged: (v) => setDialogState(() => isRequired = v),
                   contentPadding: EdgeInsets.zero,
@@ -487,37 +495,45 @@ class _VersionManagementScreenState extends State<VersionManagementScreen> {
             ElevatedButton.icon(
               icon: const Icon(Icons.add),
               label: const Text('Add Version'),
-              onPressed: downloadUrlController.text.isEmpty ||
+              onPressed:
+                  downloadUrlController.text.isEmpty ||
                       versionNameController.text.isEmpty ||
                       versionCodeController.text.isEmpty
                   ? null
                   : () async {
                       // Validate URL format
                       final url = downloadUrlController.text.trim();
-                      if (!url.startsWith('http://') && !url.startsWith('https://')) {
+                      if (!url.startsWith('http://') &&
+                          !url.startsWith('https://')) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                            content: Text('Please enter a valid URL starting with http:// or https://'),
+                            content: Text(
+                              'Please enter a valid URL starting with http:// or https://',
+                            ),
                             backgroundColor: Colors.red,
                           ),
                         );
                         return;
                       }
-                      
+
                       // Validate version code
                       final code = int.tryParse(versionCodeController.text);
-                      if (code == null || (_versions.isNotEmpty && code <= _versions.first.versionCode)) {
+                      if (code == null ||
+                          (_versions.isNotEmpty &&
+                              code <= _versions.first.versionCode)) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
-                            content: Text(_versions.isNotEmpty 
-                                ? 'Version code must be greater than ${_versions.first.versionCode}'
-                                : 'Please enter a valid version code'),
+                            content: Text(
+                              _versions.isNotEmpty
+                                  ? 'Version code must be greater than ${_versions.first.versionCode}'
+                                  : 'Please enter a valid version code',
+                            ),
                             backgroundColor: Colors.red,
                           ),
                         );
                         return;
                       }
-                      
+
                       Navigator.pop(ctx);
                       await _addVersionFromUrl(
                         versionName: versionNameController.text.trim(),
@@ -626,299 +642,6 @@ class _VersionManagementScreenState extends State<VersionManagementScreen> {
     );
   }
 
-  // ignore: unused_element
-  void _showUploadDialog() {
-    final versionNameController = TextEditingController();
-    final versionCodeController = TextEditingController();
-    final releaseNotesController = TextEditingController();
-    Uint8List? selectedBytes;
-    String? selectedFileName;
-    bool isRequired = false;
-
-    showDialog(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Row(
-            children: [
-              Icon(Icons.upload_file, color: Colors.blue),
-              SizedBox(width: 8),
-              Text('Upload New Version'),
-            ],
-          ),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Version Name
-                TextField(
-                  controller: versionNameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Version Name *',
-                    hintText: 'e.g., 2.1.0',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.tag),
-                  ),
-                ),
-                const SizedBox(height: 16),
-
-                // Version Code
-                TextField(
-                  controller: versionCodeController,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'Version Code *',
-                    hintText: 'e.g., 210',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.code),
-                    helperText: 'Must be higher than previous version',
-                  ),
-                ),
-                const SizedBox(height: 16),
-
-                // Release Notes
-                TextField(
-                  controller: releaseNotesController,
-                  maxLines: 3,
-                  decoration: const InputDecoration(
-                    labelText: 'Release Notes',
-                    hintText: 'What\'s new in this version...',
-                    border: OutlineInputBorder(),
-                    alignLabelWithHint: true,
-                  ),
-                ),
-                const SizedBox(height: 16),
-
-                // APK File Picker (works on both web and mobile)
-                InkWell(
-                  onTap: () async {
-                    final result = await FilePicker.platform.pickFiles(
-                      type: FileType.custom,
-                      allowedExtensions: ['apk'],
-                      withData: true, // Get bytes for web compatibility
-                    );
-                    if (result != null && result.files.single.bytes != null) {
-                      setDialogState(() {
-                        selectedBytes = result.files.single.bytes;
-                        selectedFileName = result.files.single.name;
-                      });
-                    }
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      border: Border.all(
-                        color: selectedBytes != null ? Colors.green : Colors.grey,
-                        width: selectedBytes != null ? 2 : 1,
-                      ),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          selectedBytes != null ? Icons.check_circle : Icons.android,
-                          color: selectedBytes != null ? Colors.green : Colors.grey,
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            selectedBytes != null
-                                ? '${selectedFileName ?? "APK"} (${(selectedBytes!.length / 1024 / 1024).toStringAsFixed(1)} MB)'
-                                : 'Select APK file',
-                            style: TextStyle(
-                              color: selectedBytes != null ? Colors.green : Colors.grey,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-
-                // Required Update Toggle
-                SwitchListTile(
-                  title: const Text('Required Update'),
-                  subtitle: const Text('Force users to update'),
-                  value: isRequired,
-                  onChanged: (v) => setDialogState(() => isRequired = v),
-                  contentPadding: EdgeInsets.zero,
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton.icon(
-              icon: const Icon(Icons.cloud_upload),
-              label: const Text('Upload'),
-              onPressed: selectedBytes == null ||
-                      versionNameController.text.isEmpty ||
-                      versionCodeController.text.isEmpty
-                  ? null
-                  : () async {
-                      Navigator.pop(ctx);
-                      await _uploadVersionFromBytes(
-                        versionName: versionNameController.text,
-                        versionCode: int.tryParse(versionCodeController.text) ?? 0,
-                        releaseNotes: releaseNotesController.text,
-                        fileBytes: selectedBytes!,
-                        fileName: selectedFileName ?? 'UniTrack.apk',
-                        isRequired: isRequired,
-                      );
-                    },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// Show dialog to add version from GitHub URL (Free plan friendly!)
-  // ignore: unused_element
-  void _showGitHubUrlDialog() {
-    final versionNameController = TextEditingController();
-    final versionCodeController = TextEditingController();
-    final releaseNotesController = TextEditingController();
-    final downloadUrlController = TextEditingController();
-    bool isRequired = false;
-
-    showDialog(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Row(
-            children: [
-              Icon(Icons.link, color: Colors.blue),
-              SizedBox(width: 8),
-              Text('Add from GitHub'),
-            ],
-          ),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Info banner
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.blue.shade50,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.blue.shade200),
-                  ),
-                  child: const Row(
-                    children: [
-                      Icon(Icons.info, color: Colors.blue, size: 20),
-                      SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'Recommended for Firebase free plan! Host APK on GitHub and link here.',
-                          style: TextStyle(fontSize: 12, color: Colors.blue),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-
-                // Version Name
-                TextField(
-                  controller: versionNameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Version Name *',
-                    hintText: 'e.g., 2.0.1',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.tag),
-                  ),
-                ),
-                const SizedBox(height: 16),
-
-                // Version Code
-                TextField(
-                  controller: versionCodeController,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'Version Code *',
-                    hintText: 'e.g., 201',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.code),
-                    helperText: 'Must be higher than previous version',
-                  ),
-                ),
-                const SizedBox(height: 16),
-
-                // GitHub Download URL
-                TextField(
-                  controller: downloadUrlController,
-                  decoration: const InputDecoration(
-                    labelText: 'GitHub Download URL *',
-                    hintText: 'https://github.com/.../releases/download/...',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.download),
-                    helperText: 'Direct APK download link from GitHub Releases',
-                  ),
-                ),
-                const SizedBox(height: 16),
-
-                // Release Notes
-                TextField(
-                  controller: releaseNotesController,
-                  maxLines: 3,
-                  decoration: const InputDecoration(
-                    labelText: 'Release Notes',
-                    hintText: 'What\'s new in this version...',
-                    border: OutlineInputBorder(),
-                    alignLabelWithHint: true,
-                  ),
-                ),
-                const SizedBox(height: 16),
-
-                // Required Update Toggle
-                SwitchListTile(
-                  title: const Text('Required Update'),
-                  subtitle: const Text('Force users to update'),
-                  value: isRequired,
-                  onChanged: (v) => setDialogState(() => isRequired = v),
-                  contentPadding: EdgeInsets.zero,
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton.icon(
-              icon: const Icon(Icons.add),
-              label: const Text('Add Version'),
-              onPressed: downloadUrlController.text.isEmpty ||
-                      versionNameController.text.isEmpty ||
-                      versionCodeController.text.isEmpty
-                  ? null
-                  : () async {
-                      Navigator.pop(ctx);
-                      await _addVersionFromUrl(
-                        versionName: versionNameController.text,
-                        versionCode: int.tryParse(versionCodeController.text) ?? 0,
-                        downloadUrl: downloadUrlController.text,
-                        releaseNotes: releaseNotesController.text,
-                        isRequired: isRequired,
-                      );
-                    },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   /// Add version entry with GitHub URL (no upload needed)
   Future<void> _addVersionFromUrl({
     required String versionName,
@@ -931,7 +654,7 @@ class _VersionManagementScreenState extends State<VersionManagementScreen> {
 
     try {
       final firestore = FirebaseFirestore.instance;
-      
+
       // Create version document with GitHub URL
       await firestore.collection('app_versions').add({
         'versionName': versionName,
@@ -981,58 +704,6 @@ class _VersionManagementScreenState extends State<VersionManagementScreen> {
     setState(() => _isLoading = false);
   }
 
-  Future<void> _uploadVersionFromBytes({
-    required String versionName,
-    required int versionCode,
-    required String releaseNotes,
-    required Uint8List fileBytes,
-    required String fileName,
-    required bool isRequired,
-  }) async {
-    setState(() {
-      _isUploading = true;
-      _uploadProgress = 0;
-    });
-
-    final result = await _updateService.uploadNewVersionFromBytes(
-      versionName: versionName,
-      versionCode: versionCode,
-      fileBytes: fileBytes,
-      fileName: 'UniTrack_v$versionName.apk',
-      releaseNotes: releaseNotes.isNotEmpty ? releaseNotes : null,
-      isRequired: isRequired,
-      onProgress: (progress) {
-        setState(() => _uploadProgress = progress);
-      },
-    );
-
-    setState(() => _isUploading = false);
-
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              Icon(
-                result != null ? Icons.check_circle : Icons.error,
-                color: Colors.white,
-              ),
-              const SizedBox(width: 8),
-              Text(result != null
-                  ? 'Version $versionName uploaded successfully!'
-                  : 'Failed to upload version'),
-            ],
-          ),
-          backgroundColor: result != null ? Colors.green : Colors.red,
-        ),
-      );
-
-      if (result != null) {
-        _loadVersions();
-      }
-    }
-  }
-
   Future<void> _toggleActive(AppVersion version) async {
     final success = await _updateService.toggleVersionActive(
       version.id,
@@ -1054,7 +725,9 @@ class _VersionManagementScreenState extends State<VersionManagementScreen> {
       text: 'Update Available: v${version.versionName}',
     );
     final messageController = TextEditingController(
-      text: version.releaseNotes ?? 'A new version of UniTrack is available. Update now for the latest features and improvements!',
+      text:
+          version.releaseNotes ??
+          'A new version of UniTrack is available. Update now for the latest features and improvements!',
     );
 
     showDialog(
@@ -1136,9 +809,11 @@ class _VersionManagementScreenState extends State<VersionManagementScreen> {
                 color: Colors.white,
               ),
               const SizedBox(width: 8),
-              Text(success
-                  ? 'Notification sent to all users!'
-                  : 'Failed to send notification'),
+              Text(
+                success
+                    ? 'Notification sent to all users!'
+                    : 'Failed to send notification',
+              ),
             ],
           ),
           backgroundColor: success ? Colors.green : Colors.red,
@@ -1233,13 +908,18 @@ class _VersionCard extends StatelessWidget {
               color: version.isActive
                   ? (isLatest ? theme.colorScheme.primaryContainer : null)
                   : Colors.grey.shade200,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(12),
+              ),
             ),
             child: Row(
               children: [
                 // Version badge
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
                     color: version.isActive ? Colors.green : Colors.grey,
                     borderRadius: BorderRadius.circular(20),
@@ -1255,7 +935,10 @@ class _VersionCard extends StatelessWidget {
                 const SizedBox(width: 8),
                 if (isLatest)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.blue,
                       borderRadius: BorderRadius.circular(12),
@@ -1272,7 +955,10 @@ class _VersionCard extends StatelessWidget {
                 if (version.isRequired)
                   Container(
                     margin: const EdgeInsets.only(left: 8),
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.red,
                       borderRadius: BorderRadius.circular(12),
@@ -1310,8 +996,12 @@ class _VersionCard extends StatelessWidget {
                       child: Row(
                         children: [
                           Icon(
-                            version.isActive ? Icons.visibility_off : Icons.visibility,
-                            color: version.isActive ? Colors.grey : Colors.green,
+                            version.isActive
+                                ? Icons.visibility_off
+                                : Icons.visibility,
+                            color: version.isActive
+                                ? Colors.grey
+                                : Colors.green,
                           ),
                           const SizedBox(width: 8),
                           Text(version.isActive ? 'Deactivate' : 'Activate'),
@@ -1324,10 +1014,16 @@ class _VersionCard extends StatelessWidget {
                         children: [
                           Icon(
                             version.isRequired ? Icons.lock_open : Icons.lock,
-                            color: version.isRequired ? Colors.grey : Colors.orange,
+                            color: version.isRequired
+                                ? Colors.grey
+                                : Colors.orange,
                           ),
                           const SizedBox(width: 8),
-                          Text(version.isRequired ? 'Make Optional' : 'Make Required'),
+                          Text(
+                            version.isRequired
+                                ? 'Make Optional'
+                                : 'Make Required',
+                          ),
                         ],
                       ),
                     ),
@@ -1388,11 +1084,18 @@ class _VersionCard extends StatelessWidget {
                 // Release date
                 Row(
                   children: [
-                    Icon(Icons.calendar_today, size: 16, color: Colors.grey.shade600),
+                    Icon(
+                      Icons.calendar_today,
+                      size: 16,
+                      color: Colors.grey.shade600,
+                    ),
                     const SizedBox(width: 4),
                     Text(
                       'Released: ${_formatDate(version.releaseDate)}',
-                      style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+                      style: TextStyle(
+                        color: Colors.grey.shade600,
+                        fontSize: 13,
+                      ),
                     ),
                   ],
                 ),
@@ -1476,18 +1179,18 @@ class _SourceOption extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      onTap: isDisabled ? onTap : onTap, // Show message even if disabled
+      onTap: isDisabled ? null : onTap,
       borderRadius: BorderRadius.circular(8),
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: isSelected 
-              ? Colors.blue.shade50 
+          color: isSelected
+              ? Colors.blue.shade50
               : (isDisabled ? Colors.grey.shade50 : Colors.white),
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: isSelected 
-                ? Colors.blue 
+            color: isSelected
+                ? Colors.blue
                 : (isDisabled ? Colors.grey.shade300 : Colors.grey.shade400),
             width: isSelected ? 2 : 1,
           ),
@@ -1495,9 +1198,9 @@ class _SourceOption extends StatelessWidget {
         child: Column(
           children: [
             Icon(
-              icon, 
-              color: isSelected 
-                  ? Colors.blue 
+              icon,
+              color: isSelected
+                  ? Colors.blue
                   : (isDisabled ? Colors.grey.shade400 : Colors.grey.shade600),
               size: 24,
             ),
@@ -1507,9 +1210,11 @@ class _SourceOption extends StatelessWidget {
               style: TextStyle(
                 fontWeight: FontWeight.w600,
                 fontSize: 12,
-                color: isSelected 
-                    ? Colors.blue.shade700 
-                    : (isDisabled ? Colors.grey.shade500 : Colors.grey.shade700),
+                color: isSelected
+                    ? Colors.blue.shade700
+                    : (isDisabled
+                          ? Colors.grey.shade500
+                          : Colors.grey.shade700),
               ),
             ),
             Text(

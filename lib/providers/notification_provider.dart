@@ -7,13 +7,17 @@ import '../services/notification_service.dart';
 /// Provider for managing notifications state
 class NotificationProvider extends ChangeNotifier {
   final NotificationService _notificationService;
-  
+
   List<AppNotification> _notifications = [];
   int _unreadCount = 0;
   bool _isLoading = false;
   String? _error;
   String? _currentUserId;
-  
+
+  /// Track known notification IDs to detect new arrivals for toast display
+  Set<String> _knownNotificationIds = {};
+  bool _isFirstLoad = true;
+
   StreamSubscription? _notificationsSubscription;
   StreamSubscription? _unreadCountSubscription;
 
@@ -21,7 +25,7 @@ class NotificationProvider extends ChangeNotifier {
 
   // Getters
   List<AppNotification> get notifications => _notifications;
-  List<AppNotification> get unreadNotifications => 
+  List<AppNotification> get unreadNotifications =>
       _notifications.where((n) => !n.isRead).toList();
   int get unreadCount => _unreadCount;
   bool get isLoading => _isLoading;
@@ -31,49 +35,64 @@ class NotificationProvider extends ChangeNotifier {
   /// Initialize notifications for a user
   Future<void> initialize(String userId) async {
     if (_currentUserId == userId) return;
-    
+
     _currentUserId = userId;
     _isLoading = true;
     _error = null;
+    _isFirstLoad = true;
+    _knownNotificationIds = {};
     notifyListeners();
 
     try {
-      // Initialize the notification service
+      // Initialize the notification service (local notification setup)
       await _notificationService.initialize();
-      
-      // Start listening for push notifications
-      _notificationService.startListening(userId);
-      
-      // Subscribe to notifications stream
+
+      // Subscribe to notifications stream (replaces separate startListening)
       _notificationsSubscription?.cancel();
       _notificationsSubscription = _notificationService
           .getNotificationsStream(userId)
           .listen(
-        (notifications) {
-          _notifications = notifications;
-          _isLoading = false;
-          notifyListeners();
-        },
-        onError: (e) {
-          _error = 'Failed to load notifications';
-          _isLoading = false;
-          notifyListeners();
-        },
-      );
+            (notifications) {
+              // Detect newly arrived notifications for toast display
+              if (_isFirstLoad) {
+                // First load — populate known IDs, don't show toasts
+                _knownNotificationIds = notifications.map((n) => n.id).toSet();
+                _isFirstLoad = false;
+              } else {
+                // Subsequent updates — show toast for new unread notifications
+                for (final notification in notifications) {
+                  if (!_knownNotificationIds.contains(notification.id) &&
+                      !notification.isRead) {
+                    _notificationService.showNotificationAlert(notification);
+                  }
+                }
+                _knownNotificationIds = notifications.map((n) => n.id).toSet();
+              }
+
+              _notifications = notifications;
+              _isLoading = false;
+              notifyListeners();
+            },
+            onError: (e) {
+              _error = 'Failed to load notifications';
+              _isLoading = false;
+              notifyListeners();
+            },
+          );
 
       // Subscribe to unread count stream
       _unreadCountSubscription?.cancel();
       _unreadCountSubscription = _notificationService
           .getUnreadCountStream(userId)
           .listen(
-        (count) {
-          _unreadCount = count;
-          notifyListeners();
-        },
-        onError: (e) {
-          debugPrint('Error getting unread count: $e');
-        },
-      );
+            (count) {
+              _unreadCount = count;
+              notifyListeners();
+            },
+            onError: (e) {
+              debugPrint('Error getting unread count: $e');
+            },
+          );
     } catch (e) {
       _error = 'Failed to initialize notifications';
       _isLoading = false;
@@ -94,7 +113,7 @@ class NotificationProvider extends ChangeNotifier {
         student.id,
         staffId,
       );
-      
+
       if (hasRecent) {
         _error = 'Please wait 5 minutes before pinging again';
         notifyListeners();
@@ -159,6 +178,9 @@ class NotificationProvider extends ChangeNotifier {
     _currentUserId = null;
     _notifications = [];
     _unreadCount = 0;
+    _knownNotificationIds = {};
+    _isFirstLoad = true;
+    notifyListeners();
   }
 
   @override

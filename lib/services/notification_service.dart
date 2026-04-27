@@ -7,14 +7,16 @@ import '../models/notification_model.dart';
 import '../models/user_model.dart';
 
 /// Global navigator key for showing in-app notifications on web
-final GlobalKey<NavigatorState> notificationNavigatorKey = GlobalKey<NavigatorState>();
+final GlobalKey<NavigatorState> notificationNavigatorKey =
+    GlobalKey<NavigatorState>();
 
 /// Service for handling notifications between students and staff
 class NotificationService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   // Lazy init — FlutterLocalNotificationsPlugin has no web implementation
-  late final FlutterLocalNotificationsPlugin _localNotifications = FlutterLocalNotificationsPlugin();
-  
+  late final FlutterLocalNotificationsPlugin _localNotifications =
+      FlutterLocalNotificationsPlugin();
+
   StreamSubscription? _notificationSubscription;
 
   /// Initialize local notifications
@@ -24,19 +26,21 @@ class NotificationService {
       debugPrint('📱 Using in-app notifications for web');
       return;
     }
-    
-    const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
+
+    const androidSettings = AndroidInitializationSettings(
+      '@mipmap/ic_launcher',
+    );
     const iosSettings = DarwinInitializationSettings(
       requestAlertPermission: true,
       requestBadgePermission: true,
       requestSoundPermission: true,
     );
-    
+
     const initSettings = InitializationSettings(
       android: androidSettings,
       iOS: iosSettings,
     );
-    
+
     await _localNotifications.initialize(
       initSettings,
       onDidReceiveNotificationResponse: _onNotificationTapped,
@@ -53,24 +57,36 @@ class NotificationService {
   /// Note: Using client-side filtering to avoid composite index requirement
   void startListening(String userId) {
     _notificationSubscription?.cancel();
-    
+
+    bool isFirstSnapshot = true;
+
     _notificationSubscription = _firestore
         .collection('notifications')
         .where('recipientId', isEqualTo: userId)
         .snapshots()
-        .listen((snapshot) {
-      for (final change in snapshot.docChanges) {
-        if (change.type == DocumentChangeType.added) {
-          final notification = AppNotification.fromFirestore(change.doc);
-          // Only show local notification for unread notifications
-          if (!notification.isRead) {
-            _showLocalNotification(notification);
-          }
-        }
-      }
-    }, onError: (e) {
-      debugPrint('Error listening to notifications: $e');
-    });
+        .listen(
+          (snapshot) {
+            // On the first snapshot, ALL existing docs come as 'added'.
+            // Skip local notifications for those — only notify on truly new docs.
+            if (isFirstSnapshot) {
+              isFirstSnapshot = false;
+              return;
+            }
+
+            for (final change in snapshot.docChanges) {
+              if (change.type == DocumentChangeType.added) {
+                final notification = AppNotification.fromFirestore(change.doc);
+                // Only show local notification for unread notifications
+                if (!notification.isRead) {
+                  _showLocalNotification(notification);
+                }
+              }
+            }
+          },
+          onError: (e) {
+            debugPrint('Error listening to notifications: $e');
+          },
+        );
   }
 
   /// Stop listening for notifications
@@ -86,7 +102,7 @@ class NotificationService {
       _showWebNotification(notification);
       return;
     }
-    
+
     const androidDetails = AndroidNotificationDetails(
       'unitrack_notifications',
       'UniTrack Notifications',
@@ -96,18 +112,18 @@ class NotificationService {
       showWhen: true,
       icon: '@mipmap/ic_launcher',
     );
-    
+
     const iosDetails = DarwinNotificationDetails(
       presentAlert: true,
       presentBadge: true,
       presentSound: true,
     );
-    
+
     const details = NotificationDetails(
       android: androidDetails,
       iOS: iosDetails,
     );
-    
+
     await _localNotifications.show(
       notification.id.hashCode,
       notification.title,
@@ -142,8 +158,10 @@ class NotificationService {
         },
       );
 
-      await _firestore.collection('notifications').add(notification.toFirestore());
-      
+      await _firestore
+          .collection('notifications')
+          .add(notification.toFirestore());
+
       debugPrint('📢 Notification sent: ${student.fullName} -> $staffName');
       return true;
     } catch (e) {
@@ -153,70 +171,62 @@ class NotificationService {
   }
 
   /// Get notifications for a user (stream)
-  /// Note: Using client-side sorting to avoid composite index requirement
+  /// Uses composite index: recipientId ASC, createdAt DESC
   Stream<List<AppNotification>> getNotificationsStream(String userId) {
     return _firestore
         .collection('notifications')
         .where('recipientId', isEqualTo: userId)
+        .orderBy('createdAt', descending: true)
+        .limit(50)
         .snapshots()
-        .map((snapshot) {
-          final notifications = snapshot.docs
+        .map(
+          (snapshot) => snapshot.docs
               .map((doc) => AppNotification.fromFirestore(doc))
-              .toList();
-          // Sort client-side to avoid composite index requirement
-          notifications.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-          // Limit to 50 most recent
-          return notifications.take(50).toList();
-        });
+              .toList(),
+        );
   }
 
   /// Get unread notification count (stream)
-  /// Note: Using client-side filtering to avoid composite index requirement
+  /// Server-side filter avoids downloading all docs just to count
   Stream<int> getUnreadCountStream(String userId) {
     return _firestore
         .collection('notifications')
         .where('recipientId', isEqualTo: userId)
+        .where('isRead', isEqualTo: false)
         .snapshots()
-        .map((snapshot) {
-          // Filter unread client-side to avoid composite index requirement
-          return snapshot.docs
-              .map((doc) => AppNotification.fromFirestore(doc))
-              .where((n) => !n.isRead)
-              .length;
-        });
+        .map((snapshot) => snapshot.size);
   }
 
   /// Mark notification as read
   Future<void> markAsRead(String notificationId) async {
     try {
-      await _firestore
-          .collection('notifications')
-          .doc(notificationId)
-          .set({'isRead': true}, SetOptions(merge: true));
+      await _firestore.collection('notifications').doc(notificationId).set({
+        'isRead': true,
+      }, SetOptions(merge: true));
     } catch (e) {
       debugPrint('Error marking notification as read: $e');
     }
   }
 
   /// Mark all notifications as read for a user
-  /// Note: Using client-side filtering to avoid composite index requirement
+  /// Uses composite index: recipientId ASC, isRead ASC
   Future<void> markAllAsRead(String userId) async {
     try {
-      final batch = _firestore.batch();
-      final allDocs = await _firestore
+      final unreadDocs = await _firestore
           .collection('notifications')
           .where('recipientId', isEqualTo: userId)
+          .where('isRead', isEqualTo: false)
           .get();
 
-      // Filter unread client-side
-      for (final doc in allDocs.docs) {
-        final data = doc.data();
-        if (data['isRead'] == false) {
+      // Batch in chunks of 499 (Firestore limit is 500)
+      for (int i = 0; i < unreadDocs.docs.length; i += 499) {
+        final batch = _firestore.batch();
+        final chunk = unreadDocs.docs.skip(i).take(499);
+        for (final doc in chunk) {
           batch.set(doc.reference, {'isRead': true}, SetOptions(merge: true));
         }
+        await batch.commit();
       }
-
-      await batch.commit();
     } catch (e) {
       debugPrint('Error marking all notifications as read: $e');
     }
@@ -231,59 +241,63 @@ class NotificationService {
     }
   }
 
-  /// Delete all notifications for a user
+  /// Delete all notifications for a user (paginated to avoid memory spikes)
   Future<void> deleteAllNotifications(String userId) async {
     try {
-      final batch = _firestore.batch();
-      final docs = await _firestore
-          .collection('notifications')
-          .where('recipientId', isEqualTo: userId)
-          .get();
+      QuerySnapshot<Map<String, dynamic>> page;
+      do {
+        page = await _firestore
+            .collection('notifications')
+            .where('recipientId', isEqualTo: userId)
+            .limit(499)
+            .get();
 
-      for (final doc in docs.docs) {
-        batch.delete(doc.reference);
-      }
+        if (page.docs.isEmpty) break;
 
-      await batch.commit();
+        final batch = _firestore.batch();
+        for (final doc in page.docs) {
+          batch.delete(doc.reference);
+        }
+        await batch.commit();
+      } while (page.docs.length == 499);
     } catch (e) {
       debugPrint('Error deleting all notifications: $e');
     }
   }
 
   /// Check if student has recently pinged this staff (to prevent spam)
-  /// Note: Using client-side filtering to avoid composite index requirement
+  /// Uses composite index: senderId ASC, recipientId ASC, type ASC, createdAt ASC
   Future<bool> hasRecentlyPinged(String studentId, String staffId) async {
     try {
-      final fiveMinutesAgo = DateTime.now().subtract(const Duration(minutes: 5));
-      
-      // Query by senderId only and filter the rest client-side
+      final fiveMinutesAgo = DateTime.now().subtract(
+        const Duration(minutes: 5),
+      );
+
       final pings = await _firestore
           .collection('notifications')
           .where('senderId', isEqualTo: studentId)
+          .where('recipientId', isEqualTo: staffId)
+          .where('type', isEqualTo: NotificationType.lookingForYou.name)
+          .where('createdAt', isGreaterThan: Timestamp.fromDate(fiveMinutesAgo))
+          .limit(1)
           .get();
 
-      // Filter client-side for other conditions
-      final recentPings = pings.docs.where((doc) {
-        final data = doc.data();
-        final createdAt = (data['createdAt'] as Timestamp?)?.toDate();
-        return data['recipientId'] == staffId &&
-               data['type'] == NotificationType.lookingForYou.name &&
-               createdAt != null &&
-               createdAt.isAfter(fiveMinutesAgo);
-      });
-
-      return recentPings.isNotEmpty;
+      return pings.docs.isNotEmpty;
     } catch (e) {
       debugPrint('Error checking recent pings: $e');
       return false;
     }
   }
 
+  /// Show a notification toast/alert (public for provider to call)
+  void showNotificationAlert(AppNotification notification) {
+    _showLocalNotification(notification);
+  }
+
   /// Show in-app overlay notification for web platform
   void _showWebNotification(AppNotification notification) {
     // Use an OverlayEntry for a toast-style notification
-    final overlayState = notificationNavigatorKey.currentState
-        ?.overlay;
+    final overlayState = notificationNavigatorKey.currentState?.overlay;
     if (overlayState == null) return;
 
     late OverlayEntry entry;
@@ -321,7 +335,8 @@ class _WebNotificationOverlay extends StatefulWidget {
   });
 
   @override
-  State<_WebNotificationOverlay> createState() => _WebNotificationOverlayState();
+  State<_WebNotificationOverlay> createState() =>
+      _WebNotificationOverlayState();
 }
 
 class _WebNotificationOverlayState extends State<_WebNotificationOverlay>
@@ -369,10 +384,17 @@ class _WebNotificationOverlayState extends State<_WebNotificationOverlay>
               onTap: widget.onDismiss,
               borderRadius: BorderRadius.circular(12),
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
                 child: Row(
                   children: [
-                    const Icon(Icons.notifications_active, color: Colors.white, size: 24),
+                    const Icon(
+                      Icons.notifications_active,
+                      color: Colors.white,
+                      size: 24,
+                    ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(
