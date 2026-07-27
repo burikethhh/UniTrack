@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>UniTrack - SKSU Faculty Tracking System</title>
-    <meta name="description" content="UniTrack is the official real-time faculty location tracking and monitoring system for Sultan Kudarat State University. Track faculty members across campus, monitor office hours, and ensure accountability with GPS-verified location data.">
-    <meta name="keywords" content="UniTrack, SKSU, Sultan Kudarat State University, faculty tracking, location monitoring, GPS tracking, campus management">
+    <title>ISKSULARS TRACK - SKSU Student Leader Tracking</title>
+    <meta name="description" content="ISKSULARS TRACK is the official real-time student leader and organization officer location tracking system for Sultan Kudarat State University. Find student leaders and officers across campus with GPS-verified location data.">
+    <meta name="keywords" content="ISKSULARS TRACK, SKSU, Sultan Kudarat State University, student leader tracking, organization officer, campus location, GPS tracking">
     <meta name="author" content="SKSU IT Department">
 
     <!-- Security Headers (meta-tag equivalents for static hosting) -->
@@ -566,10 +566,6 @@
         
         .role-icon.faculty {
             background: linear-gradient(135deg, #4EEBC2 0%, #00C896 100%);
-        }
-        
-        .role-icon.staff {
-            background: linear-gradient(135deg, #64B5F6 0%, #1E88E5 100%);
         }
         
         .role-icon.admin {
@@ -1171,41 +1167,39 @@
     <!-- Navigation -->
     <nav>
         <a href="#" class="logo">
-            <img src="assets/icon.png" alt="UniTrack" class="logo-img">
-            UniTrack
+            <img src="assets/icon.png" alt="ISKSULARS TRACK" class="logo-img">
+            ISKSULARS TRACK
         </a>
         <button class="mobile-menu-btn" onclick="toggleMobileMenu()">
             <i class="fas fa-bars"></i>
         </button>
         <div class="nav-links" id="navLinks">
             <a href="#features" onclick="closeMobileMenu()">Features</a>
-            <a href="#download" onclick="closeMobileMenu()">Download</a>
-            <a href="#installation" onclick="closeMobileMenu()">Installation</a>
-            <a href="#download" class="nav-btn" onclick="closeMobileMenu()">Get App</a>
+            <a href="#how-it-works" onclick="closeMobileMenu()">How It Works</a>
+            <a href="#download" onclick="closeMobileMenu()">Get Started</a>
+            <a href="https://unitrack-sksu-app.web.app" target="_blank" class="nav-btn" onclick="closeMobileMenu()">Launch App</a>
         </div>
     </nav>
     
-    <!-- Hero Section -->
+<!-- Hero Section -->
     <section class="hero">
         <div class="hero-container">
             <div class="hero-content">
                 <h1 class="fade-in">
-                    Real-Time Faculty Tracking with <span>UniTrack</span>
+                    Find Student Leaders & Officers <span>Instantly</span>
                 </h1>
                 <p class="fade-in fade-in-delay-1">
-                    The official faculty location monitoring system for Sultan Kudarat State University. 
-                    Track faculty members in real-time across campus buildings, monitor office hour compliance, 
-                    verify on-ground presence during class schedules, and generate comprehensive accountability reports 
-                    with GPS-verified location data.
+                    ISKSULARS TRACK is the real-time locator for student leaders and organization officers at Sultan Kudarat State University.
+                    Pinpoint who's available on campus, ping them directly, and get the help you need — all from one dashboard.
                 </p>
                 <div class="hero-buttons fade-in fade-in-delay-2">
-                    <a href="#download" class="btn btn-primary">
-                        <i class="fab fa-android"></i>
-                        Download for Android
+                    <a href="https://unitrack-sksu-app.web.app" target="_blank" class="btn btn-primary">
+                        <i class="fas fa-location-dot"></i>
+                        Launch the App
                     </a>
                     <a href="#features" class="btn btn-outline">
                         <i class="fas fa-info-circle"></i>
-                        Learn More
+                        Explore Features
                     </a>
                 </div>
             </div>
@@ -1214,8 +1208,8 @@
                 <div class="phone-mockup">
                     <div class="phone-screen">
                         <div class="phone-header">
-                            <h3>UniTrack</h3>
-                            <p>Faculty Monitoring</p>
+                            <h3>ISKSULARS TRACK</h3>
+                            <p>Student Leader Locator</p>
                         </div>
                         <div class="phone-content">
                             <div class="status-card">
@@ -1224,7 +1218,7 @@
                                 </div>
                                 <div class="status-text">
                                     <h4>Live Tracking Active</h4>
-                                    <p>12 Faculty Online Now</p>
+                                    <p>24 Officers Available Now</p>
                                 </div>
                             </div>
                             <div class="mini-map">
@@ -1241,15 +1235,15 @@
                             <div class="feature-list">
                                 <div class="feature-item">
                                     <i class="fas fa-user-tie"></i>
-                                    <span>Faculty Location Status</span>
+                                    <span>Officer Location Status</span>
                                 </div>
                                 <div class="feature-item">
                                     <i class="fas fa-clock"></i>
-                                    <span>Office Hours Monitoring</span>
+                                    <span>Real-Time Availability</span>
                                 </div>
                                 <div class="feature-item">
                                     <i class="fas fa-building"></i>
-                                    <span>Building Assignments</span>
+                                    <span>Campus Building Map</span>
                                 </div>
                             </div>
                         </div>
@@ -1258,193 +1252,122 @@
             </div>
         </div>
     </section>
-    
+
     <!-- Features Section -->
     <section class="features" id="features">
         <div class="section-header">
-            <h2>Powerful Tracking Features</h2>
-            <p>Comprehensive tools for real-time faculty location monitoring and accountability</p>
+            <h2>Everything You Need to Locate Leaders</h2>
+            <p>A fast, intuitive way to connect with student leaders and org officers on campus</p>
         </div>
         <div class="features-grid">
             <div class="feature-card">
                 <div class="feature-icon">
-                    <i class="fas fa-satellite-dish"></i>
+                    <i class="fas fa-map-location-dot"></i>
                 </div>
-                <h3>Live GPS Tracking</h3>
-                <p>Monitor faculty locations in real-time with high-precision GPS. View exact positions on the interactive campus map with continuous location updates.</p>
-            </div>
-            <div class="feature-card">
-                <div class="feature-icon">
-                    <i class="fas fa-users-viewfinder"></i>
-                </div>
-                <h3>Faculty Monitoring Dashboard</h3>
-                <p>Administrators can view all faculty members' current locations, track movement history, and monitor presence within assigned campus buildings and offices.</p>
+                <h3>Real-Time Map Locator</h3>
+                <p>See where student leaders and organization officers are right now on an interactive campus map. GPS-verified positions update live so you know exactly who's nearby.</p>
             </div>
             <div class="feature-card">
                 <div class="feature-icon">
                     <i class="fas fa-bell"></i>
                 </div>
-                <h3>Smart Notifications</h3>
-                <p>Receive instant alerts when faculty enter or leave designated zones, miss scheduled office hours, or when tracking sessions begin and end.</p>
+                <h3>Ping & Notify</h3>
+                <p>Send instant ping requests to officers and leaders. Whether you need a signature, a quick consult, or urgent help — tap to notify them and get a response fast.</p>
             </div>
             <div class="feature-card">
                 <div class="feature-icon">
-                    <i class="fas fa-file-lines"></i>
+                    <i class="fas fa-building-columns"></i>
                 </div>
-                <h3>Comprehensive Reports</h3>
-                <p>Generate detailed location history reports, office hour compliance summaries, and movement analytics with export options for PDF and Excel.</p>
+                <h3>Campus Directory</h3>
+                <p>Browse all 60+ SKSU student organizations and their officers in one searchable directory. Filter by org, role, building, or availability status.</p>
             </div>
             <div class="feature-card">
                 <div class="feature-icon">
-                    <i class="fas fa-map-location-dot"></i>
+                    <i class="fas fa-chart-pie"></i>
                 </div>
-                <h3>Interactive Campus Map</h3>
-                <p>View all faculty positions on a detailed campus map with building overlays, room assignments, and real-time location markers with status indicators.</p>
-            </div>
-            <div class="feature-card">
-                <div class="feature-icon">
-                    <i class="fas fa-user-shield"></i>
-                </div>
-                <h3>Secure Access Control</h3>
-                <p>Faculty members can view their own location history and tracking status. Department heads and staff have designated access to monitor their assigned faculty members.</p>
+                <h3>Admin Dashboard</h3>
+                <p>A powerful admin panel for monitoring activity, analyzing officer engagement, managing broadcast messages, and generating real-time reports.</p>
             </div>
         </div>
     </section>
-    
-    <!-- Download Section -->
-    <section class="download" id="download">
-        <div class="download-container">
-            <div class="download-content">
-                <h2>Download UniTrack Now</h2>
-                <p>Get the official SKSU faculty tracking and monitoring application</p>
-                
-                <div class="version-info">
-                    <span class="version-badge">v2.2.0</span>
-                    <span>Latest Release • February 2026</span>
-                </div>
-                
-                <a href="https://github.com/burikethhh/UniTrack/releases/download/v2.2.0/UniTrack-v2.2.0.apk" class="download-btn" id="downloadBtn">
-                    <i class="fab fa-android"></i>
-                    <div>
-                        <div>Download APK</div>
-                        <div style="font-size: 0.8rem; font-weight: 400; opacity: 0.8;">Android 6.0+</div>
-                    </div>
-                </a>
-                
-                <a href="https://unitrack-sksu-app.surge.sh" class="download-btn" style="background: linear-gradient(135deg, #007AFF, #5856D6); margin-top: 12px;" target="_blank">
-                    <i class="fab fa-apple"></i>
-                    <div>
-                        <div>Open Web App</div>
-                        <div style="font-size: 0.8rem; font-weight: 400; opacity: 0.8;">iOS / Any Browser</div>
-                    </div>
-                </a>
-                
-                <!-- What's New Section -->
-                <div class="whats-new">
-                    <h3><i class="fas fa-sparkles"></i> What's New in v2.2.0</h3>
-                    <ul class="update-list">
-                        <li><i class="fas fa-map-marker-alt"></i> <strong>Photo Map Markers</strong> - Real profile pictures on the live map with smart clustering</li>
-                        <li><i class="fas fa-chart-pie"></i> <strong>Analytics Charts</strong> - Interactive pie & bar charts for admin dashboard analytics</li>
-                        <li><i class="fas fa-user-cog"></i> <strong>Functional Settings</strong> - Delete account, notification toggles, auto-hide schedule</li>
-                        <li><i class="fas fa-cloud-upload-alt"></i> <strong>Offline Write Queue</strong> - Queue actions offline, auto-sync when back online</li>
-                        <li><i class="fas fa-id-card"></i> <strong>Student Profile Edit</strong> - Students can now edit their name, department & photo</li>
-                    </ul>
-                </div>
-            </div>
-        </div>
-    </section>
-    
-    <!-- Installation Guide -->
-    <section class="installation" id="installation">
+
+    <!-- How It Works Section -->
+    <section class="how-it-works" id="how-it-works">
         <div class="section-header">
-            <h2>Installation Guide</h2>
-            <p>Follow these simple steps to install UniTrack on your device</p>
-        </div>
-        <div class="steps-container">
-            <div class="step">
-                <div class="step-number">1</div>
-                <div class="step-content">
-                    <h3>Download the APK</h3>
-                    <p>Click the download button above to get the latest version of UniTrack APK file to your device.</p>
-                </div>
-            </div>
-            <div class="step">
-                <div class="step-number">2</div>
-                <div class="step-content">
-                    <h3>Enable Unknown Sources</h3>
-                    <p>Go to <code>Settings → Security → Install unknown apps</code> and enable installation from your browser or file manager.</p>
-                </div>
-            </div>
-            <div class="step">
-                <div class="step-number">3</div>
-                <div class="step-content">
-                    <h3>Install the App</h3>
-                    <p>Open the downloaded APK file and tap "Install". Wait for the installation to complete.</p>
-                </div>
-            </div>
-            <div class="step">
-                <div class="step-number">4</div>
-                <div class="step-content">
-                    <h3>Grant Permissions</h3>
-                    <p>Open UniTrack and grant the required permissions for <strong>location (important for tracking)</strong>, notifications, and storage when prompted.</p>
-                </div>
-            </div>
-            <div class="step">
-                <div class="step-number">5</div>
-                <div class="step-content">
-                    <h3>Login & Start Tracking</h3>
-                    <p>Use your SKSU email credentials to login. Faculty members will have their location tracked, and department heads can monitor faculty positions on the live campus map.</p>
-                </div>
-            </div>
-        </div>
-    </section>
-    
-    <!-- Requirements -->
-    <section class="requirements">
-        <div class="requirements-container">
-            <h3><i class="fas fa-mobile-screen"></i> System Requirements</h3>
-            <ul class="req-list">
-                <li><i class="fas fa-check"></i> Android 6.0 (Marshmallow) or higher</li>
-                <li><i class="fas fa-check"></i> At least 150MB free storage</li>
-                <li><i class="fas fa-check"></i> GPS/Location services enabled (required for tracking)</li>
-                <li><i class="fas fa-check"></i> Internet connection (WiFi or mobile data)</li>
-                <li><i class="fas fa-check"></i> Valid SKSU faculty/staff email account</li>
-            </ul>
-        </div>
-    </section>
-    
-    <!-- How It Works -->
-    <section class="how-it-works">
-        <div class="section-header">
-            <h2>How Faculty Tracking Works</h2>
-            <p>Understanding the UniTrack monitoring process</p>
+            <h2>How It Works</h2>
+            <p>Three simple steps to start finding leaders on campus</p>
         </div>
         <div class="roles-container">
             <div class="role-card">
                 <div class="role-icon faculty">
-                    <i class="fas fa-chalkboard-teacher"></i>
+                    <i class="fas fa-envelope"></i>
                 </div>
-                <h3>Faculty Members</h3>
+                <h3>1. Register with Your SKSU Email</h3>
                 <ul>
-                    <li>Login with SKSU credentials</li>
-                    <li>Enable location tracking when on campus</li>
-                    <li>View personal location history</li>
-                    <li>Receive schedule reminders</li>
-                    <li>Track own office hour compliance</li>
+                    <li>Sign in using your official @sksu.edu.ph email account</li>
+                    <li>Select your role: Student, Student Leader, or Organization Officer</li>
+                    <li>Verify your account and set up your profile</li>
                 </ul>
             </div>
             <div class="role-card">
-                <div class="role-icon staff">
-                    <i class="fas fa-user-tie"></i>
+                <div class="role-icon faculty">
+                    <i class="fas fa-map-pin"></i>
                 </div>
-                <h3>Department Heads</h3>
+                <h3>2. Find Leaders on the Map</h3>
                 <ul>
-                    <li>Monitor department faculty locations</li>
-                    <li>View real-time campus map</li>
-                    <li>Generate department reports</li>
-                    <li>Send notifications to faculty</li>
-                    <li>Manage schedules and assignments</li>
+                    <li>Open the live campus map from any device</li>
+                    <li>See real-time location pins for all available leaders & officers</li>
+                    <li>Check status, role, and contact details at a glance</li>
                 </ul>
+            </div>
+            <div class="role-card">
+                <div class="role-icon admin">
+                    <i class="fas fa-paper-plane"></i>
+                </div>
+                <h3>3. Ping Them for Help</h3>
+                <ul>
+                    <li>Tap any officer to send a direct ping or inquiry</li>
+                    <li>Leaders receive instant browser notifications</li>
+                    <li>Get connected and resolve matters without roaming campus</li>
+                </ul>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA / Download Section -->
+    <section class="download" id="download">
+        <div class="download-container">
+            <div class="download-content">
+                <h2>Ready to Find Your Leaders?</h2>
+                <p>Launch ISKSULARS TRACK now — no download required</p>
+
+                <div class="version-info">
+                    <span class="version-badge">Live Now</span>
+                    <span>Web App &bull; Mobile Ready</span>
+                </div>
+
+                <a href="https://unitrack-sksu-app.web.app" target="_blank" class="download-btn" id="downloadBtn">
+                    <i class="fas fa-arrow-up-right-from-square"></i>
+                    <div>
+                        <div>Open ISKSULARS TRACK</div>
+                        <div style="font-size: 0.8rem; font-weight: 400; opacity: 0.8;">Any device, any browser</div>
+                    </div>
+                </a>
+
+                <div class="download-stats">
+                    <div class="stat">
+                        <div class="stat-value">60+</div>
+                        <div class="stat-label">Organizations</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value">Real-Time</div>
+                        <div class="stat-label">GPS Mapping</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value">24/7</div>
+                        <div class="stat-label">Availability</div>
+                    </div>
+                </div>
             </div>
         </div>
     </section>
@@ -1453,22 +1376,21 @@
     <footer>
         <div class="footer-content">
             <div class="footer-logo">
-                <img src="assets/icon.png" alt="UniTrack" class="logo-img">
-                <span>UniTrack</span>
+                <img src="assets/icon.png" alt="ISKSULARS TRACK" class="logo-img">
+                <span>ISKSULARS TRACK</span>
             </div>
             <p style="color: rgba(255,255,255,0.6); margin-bottom: 1.5rem; max-width: 500px; margin-left: auto; margin-right: auto;">
-                Real-time faculty location tracking and monitoring system for Sultan Kudarat State University.
+                The real-time student leader &amp; organization officer locator for Sultan Kudarat State University.
             </p>
             <div class="footer-links">
                 <a href="#features">Features</a>
-                <a href="#download">Download</a>
-                <a href="#installation">Installation</a>
-                <a href="mailto:support@sksu.edu.ph">Support</a>
+                <a href="#how-it-works">How It Works</a>
                 <a href="privacy.html">Privacy Policy</a>
+                <a href="mailto:support@sksu.edu.ph">Contact</a>
             </div>
             <p class="copyright">
-                © 2026 Sultan Kudarat State University. All rights reserved.<br>
-                UniTrack - Faculty Tracking System
+                &copy; 2026 Sultan Kudarat State University. All rights reserved.<br>
+                ISKSULARS TRACK &mdash; Find Student Leaders &amp; Officers Instantly
             </p>
         </div>
     </footer>

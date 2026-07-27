@@ -16,6 +16,7 @@ class FacultyProvider extends ChangeNotifier {
   List<DepartmentModel> _departments = [];
   String _searchQuery = '';
   String? _selectedDepartment;
+  String? _selectedOrganization; // <-- new: organization filter
   bool _showOnlineOnly = false;
   bool _isLoading = false;
   String? _error;
@@ -54,6 +55,7 @@ class FacultyProvider extends ChangeNotifier {
   List<DepartmentModel> get departments => _departments;
   String get searchQuery => _searchQuery;
   String? get selectedDepartment => _selectedDepartment;
+  String? get selectedOrganization => _selectedOrganization;
   bool get showOnlineOnly => _showOnlineOnly;
   bool get isLoading => _isLoading;
   String? get error => _error;
@@ -254,6 +256,25 @@ class FacultyProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Filter by organization
+  void filterByOrganization(String? organization) {
+    _selectedOrganization = organization;
+    _applyFilters();
+    notifyListeners();
+  }
+
+  /// Get unique organizations from all faculty
+  List<String> get organizations {
+    final orgs = <String>{};
+    for (final f in _allFaculty) {
+      if (f.user.organization != null && f.user.organization!.isNotEmpty) {
+        orgs.add(f.user.organization!);
+      }
+    }
+    final sorted = orgs.toList()..sort();
+    return sorted;
+  }
+
   /// Toggle online only filter
   void toggleOnlineOnly() {
     _showOnlineOnly = !_showOnlineOnly;
@@ -276,6 +297,7 @@ class FacultyProvider extends ChangeNotifier {
   void clearFilters() {
     _searchQuery = '';
     _selectedDepartment = null;
+    _selectedOrganization = null;
     _showOnlineOnly = false;
     _selectedAvailabilityStatus = null;
     _focusedFacultyId = null; // Also clear focused faculty
@@ -308,6 +330,13 @@ class FacultyProvider extends ChangeNotifier {
       // Department filter
       if (_selectedDepartment != null && _selectedDepartment!.isNotEmpty) {
         if (faculty.user.department != _selectedDepartment) {
+          return false;
+        }
+      }
+
+      // Organization filter
+      if (_selectedOrganization != null && _selectedOrganization!.isNotEmpty) {
+        if (faculty.user.organization != _selectedOrganization) {
           return false;
         }
       }

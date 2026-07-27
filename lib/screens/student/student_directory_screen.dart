@@ -223,6 +223,50 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
 
                 const SizedBox(height: 12),
 
+                // Organization filter chips
+                Consumer<FacultyProvider>(
+                  builder: (context, provider, _) {
+                    final orgs = provider.organizations;
+                    if (orgs.isEmpty) return const SizedBox.shrink();
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            children: [
+                              FilterChip(
+                                label: const Text('All Orgs'),
+                                selected: provider.selectedOrganization == null,
+                                onSelected: (_) => provider.filterByOrganization(null),
+                                selectedColor: AppColors.primary.withValues(alpha: 0.2),
+                                checkmarkColor: AppColors.primary,
+                              ),
+                              const SizedBox(width: 8),
+                              ...orgs.map((org) {
+                                return Padding(
+                                  padding: const EdgeInsets.only(right: 8),
+                                  child: FilterChip(
+                                    label: Text(org),
+                                    selected: provider.selectedOrganization == org,
+                                    onSelected: (_) => provider.filterByOrganization(
+                                      provider.selectedOrganization == org ? null : org,
+                                    ),
+                                    selectedColor: AppColors.primary.withValues(alpha: 0.2),
+                                    checkmarkColor: AppColors.primary,
+                                  ),
+                                );
+                              }),
+                            ],
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+
+                const SizedBox(height: 12),
+
                 // Availability status filter chips
                 Consumer<FacultyProvider>(
                   builder: (context, provider, _) {
