@@ -19,7 +19,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: tools/push-dispatcher
-        run: npm ci
+        run: npm install
 
       - name: Restore service account key
         env:
