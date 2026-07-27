@@ -1,0 +1,36 @@
+name: Push Notification Dispatcher
+
+on:
+  schedule:
+    # Runs every 2 minutes (free on public repos, 2000 min/month)
+    - cron: '*/2 * * * *'
+  workflow_dispatch:  # manual trigger for testing
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        working-directory: tools/push-dispatcher
+        run: npm ci
+
+      - name: Restore service account key
+        env:
+          SERVICE_ACCOUNT_JSON: ${{ secrets.SERVICE_ACCOUNT_JSON }}
+        run: |
+          echo "$SERVICE_ACCOUNT_JSON" > tools/service-account.json
+
+      - name: Dispatch push notifications
+        working-directory: tools/push-dispatcher
+        run: node dispatch.js
+
+      - name: Clean up service account key
+        if: always()
+        run: rm -f tools/service-account.json

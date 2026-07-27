@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
@@ -8,6 +9,8 @@ import '../../providers/providers.dart';
 import '../../widgets/widgets.dart';
 import 'faculty_detail_screen.dart';
 import 'student_map_screen.dart';
+import '../staff/notifications_screen.dart';
+import '../../services/activity_log_service.dart';
 
 /// Directory screen for browsing faculty
 class StudentDirectoryScreen extends StatefulWidget {
@@ -19,10 +22,12 @@ class StudentDirectoryScreen extends StatefulWidget {
 
 class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
   final _searchController = TextEditingController();
+  Timer? _searchLogDebounce;
 
   @override
   void dispose() {
     _searchController.dispose();
+    _searchLogDebounce?.cancel();
     super.dispose();
   }
 
@@ -31,7 +36,44 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Faculty Directory'),
+        bottom: const PreferredSize(
+          preferredSize: Size.fromHeight(24),
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(16, 0, 16, 10),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Locate faculty and leaders on campus',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Colors.white70,
+                ),
+              ),
+            ),
+          ),
+        ),
         actions: [
+          Consumer<NotificationProvider>(
+            builder: (context, provider, _) {
+              return IconButton(
+                icon: Badge(
+                  isLabelVisible: provider.unreadCount > 0,
+                  label: provider.unreadCount > 99
+                      ? const Text('99+')
+                      : Text('${provider.unreadCount}'),
+                  child: const Icon(Icons.notifications_outlined),
+                ),
+                tooltip: 'Notifications',
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const NotificationsScreen(),
+                    ),
+                  );
+                },
+              );
+            },
+          ),
           Consumer<FacultyProvider>(
             builder: (context, provider, _) {
               return IconButton(
@@ -81,10 +123,18 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
                     onChanged: (value) {
                       context.read<FacultyProvider>().search(value);
                       setState(() {});
+                      // Debounced search logging
+                      _searchLogDebounce?.cancel();
+                      if (value.length >= 3) {
+                        _searchLogDebounce = Timer(
+                          const Duration(seconds: 2),
+                          () => ActivityLogService().logSearch(value),
+                        );
+                      }
                     },
                     style: const TextStyle(fontSize: 15),
                     decoration: InputDecoration(
-                      hintText: 'Search faculty...',
+                      hintText: 'Search leaders...',
                       hintStyle: TextStyle(
                         color: AppColors.textSecondary.withValues(alpha: 0.7),
                         fontWeight: FontWeight.normal,

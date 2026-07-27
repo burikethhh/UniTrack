@@ -1,10 +1,8 @@
 import 'dart:async';
-import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user_model.dart';
 import '../services/auth_service.dart';
-import '../services/database_service.dart';
+import '../services/push_notification_service.dart';
 
 /// Authentication Provider for state management
 class AuthProvider extends ChangeNotifier {
@@ -15,7 +13,6 @@ class AuthProvider extends ChangeNotifier {
 
   AuthProvider({
     required AuthService authService,
-    DatabaseService? databaseService, // kept for backward compatibility
   }) : _authService = authService {
     _init();
   }
@@ -142,14 +139,22 @@ class AuthProvider extends ChangeNotifier {
       _isSigningIn = false;
       notifyListeners();
 
-      // Web workaround: Firebase's internal credential change handler fires
-      // synchronously during signIn, which can cause Provider's rebuild
-      // notification to be dropped on the same microtask. Schedule a guaranteed
-      // post-frame re-notification to ensure AuthWrapper Consumer rebuilds.
+      // Save FCM token for push notifications
+      if (_user != null) {
+        try {
+          PushNotificationService().saveTokenForUser(_user!.id);
+        } catch (_) {}
+      }
+
+      // On web, Provider's Consumer rebuild can be dropped on the same
+      // microtask as the credential-change notification. Schedule a single
+      // microtask re-notification (not multiple timers) as a safety net.
+      // Using a Completer-backed condition avoids a redundant rebuild storm.
       if (_user != null && kIsWeb) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          debugPrint('🔄 Post-frame notifyListeners (web workaround)');
-          notifyListeners();
+        scheduleMicrotask(() {
+          if (_user != null && !_isSigningIn) {
+            notifyListeners();
+          }
         });
       }
 
@@ -172,6 +177,7 @@ class AuthProvider extends ChangeNotifier {
     required UserRole role,
     String? department,
     String? position,
+    String? organization,
     String campusId = 'isulan', // Default campus
   }) async {
     _isLoading = true;
@@ -188,15 +194,26 @@ class AuthProvider extends ChangeNotifier {
         role: role,
         department: department,
         position: position,
+        organization: organization,
         campusId: campusId,
       );
       _isLoading = false;
       _isSigningIn = false;
       notifyListeners();
 
+      // Save FCM token for push notifications
+      if (_user != null) {
+        try {
+          PushNotificationService().saveTokenForUser(_user!.id);
+        } catch (_) {}
+      }
+
+      // Same single-microtask safety net as signIn for web
       if (_user != null && kIsWeb) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          notifyListeners();
+        scheduleMicrotask(() {
+          if (_user != null && !_isSigningIn) {
+            notifyListeners();
+          }
         });
       }
 
@@ -243,12 +260,15 @@ class AuthProvider extends ChangeNotifier {
 
   /// Sign out
   Future<void> signOut() async {
+    // Remove FCM token before signing out
+    if (_user != null) {
+      try {
+        await PushNotificationService().removeTokenForUser(_user!.id);
+      } catch (_) {}
+    }
     await _authService.signOut();
     _user = null;
     _error = null;
-    // Reset first-login flag so next login gets a clean restart
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('has_logged_in_before');
     notifyListeners();
   }
 

@@ -1,15 +1,15 @@
-// App-wide constants for UniTrack
+// App-wide constants for ISKSULARS TRACK
 import 'dart:math';
 
 /// Constants class containing all static configuration values
 class AppConstants {
   // App Info
-  static const String appName = 'UniTrack';
+  static const String appName = 'ISKSULARS TRACK';
   static const String appVersion =
-      '2.3.1'; // v16 production-readiness fixes + PWA update improvements
+      '2.5.0'; // Firestore-direct admin ops + activity audit trail
   static const int versionCode =
-      250; // Version code for update checks (2.3.1 = 241)
-  static const String appTagline = 'Real-Time Faculty & Staff Locator';
+      273; // Version code for update checks
+  static const String appTagline = 'Real-Time Campus Locator & Directory';
 
   // Version Compatibility - for older app versions to update
   static const int apiVersion = 2; // Current API version
@@ -258,7 +258,6 @@ class AppConstants {
 
   // User Roles
   static const String roleStudent = 'student';
-  static const String roleStaff = 'staff';
   static const String roleAdmin = 'admin';
 
   // Location staleness threshold (seconds) - location older than this is considered stale

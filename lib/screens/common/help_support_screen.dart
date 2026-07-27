@@ -102,7 +102,7 @@ class HelpSupportScreen extends StatelessWidget {
             _buildFAQItem(
               context,
               'Does the app work offline?',
-              'Yes! UniTrack caches faculty data locally. You can view the directory offline, but real-time locations require an internet connection.',
+              'Yes! ISKSULARS TRACK caches faculty data locally. You can view the directory offline, but real-time locations require an internet connection.',
             ),
 
             _buildFAQItem(
@@ -114,7 +114,7 @@ class HelpSupportScreen extends StatelessWidget {
             _buildFAQItem(
               context,
               'Is my location tracked when I\'m off campus?',
-              'No. UniTrack uses geofencing - your location is only shared when you\'re within campus boundaries. No location history is stored.',
+              'No. ISKSULARS TRACK uses geofencing - your location is only shared when you\'re within campus boundaries. No location history is stored.',
             ),
 
             _buildFAQItem(
@@ -128,14 +128,14 @@ class HelpSupportScreen extends StatelessWidget {
               'I\'m stuck on the login screen after signing in',
               'This can happen on first login. Here\'s how to fix it:\n\n'
                   'On Android:\n'
-                  '1. Close UniTrack completely (swipe it away from Recent Apps)\n'
-                  '2. Reopen UniTrack from your app drawer\n'
+                  '1. Close ISKSULARS TRACK completely (swipe it away from Recent Apps)\n'
+                  '2. Reopen ISKSULARS TRACK from your app drawer\n'
                   '3. You should be automatically logged in\n\n'
                   'On Web Browser:\n'
                   '1. Press Ctrl+Shift+R to hard refresh the page\n'
                   '2. Or close the tab and reopen the app URL\n\n'
                   'If you\'re still stuck, try:\n'
-                  '• Clear the app cache (Settings > Apps > UniTrack > Clear Cache)\n'
+                  '• Clear the app cache (Settings > Apps > ISKSULARS TRACK > Clear Cache)\n'
                   '• Uninstall and reinstall the app\n'
                   '• Make sure you have a stable internet connection',
             ),
@@ -149,7 +149,7 @@ class HelpSupportScreen extends StatelessWidget {
                   '3. Turn it ON\n\n'
                   'If the toggle doesn\'t work:\n'
                   '• Make sure Location (GPS) is turned ON in your phone Settings\n'
-                  '• Grant UniTrack location permission: go to Settings > Apps > UniTrack > Permissions > Location > Allow\n'
+                  '• Grant ISKSULARS TRACK location permission: go to Settings > Apps > ISKSULARS TRACK > Permissions > Location > Allow\n'
                   '• If you see "Allow only while using the app", that\'s fine — it will work\n'
                   '• On web, click "Allow" when the browser asks for location access',
             ),
@@ -185,13 +185,20 @@ class HelpSupportScreen extends StatelessWidget {
               context,
               icon: Icons.bug_report_outlined,
               title: 'Report a Bug',
-              subtitle: 'Help us improve UniTrack',
+              subtitle: 'Help us improve ISKSULARS TRACK',
               onTap: () => _launchEmail(
-                context,
-                AppConstants.supportEmail,
-                subject: 'UniTrack Bug Report - v${AppConstants.appVersion}',
+              context,
+              AppConstants.supportEmail,
+                subject: 'ISKSULARS TRACK Bug Report - v${AppConstants.appVersion}',
                 body:
-                    'Please describe the issue:\n\n\n\nSteps to reproduce:\n1. \n2. \n3. \n\nDevice: \nAndroid Version: ',
+                    'ISKSULARS TRACK Bug Report - v${AppConstants.appVersion}\n\n'
+                    'Please describe the issue:\n\n\n\n'
+                    'Steps to reproduce:\n1. \n2. \n3. \n\n'
+                    'Device Info:\n'
+                    '• App Version: ${AppConstants.appVersion}\n'
+                    '• Device: \n'
+                    '• OS Version: \n'
+                    '• Campus: \n',
               ),
             ),
 

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/utils/validators.dart';
@@ -10,7 +9,7 @@ import '../../providers/auth_provider.dart';
 import '../../widgets/widgets.dart';
 import 'register_screen.dart';
 
-/// Login Screen for UniTrack
+/// Login Screen for ISKSULARS TRACK
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -51,7 +50,7 @@ class _LoginScreenState extends State<LoginScreen> with SnackBarMixin {
 
     try {
       final success = await authProvider
-          .signIn(email: email, password: _passwordController.text)
+          .signIn(email: email, password: _passwordController.text.trim())
           .timeout(
             const Duration(seconds: 30),
             onTimeout: () {
@@ -73,17 +72,8 @@ class _LoginScreenState extends State<LoginScreen> with SnackBarMixin {
       }
 
       if (success && mounted) {
-        // Mark first login for future reference
-        final prefs = await SharedPreferences.getInstance();
-        final hasLoggedInBefore =
-            prefs.getBool('has_logged_in_before') ?? false;
-        if (!hasLoggedInBefore) {
-          await prefs.setBool('has_logged_in_before', true);
-          debugPrint('First login detected');
-        }
         // AuthProvider.signIn() sets _user and calls notifyListeners(),
         // which triggers AuthWrapper Consumer to rebuild and navigate.
-        // No reload needed — the widget tree rebuilds automatically.
         debugPrint('Login success — AuthWrapper will navigate');
         return;
       } else if (!success && mounted) {
@@ -123,25 +113,25 @@ class _LoginScreenState extends State<LoginScreen> with SnackBarMixin {
                         child: Column(
                           children: [
                             Container(
-                              width: 100,
-                              height: 100,
+                              width: 110,
+                              height: 110,
                               decoration: BoxDecoration(
-                                gradient: AppColors.accentGradient,
-                                borderRadius: BorderRadius.circular(24),
+                                shape: BoxShape.circle,
                                 boxShadow: [
                                   BoxShadow(
-                                    color: AppColors.accent.withValues(
-                                      alpha: 0.3,
+                                    color: AppColors.primary.withValues(
+                                      alpha: 0.2,
                                     ),
                                     blurRadius: 20,
                                     offset: const Offset(0, 10),
                                   ),
                                 ],
                               ),
-                              child: const Icon(
-                                Icons.location_on,
-                                size: 50,
-                                color: Colors.white,
+                              child: ClipOval(
+                                child: Image.asset(
+                                  'assets/isksularstracklogo.jpg',
+                                  fit: BoxFit.cover,
+                                ),
                               ),
                             ),
                             const SizedBox(height: 24),
@@ -242,7 +232,7 @@ class _LoginScreenState extends State<LoginScreen> with SnackBarMixin {
                           Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 16),
                             child: Text(
-                              'New to UniTrack?',
+                              'New to ISKSULARS TRACK?',
                               style: TextStyle(color: AppColors.textSecondary),
                             ),
                           ),

@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -84,7 +85,7 @@ void main() async {
     rethrow;
   }
 
-  runApp(const UniTrackApp());
+  runApp(const IsksularsTrackApp());
 }
 
 Future<void> _initializeApp() async {
@@ -146,6 +147,13 @@ Future<void> _initializeApp() async {
         debugPrint('⚠️ Push notification init error (non-fatal): $e');
         return null;
       });
+
+  // Pre-load saved theme mode so first frame uses correct theme
+  try {
+    await ThemeProvider().load();
+  } catch (e) {
+    debugPrint('⚠️ Theme load error (non-fatal): $e');
+  }
 }
 
 /// Custom scroll behavior that enables drag scrolling on all devices (web + touch)
@@ -159,8 +167,8 @@ class AppScrollBehavior extends MaterialScrollBehavior {
   };
 }
 
-class UniTrackApp extends StatelessWidget {
-  const UniTrackApp({super.key});
+class IsksularsTrackApp extends StatelessWidget {
+  const IsksularsTrackApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -180,7 +188,6 @@ class UniTrackApp extends StatelessWidget {
         ChangeNotifierProvider<AuthProvider>(
           create: (context) => AuthProvider(
             authService: context.read<AuthService>(),
-            databaseService: context.read<DatabaseService>(),
           ),
         ),
         ChangeNotifierProvider<LocationProvider>(
@@ -198,7 +205,11 @@ class UniTrackApp extends StatelessWidget {
           update: (context, authProvider, notificationProvider) {
             final userId = authProvider.user?.id;
             if (userId != null && notificationProvider != null) {
-              notificationProvider.initialize(userId);
+              // Defer initialization to avoid calling notifyListeners()
+              // synchronously during the build phase (causes web freeze).
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                notificationProvider.initialize(userId);
+              });
             } else if (notificationProvider != null) {
               // User logged out — cancel Firestore listeners for old user
               notificationProvider.stopListening();
@@ -209,11 +220,15 @@ class UniTrackApp extends StatelessWidget {
         ),
         // Admin Provider for super admin features
         ChangeNotifierProvider<AdminProvider>(create: (_) => AdminProvider()),
+        ChangeNotifierProvider<ThemeProvider>(create: (_) => ThemeProvider()),
       ],
-      child: MaterialApp(
+      child: Consumer<ThemeProvider>(
+        builder: (context, themeProvider, _) => MaterialApp(
         title: AppConstants.appName,
         debugShowCheckedModeBanner: false,
         theme: AppTheme.lightTheme,
+        darkTheme: AppTheme.darkTheme,
+        themeMode: themeProvider.themeMode,
         scrollBehavior: AppScrollBehavior(),
         navigatorKey: notificationNavigatorKey,
         home: kDemoMode ? const DemoModeSelector() : const AppEntry(),
@@ -245,7 +260,8 @@ class UniTrackApp extends StatelessWidget {
           return OfflineModeBanner(child: child ?? const SizedBox.shrink());
         },
       ),
-    );
+        ),
+      );
   }
 }
 
@@ -354,7 +370,7 @@ class DemoModeSelector extends StatelessWidget {
                 const SizedBox(height: 24),
 
                 const Text(
-                  'UniTrack',
+                  'ISKSULARS TRACK',
                   style: TextStyle(
                     fontSize: 36,
                     fontWeight: FontWeight.bold,
@@ -409,21 +425,6 @@ class DemoModeSelector extends StatelessWidget {
                     context,
                     MaterialPageRoute(
                       builder: (_) => const StudentHomeScreen(),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-
-                _buildRoleButton(
-                  context,
-                  'Faculty / Staff',
-                  'Manage your location sharing',
-                  Icons.person,
-                  Colors.green,
-                  () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const StaffDashboardScreen(),
                     ),
                   ),
                 ),
@@ -575,6 +576,12 @@ class _AuthWrapperState extends State<AuthWrapper> {
           debugPrint('🔄 AuthWrapper: Showing HOME for ${user.role}');
         }
 
+        // Check email verification — block unverified users
+        final firebaseUser = FirebaseAuth.instance.currentUser;
+        if (firebaseUser != null && !firebaseUser.emailVerified) {
+          return const EmailVerificationScreen();
+        }
+
         // Check for updates on first authenticated build
         if (!_hasCheckedForUpdates) {
           _hasCheckedForUpdates = true;
@@ -584,9 +591,9 @@ class _AuthWrapperState extends State<AuthWrapper> {
         switch (user.role) {
           case UserRole.admin:
             return const SuperAdminDashboard();
-          case UserRole.staff:
-            return const StaffDashboardScreen();
           case UserRole.student:
+          case UserRole.studentLeader:
+          case UserRole.organizationOfficer:
             return const StudentHomeScreen();
         }
       },

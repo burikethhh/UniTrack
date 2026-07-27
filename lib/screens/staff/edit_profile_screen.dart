@@ -32,6 +32,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   bool _isLoading = false;
   bool _isUploadingPhoto = false;
   List<DepartmentModel> _departments = [];
+  List<String> _officeHours = [];
 
   @override
   void initState() {
@@ -57,6 +58,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         _phoneController.text = user.phoneNumber ?? '';
         _selectedDepartment = user.department;
         _photoUrl = user.photoUrl;
+        _officeHours = List<String>.from(user.officeHours ?? []);
       });
     }
   }
@@ -199,6 +201,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         phoneNumber: _phoneController.text.trim().isEmpty
             ? null
             : _phoneController.text.trim(),
+        officeHours: _officeHours.isEmpty ? null : _officeHours,
       );
 
       // Update via auth provider (handles both Firestore and local state)
@@ -235,6 +238,18 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
   }
 
+  Future<void> _addOfficeHour() async {
+    final result = await showDialog<_OfficeHourEntry>(
+      context: context,
+      builder: (_) => const _OfficeHourDialog(),
+    );
+    if (result != null && mounted) {
+      setState(() {
+        _officeHours.add('${result.day} ${result.start.format(context)} - ${result.end.format(context)}');
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -264,223 +279,279 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       ),
       body: Form(
         key: _formKey,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Profile Photo Section
-              Center(
-                child: Stack(
-                  children: [
-                    GestureDetector(
-                      onTap: _pickPhoto,
-                      child: Container(
-                        width: 120,
-                        height: 120,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: AppColors.surface,
-                          border: Border.all(
-                            color: AppColors.primary,
-                            width: 3,
-                          ),
-                          image: _selectedPhotoBytes != null
-                              ? DecorationImage(
-                                  image: MemoryImage(_selectedPhotoBytes!),
-                                  fit: BoxFit.cover,
-                                )
-                              : _photoUrl != null
-                              ? DecorationImage(
-                                  image: NetworkImage(_photoUrl!),
-                                  fit: BoxFit.cover,
-                                )
-                              : null,
-                        ),
-                        child: _selectedPhotoBytes == null && _photoUrl == null
-                            ? Icon(
-                                Icons.person,
-                                size: 60,
-                                color: AppColors.textSecondary,
-                              )
-                            : null,
-                      ),
-                    ),
-                    Positioned(
-                      bottom: 0,
-                      right: 0,
-                      child: GestureDetector(
-                        onTap: _pickPhoto,
-                        child: Container(
-                          width: 36,
-                          height: 36,
-                          decoration: BoxDecoration(
-                            color: AppColors.primary,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white, width: 2),
-                          ),
-                          child: const Icon(
-                            Icons.camera_alt,
-                            size: 18,
-                            color: Colors.white,
+        child: Builder(
+          builder: (context) {
+            final user = context.read<AuthProvider>().user;
+            return SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Profile Photo Section
+                  Center(
+                    child: Stack(
+                      children: [
+                        GestureDetector(
+                          onTap: _pickPhoto,
+                          child: Container(
+                            width: 120,
+                            height: 120,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: AppColors.surface,
+                              border: Border.all(
+                                color: AppColors.primary,
+                                width: 3,
+                              ),
+                              image: _selectedPhotoBytes != null
+                                  ? DecorationImage(
+                                      image: MemoryImage(_selectedPhotoBytes!),
+                                      fit: BoxFit.cover,
+                                    )
+                                  : _photoUrl != null
+                                  ? DecorationImage(
+                                      image: NetworkImage(_photoUrl!),
+                                      fit: BoxFit.cover,
+                                    )
+                                  : null,
+                            ),
+                            child: _selectedPhotoBytes == null && _photoUrl == null
+                                ? Icon(
+                                    Icons.person,
+                                    size: 60,
+                                    color: AppColors.textSecondary,
+                                  )
+                                : null,
                           ),
                         ),
-                      ),
-                    ),
-                    if (_isUploadingPhoto)
-                      Positioned.fill(
-                        child: Container(
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: Colors.black.withValues(alpha: 0.5),
-                          ),
-                          child: const Center(
-                            child: CircularProgressIndicator(
-                              color: Colors.white,
+                        Positioned(
+                          bottom: 0,
+                          right: 0,
+                          child: GestureDetector(
+                            onTap: _pickPhoto,
+                            child: Container(
+                              width: 36,
+                              height: 36,
+                              decoration: BoxDecoration(
+                                color: AppColors.primary,
+                                shape: BoxShape.circle,
+                                border: Border.all(color: Colors.white, width: 2),
+                              ),
+                              child: const Icon(
+                                Icons.camera_alt,
+                                size: 18,
+                                color: Colors.white,
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 8),
-              Center(
-                child: TextButton.icon(
-                  onPressed: _pickPhoto,
-                  icon: const Icon(Icons.photo_library),
-                  label: const Text('Change Photo'),
-                ),
-              ),
-
-              const SizedBox(height: 24),
-
-              // Personal Information Section
-              _buildSectionHeader('Personal Information'),
-              const SizedBox(height: 12),
-
-              // First Name
-              CustomTextField(
-                controller: _firstNameController,
-                label: 'First Name',
-                hint: 'Enter your first name',
-                prefixIcon: Icons.person_outline,
-                validator: Validators.required,
-                textCapitalization: TextCapitalization.words,
-              ),
-              const SizedBox(height: 16),
-
-              // Last Name
-              CustomTextField(
-                controller: _lastNameController,
-                label: 'Last Name',
-                hint: 'Enter your last name',
-                prefixIcon: Icons.person_outline,
-                validator: Validators.required,
-                textCapitalization: TextCapitalization.words,
-              ),
-
-              const SizedBox(height: 24),
-
-              // Work Information Section
-              _buildSectionHeader('Work Information'),
-              const SizedBox(height: 12),
-
-              // Department Dropdown
-              DropdownButtonFormField<String>(
-                // Only use _selectedDepartment if it exists in the department list
-                initialValue:
-                    _departments.any(
-                      (d) => d.name == _selectedDepartment,
-                    ) // ignore: deprecated_member_use
-                    ? _selectedDepartment
-                    : null,
-                decoration: InputDecoration(
-                  labelText: 'Department',
-                  prefixIcon: const Icon(Icons.business),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  filled: true,
-                  fillColor: AppColors.surface,
-                ),
-                items: [
-                  const DropdownMenuItem<String>(
-                    value: null,
-                    child: Text('Select Department'),
-                  ),
-                  ..._departments.map(
-                    (dept) => DropdownMenuItem<String>(
-                      value: dept.name,
-                      child: Text(dept.name),
+                        if (_isUploadingPhoto)
+                          Positioned.fill(
+                            child: Container(
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: Colors.black.withValues(alpha: 0.5),
+                              ),
+                              child: const Center(
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                   ),
+                  const SizedBox(height: 8),
+                  Center(
+                    child: TextButton.icon(
+                      onPressed: _pickPhoto,
+                      icon: const Icon(Icons.photo_library),
+                      label: const Text('Change Photo'),
+                    ),
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // Personal Information Section
+                  _buildSectionHeader('Personal Information'),
+                  const SizedBox(height: 12),
+
+                  // First Name
+                  CustomTextField(
+                    controller: _firstNameController,
+                    label: 'First Name',
+                    hint: 'Enter your first name',
+                    prefixIcon: Icons.person_outline,
+                    validator: Validators.required,
+                    textCapitalization: TextCapitalization.words,
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Last Name
+                  CustomTextField(
+                    controller: _lastNameController,
+                    label: 'Last Name',
+                    hint: 'Enter your last name',
+                    prefixIcon: Icons.person_outline,
+                    validator: Validators.required,
+                    textCapitalization: TextCapitalization.words,
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // Work Information Section
+                  _buildSectionHeader('Work Information'),
+                  const SizedBox(height: 12),
+
+                  // Department Dropdown
+                  DropdownButtonFormField<String>(
+                    // Only use _selectedDepartment if it exists in the department list
+                    initialValue:
+                        _departments.any(
+                          (d) => d.name == _selectedDepartment,
+                        ) // ignore: deprecated_member_use
+                        ? _selectedDepartment
+                        : null,
+                    decoration: InputDecoration(
+                      labelText: 'Department',
+                      prefixIcon: const Icon(Icons.business),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      filled: true,
+                      fillColor: AppColors.surface,
+                    ),
+                    items: [
+                      const DropdownMenuItem<String>(
+                        value: null,
+                        child: Text('Select Department'),
+                      ),
+                      ..._departments.map(
+                        (dept) => DropdownMenuItem<String>(
+                          value: dept.name,
+                          child: Text(dept.name),
+                        ),
+                      ),
+                    ],
+                    onChanged: (value) {
+                      setState(() {
+                        _selectedDepartment = value;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Position
+                  CustomTextField(
+                    controller: _positionController,
+                    label: 'Position',
+                    hint: 'e.g., Professor, Instructor, Dean',
+                    prefixIcon: Icons.work_outline,
+                    textCapitalization: TextCapitalization.words,
+                  ),
+
+                  if (user != null && user.isStaff) ...[
+                    const SizedBox(height: 24),
+
+                    // Office Hours Section
+                    _buildSectionHeader('Office Hours'),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Add your available hours so students know when to find you.',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    ..._officeHours.asMap().entries.map((entry) {
+                      final idx = entry.key;
+                      final slot = entry.value;
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                slot,
+                                style: Theme.of(context).textTheme.bodyMedium,
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.delete_outline, size: 20),
+                              color: AppColors.error,
+                              onPressed: () {
+                                setState(() {
+                                  _officeHours.removeAt(idx);
+                                });
+                              },
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: OutlinedButton.icon(
+                        onPressed: _addOfficeHour,
+                        icon: const Icon(Icons.add, size: 18),
+                        label: const Text('Add Office Hour'),
+                      ),
+                    ),
+                  ],
+
+                  const SizedBox(height: 24),
+
+                  // Contact Information Section
+                  _buildSectionHeader('Contact Information'),
+                  const SizedBox(height: 12),
+
+                  // Phone Number
+                  CustomTextField(
+                    controller: _phoneController,
+                    label: 'Phone Number',
+                    hint: '09XX XXX XXXX',
+                    prefixIcon: Icons.phone_outlined,
+                    keyboardType: TextInputType.phone,
+                    validator: (value) {
+                      if (value == null || value.isEmpty) return null; // Optional
+                      // Simple Philippine phone validation
+                      if (!RegExp(
+                        r'^(09|\+639)\d{9}$',
+                      ).hasMatch(value.replaceAll(' ', ''))) {
+                        return 'Enter a valid Philippine mobile number';
+                      }
+                      return null;
+                    },
+                  ),
+
+                  const SizedBox(height: 32),
+
+                  // Save Button
+                  PrimaryButton(
+                    text: 'Save Changes',
+                    onPressed: _saveProfile,
+                    isLoading: _isLoading,
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // Cancel Button
+                  OutlinedButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    child: const Text('Cancel'),
+                  ),
+
+                  const SizedBox(height: 24),
                 ],
-                onChanged: (value) {
-                  setState(() {
-                    _selectedDepartment = value;
-                  });
-                },
               ),
-              const SizedBox(height: 16),
-
-              // Position
-              CustomTextField(
-                controller: _positionController,
-                label: 'Position',
-                hint: 'e.g., Professor, Instructor, Dean',
-                prefixIcon: Icons.work_outline,
-                textCapitalization: TextCapitalization.words,
-              ),
-
-              const SizedBox(height: 24),
-
-              // Contact Information Section
-              _buildSectionHeader('Contact Information'),
-              const SizedBox(height: 12),
-
-              // Phone Number
-              CustomTextField(
-                controller: _phoneController,
-                label: 'Phone Number',
-                hint: '09XX XXX XXXX',
-                prefixIcon: Icons.phone_outlined,
-                keyboardType: TextInputType.phone,
-                validator: (value) {
-                  if (value == null || value.isEmpty) return null; // Optional
-                  // Simple Philippine phone validation
-                  if (!RegExp(
-                    r'^(09|\+639)\d{9}$',
-                  ).hasMatch(value.replaceAll(' ', ''))) {
-                    return 'Enter a valid Philippine mobile number';
-                  }
-                  return null;
-                },
-              ),
-
-              const SizedBox(height: 32),
-
-              // Save Button
-              PrimaryButton(
-                text: 'Save Changes',
-                onPressed: _saveProfile,
-                isLoading: _isLoading,
-              ),
-
-              const SizedBox(height: 16),
-
-              // Cancel Button
-              OutlinedButton(
-                onPressed: () => Navigator.pop(context),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                ),
-                child: const Text('Cancel'),
-              ),
-
-              const SizedBox(height: 24),
-            ],
-          ),
+            );
+          },
         ),
       ),
     );
@@ -493,6 +564,105 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         fontWeight: FontWeight.bold,
         color: AppColors.primary,
       ),
+    );
+  }
+}
+
+/// Dialog result for office hour entry.
+class _OfficeHourEntry {
+  final String day;
+  final TimeOfDay start;
+  final TimeOfDay end;
+  const _OfficeHourEntry(this.day, this.start, this.end);
+}
+
+class _OfficeHourDialog extends StatefulWidget {
+  const _OfficeHourDialog();
+
+  @override
+  State<_OfficeHourDialog> createState() => _OfficeHourDialogState();
+}
+
+class _OfficeHourDialogState extends State<_OfficeHourDialog> {
+  static const _days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  String _selectedDay = 'Mon';
+  TimeOfDay? _start;
+  TimeOfDay? _end;
+
+  @override
+  Widget build(BuildContext context) {
+    final now = TimeOfDay.now();
+    return AlertDialog(
+      title: const Text('Add Office Hour'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Day', style: TextStyle(fontWeight: FontWeight.w600)),
+          const SizedBox(height: 4),
+          DropdownButtonFormField<String>(
+            value: _selectedDay,
+            items: _days
+                .map((d) => DropdownMenuItem(value: d, child: Text(d)))
+                .toList(),
+            onChanged: (v) => setState(() => _selectedDay = v!),
+            decoration: const InputDecoration(border: OutlineInputBorder()),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () async {
+                    final t = await showTimePicker(
+                      context: context,
+                      initialTime: now,
+                    );
+                    if (t != null) setState(() => _start = t);
+                  },
+                  child: Text(
+                    _start == null
+                        ? 'Start'
+                        : _start!.format(context),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () async {
+                    final t = await showTimePicker(
+                      context: context,
+                      initialTime: _end ?? now,
+                    );
+                    if (t != null) setState(() => _end = t);
+                  },
+                  child: Text(
+                    _end == null
+                        ? 'End'
+                        : _end!.format(context),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: (_start != null && _end != null)
+              ? () => Navigator.pop(
+                    context,
+                    _OfficeHourEntry(_selectedDay, _start!, _end!),
+                  )
+              : null,
+          child: const Text('Add'),
+        ),
+      ],
     );
   }
 }

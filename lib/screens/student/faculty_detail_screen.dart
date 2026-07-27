@@ -4,6 +4,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/utils/helpers.dart';
 import '../../providers/providers.dart';
 import '../../models/models.dart';
+import '../../services/activity_log_service.dart';
 import '../../widgets/widgets.dart';
 
 /// Detailed view for a specific faculty member
@@ -23,6 +24,9 @@ class FacultyDetailScreen extends StatelessWidget {
           if (faculty == null) {
             return const Center(child: Text('Faculty not found'));
           }
+
+          // Log profile view (fire-and-forget)
+          ActivityLogService().logProfileView(faculty.user.id);
 
           return SingleChildScrollView(
             child: Column(

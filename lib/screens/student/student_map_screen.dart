@@ -8,6 +8,7 @@ import '../../core/constants/app_constants.dart';
 import '../../core/constants/map_constants.dart';
 import '../../core/utils/helpers.dart';
 import '../../providers/providers.dart';
+import '../../services/activity_log_service.dart';
 import '../../models/models.dart';
 import '../../widgets/widgets.dart';
 import '../../widgets/map/map_view_controls.dart';
@@ -46,6 +47,7 @@ class _StudentMapScreenState extends State<StudentMapScreen> {
   void initState() {
     super.initState();
     _getCurrentLocation();
+    ActivityLogService().logMapView();
 
     // Refresh student's own GPS every 30 seconds
     _locationRefreshTimer = Timer.periodic(
@@ -135,7 +137,7 @@ class _StudentMapScreenState extends State<StudentMapScreen> {
     _getCurrentLocation().then((_) {
       if (_userLocation != null && mounted) {
         if (_use3DMap) {
-          // 3D: handled by CampusMap3D
+          _map3dKey.currentState?.centerOnUser();
         } else {
           _map2dKey.currentState?.flyTo(_userLocation!, 18.0);
         }
@@ -279,7 +281,7 @@ class _StudentMapScreenState extends State<StudentMapScreen> {
                       child: Container(
                         height: 46,
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: Theme.of(context).colorScheme.surface,
                           borderRadius: BorderRadius.circular(23),
                           boxShadow: [
                             BoxShadow(
@@ -292,7 +294,7 @@ class _StudentMapScreenState extends State<StudentMapScreen> {
                         child: TextField(
                           controller: _searchController,
                           decoration: InputDecoration(
-                            hintText: 'Search faculty...',
+                            hintText: 'Search leaders...',
                             hintStyle: TextStyle(
                               color: AppColors.textSecondary.withValues(
                                 alpha: 0.6,
@@ -482,9 +484,9 @@ class _StudentMapScreenState extends State<StudentMapScreen> {
           maxChildSize: 0.9,
           builder: (context, scrollController) {
             return Container(
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surface,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
               ),
               child: Consumer<FacultyProvider>(
                 builder: (context, provider, _) {
@@ -520,8 +522,8 @@ class _StudentMapScreenState extends State<StudentMapScreen> {
                             Expanded(
                               child: Text(
                                 _selectedCampusId != null
-                                    ? 'Online Faculty · ${_campusShortName(_selectedCampusId!)} (${onlineFaculty.length})'
-                                    : 'Online Faculty (${onlineFaculty.length})',
+? 'Online · ${_campusShortName(_selectedCampusId!)} (${onlineFaculty.length})'
+                                     : 'Online (${onlineFaculty.length})',
                                 style: const TextStyle(
                                   fontSize: 18,
                                   fontWeight: FontWeight.bold,
@@ -618,7 +620,7 @@ class _StudentMapScreenState extends State<StudentMapScreen> {
         height: 46,
         padding: const EdgeInsets.symmetric(horizontal: 12),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.circular(23),
           boxShadow: [
             BoxShadow(

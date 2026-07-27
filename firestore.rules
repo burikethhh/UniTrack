@@ -17,7 +17,24 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      return isSignedIn() && getUserRole() == 'admin';
+      return isSignedIn()
+             && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+             && getUserRole() == 'admin';
+    }
+
+    // Roles that a user may assign to THEMSELVES at registration.
+    // Privileged trackable roles (studentleader, organizationofficer) require
+    // admin approval — a user cannot self-promote to them.
+    function isSelfRegistrationRole(role) {
+      return role == 'student';
+    }
+
+    function isValidUserRole(role) {
+      return role is string
+             && (role == 'student'
+                 || role == 'studentleader'
+                 || role == 'organizationofficer'
+                 || role == 'admin');
     }
 
     // ── Users collection ──────────────────────────────────────────────
@@ -27,10 +44,11 @@ service cloud.firestore {
     match /users/{userId} {
       allow read: if isSignedIn();
       allow create: if isOwner(userId)
-                    && request.resource.data.role != 'admin';
-      allow update: if isOwner(userId)
-                    && !request.resource.data.diff(resource.data).affectedKeys()
-                        .hasAny(['role', 'isActive'])
+                    && isValidUserRole(request.resource.data.role)
+                    && isSelfRegistrationRole(request.resource.data.role);
+      allow update: if (isOwner(userId)
+                       && !request.resource.data.diff(resource.data).affectedKeys()
+                           .hasAny(['role', 'isActive']))
                     || isAdmin();
       allow delete: if isAdmin();
     }
@@ -38,32 +56,47 @@ service cloud.firestore {
     // ── Locations collection ──────────────────────────────────────────
     // Authenticated users can read all locations (map lookups).
     // Only the owner can write their own location doc.
+    // Validates flat latitude/longitude fields (numeric, valid range).
     match /locations/{userId} {
       allow read: if isSignedIn();
-      allow write: if isOwner(userId);
+      allow create: if isOwner(userId)
+                    && request.resource.data.latitude is number
+                    && request.resource.data.latitude <= 90
+                    && request.resource.data.latitude >= -90
+                    && request.resource.data.longitude is number
+                    && request.resource.data.longitude <= 180
+                    && request.resource.data.longitude >= -180;
+      allow update, delete: if isOwner(userId);
     }
 
     // ── Notifications collection ──────────────────────────────────────
     // Users can read/update/delete their own received notifications.
-    // Authenticated users can create notifications (student→staff pings).
+    // A user may only create a notification where senderId == their UID.
     // Admins can read/update/delete any notification.
     match /notifications/{notifId} {
-      allow read: if isSignedIn()
-                  && (resource.data.recipientId == request.auth.uid
-                      || resource.data.senderId == request.auth.uid)
+      allow read: if (isSignedIn()
+                       && (resource.data.recipientId == request.auth.uid
+                           || resource.data.senderId == request.auth.uid))
                   || isAdmin();
-      allow create: if isSignedIn();
-      allow update, delete: if isSignedIn()
-                            && resource.data.recipientId == request.auth.uid
+      allow create: if isSignedIn()
+                    && request.resource.data.senderId == request.auth.uid
+                    && request.resource.data.recipientId is string
+                    && request.resource.data.recipientId != request.auth.uid
+                    && request.resource.data.title is string
+                    && request.resource.data.message is string;
+      allow update, delete: if (isSignedIn()
+                                && resource.data.recipientId == request.auth.uid)
                             || isAdmin();
     }
 
     // ── Activity logs collection ──────────────────────────────────────
-    // Only admins can read. Authenticated users can create (server-side
-    // logging from admin actions still originates from the client).
+    // Only admins can read. Authenticated users can create entries but
+    // only with their own actorId (prevents audit-log forgery).
     match /activity_logs/{logId} {
       allow read: if isAdmin();
-      allow create: if isSignedIn();
+      allow create: if isSignedIn()
+                    && request.resource.data.actorId == request.auth.uid
+                    && request.resource.data.action is string;
       allow update, delete: if false; // immutable audit trail
     }
 

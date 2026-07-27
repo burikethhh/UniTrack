@@ -7,6 +7,8 @@ import '../../core/theme/app_colors.dart';
 import '../../core/constants/app_constants.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/location_provider.dart';
+import '../../providers/theme_provider.dart';
+import '../../services/activity_log_service.dart';
 import '../../widgets/widgets.dart';
 import '../../services/update_service.dart';
 import '../../services/push_notification_service.dart';
@@ -137,8 +139,10 @@ class StudentProfileScreen extends StatelessWidget {
 
                 const SizedBox(height: 20),
 
-                // Location sharing toggle
-                Consumer<LocationProvider>(
+                // Location sharing toggle (only for trackable users:
+                // student leaders and organization officers)
+                if (user.isStaff)
+                  Consumer<LocationProvider>(
                   builder: (context, locationProvider, _) {
                     return Card(
                       elevation: 0,
@@ -208,11 +212,13 @@ class StudentProfileScreen extends StatelessWidget {
                                     if (value) {
                                       final success = await locationProvider
                                           .startTracking();
+                                      if (success) ActivityLogService().logTrackingEnabled();
                                       if (!success && context.mounted) {
                                         _showLocationPermissionHelp(context);
                                       }
                                     } else {
-                                      locationProvider.stopTracking();
+                                      await locationProvider.stopTracking();
+                                      ActivityLogService().logTrackingDisabled();
                                     }
                                   },
                                   activeTrackColor: AppColors.accent.withValues(
@@ -364,7 +370,7 @@ class StudentProfileScreen extends StatelessWidget {
                     _buildMenuTile(
                       icon: Icons.info_outline,
                       iconColor: AppColors.info,
-                      title: 'About UniTrack',
+                      title: 'About ISKSULARS TRACK',
                       subtitle: 'Version ${AppConstants.appVersion}',
                       onTap: () {
                         _showAboutDialog(context);
@@ -392,7 +398,7 @@ class StudentProfileScreen extends StatelessWidget {
                       icon: Icons.help_outline,
                       iconColor: Colors.indigo,
                       title: 'Help & Support',
-                      subtitle: 'Get help with UniTrack',
+                      subtitle: 'Get help with ISKSULARS TRACK',
                       onTap: () {
                         Navigator.push(
                           context,
@@ -467,7 +473,7 @@ class StudentProfileScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'UniTrack needs location access to share your position on the campus map.',
+                'ISKSULARS TRACK needs location access to share your position on the campus map.',
                 style: TextStyle(fontSize: 14),
               ),
               const SizedBox(height: 14),
@@ -482,7 +488,7 @@ class StudentProfileScreen extends StatelessWidget {
                 _buildPermissionStep('1', 'Open your phone Settings'),
                 _buildPermissionStep(
                   '2',
-                  'Go to Apps → UniTrack → Permissions',
+                  'Go to Apps → ISKSULARS TRACK → Permissions',
                 ),
                 _buildPermissionStep(
                   '3',
@@ -718,14 +724,15 @@ class StudentProfileScreen extends StatelessWidget {
   }
 
   void _showAppearanceSettings(BuildContext context) {
+    final themeProvider = context.read<ThemeProvider>();
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      builder: (sheetContext) => Container(
+        decoration: BoxDecoration(
+          color: Theme.of(sheetContext).colorScheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         ),
         padding: const EdgeInsets.all(20),
         child: Column(
@@ -769,7 +776,7 @@ class StudentProfileScreen extends StatelessWidget {
             const SizedBox(height: 24),
 
             // Theme options
-            const Text(
+            Text(
               'Theme',
               style: TextStyle(
                 fontSize: 14,
@@ -779,24 +786,45 @@ class StudentProfileScreen extends StatelessWidget {
             ),
             const SizedBox(height: 12),
 
-            // Light theme (current)
+            // System theme
             _buildThemeOption(
-              context,
+              sheetContext,
+              icon: Icons.settings_brightness,
+              title: 'System',
+              subtitle: 'Follow device setting',
+              isSelected: themeProvider.isSystem,
+              onTap: () {
+                themeProvider.setThemeMode(ThemeMode.system);
+                Navigator.pop(sheetContext);
+              },
+            ),
+            const SizedBox(height: 8),
+
+            // Light theme
+            _buildThemeOption(
+              sheetContext,
               icon: Icons.light_mode,
               title: 'Light',
-              subtitle: 'Default bright theme',
-              isSelected: true,
-              onTap: () {},
+              subtitle: 'Always light',
+              isSelected: themeProvider.isLight,
+              onTap: () {
+                themeProvider.setThemeMode(ThemeMode.light);
+                Navigator.pop(sheetContext);
+              },
             ),
+            const SizedBox(height: 8),
 
-            const SizedBox(height: 16),
-            Text(
-              'More themes coming soon',
-              style: TextStyle(
-                fontSize: 13,
-                color: AppColors.textSecondary.withValues(alpha: 0.7),
-                fontStyle: FontStyle.italic,
-              ),
+            // Dark theme
+            _buildThemeOption(
+              sheetContext,
+              icon: Icons.dark_mode,
+              title: 'Dark',
+              subtitle: 'Always dark',
+              isSelected: themeProvider.isDark,
+              onTap: () {
+                themeProvider.setThemeMode(ThemeMode.dark);
+                Navigator.pop(sheetContext);
+              },
             ),
 
             const SizedBox(height: 20),
@@ -894,7 +922,7 @@ class StudentProfileScreen extends StatelessWidget {
               Navigator.pop(dialogContext);
               // Stop location tracking before signing out
               try {
-                locationProvider.stopTracking();
+                await locationProvider.stopTracking();
               } catch (_) {}
               await authProvider.signOut();
             },
@@ -1051,9 +1079,9 @@ class _NotificationSettingsSheetState
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       ),
       padding: const EdgeInsets.all(20),
       child: Column(
@@ -1192,7 +1220,7 @@ class _NotificationSettingsSheetState
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'To enable notifications, go to your device Settings > Apps > UniTrack > Notifications',
+                      'To enable notifications, go to your device Settings > Apps > ISKSULARS TRACK > Notifications',
                       style: TextStyle(
                         fontSize: 12,
                         color: Colors.orange.shade700,

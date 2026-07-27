@@ -1,0 +1,10 @@
+{
+  "name": "push-dispatcher",
+  "version": "1.0.0",
+  "description": "Sends FCM push notifications for ISKSULARS TRACK (GitHub Actions cron)",
+  "private": true,
+  "main": "dispatch.js",
+  "dependencies": {
+    "firebase-admin": "^13.0.0"
+  }
+}

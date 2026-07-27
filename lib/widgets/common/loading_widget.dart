@@ -272,60 +272,6 @@ class SkeletonItem extends StatelessWidget {
   }
 }
 
-/// Skeleton for faculty/user card loading
-class FacultyCardSkeleton extends StatelessWidget {
-  const FacultyCardSkeleton({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Row(
-        children: [
-          // Avatar skeleton
-          Container(
-            width: 50,
-            height: 50,
-            decoration: BoxDecoration(
-              color: AppColors.border,
-              shape: BoxShape.circle,
-            ),
-          ),
-          const SizedBox(width: 12),
-          // Info skeleton
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SkeletonItem(width: 150, height: 16),
-                const SizedBox(height: 8),
-                SkeletonItem(width: 100, height: 12),
-                const SizedBox(height: 4),
-                SkeletonItem(width: 80, height: 12),
-              ],
-            ),
-          ),
-          // Status skeleton
-          Container(
-            width: 60,
-            height: 24,
-            decoration: BoxDecoration(
-              color: AppColors.border,
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 /// Pull-to-refresh wrapper
 class RefreshableList extends StatelessWidget {
   final Future<void> Function() onRefresh;

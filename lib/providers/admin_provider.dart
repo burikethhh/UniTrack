@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import '../models/models.dart';
+import '../services/activity_log_service.dart';
 
 /// Statistics model for admin dashboard
 class AppStatistics {
   final int totalUsers;
   final int totalStudents;
-  final int totalStaff;
+  final int totalStudentLeaders;
+  final int totalOrgOfficers;
   final int totalAdmins;
   final int activeToday;
   final int newUsersThisWeek;
@@ -21,7 +22,8 @@ class AppStatistics {
   AppStatistics({
     this.totalUsers = 0,
     this.totalStudents = 0,
-    this.totalStaff = 0,
+    this.totalStudentLeaders = 0,
+    this.totalOrgOfficers = 0,
     this.totalAdmins = 0,
     this.activeToday = 0,
     this.newUsersThisWeek = 0,
@@ -56,7 +58,7 @@ class ActivityLog {
     final data = doc.data() as Map<String, dynamic>;
     return ActivityLog(
       id: doc.id,
-      userId: data['userId'] ?? '',
+      userId: data['actorId'] ?? '',
       userName: data['userName'] ?? 'Unknown',
       action: data['action'] ?? '',
       details: data['details'],
@@ -80,13 +82,20 @@ class AdminProvider extends ChangeNotifier {
   bool _showBannedOnly = false;
   String _sortBy = 'name'; // 'name', 'date', 'role', 'campus'
 
+  // Pagination
+  static const int _pageSize = 100;
+  DocumentSnapshot? _lastDocument;
+  bool _hasMoreUsers = true;
+
   // Getters
   List<UserModel> get allUsers => _allUsers;
   List<UserModel> get filteredUsers => _filteredUsers;
   List<UserModel> get students =>
       _allUsers.where((u) => u.role == UserRole.student).toList();
-  List<UserModel> get staff =>
-      _allUsers.where((u) => u.role == UserRole.staff).toList();
+  List<UserModel> get studentLeaders =>
+      _allUsers.where((u) => u.role == UserRole.studentLeader).toList();
+  List<UserModel> get orgOfficers =>
+      _allUsers.where((u) => u.role == UserRole.organizationOfficer).toList();
   List<UserModel> get admins =>
       _allUsers.where((u) => u.role == UserRole.admin).toList();
   List<UserModel> get bannedUsers =>
@@ -98,6 +107,7 @@ class AdminProvider extends ChangeNotifier {
   UserRole? get roleFilter => _roleFilter;
   String? get campusFilter => _campusFilter;
   bool get showBannedOnly => _showBannedOnly;
+  bool get hasMoreUsers => _hasMoreUsers;
 
   /// Initialize and load all data
   Future<void> initialize() async {
@@ -108,17 +118,65 @@ class AdminProvider extends ChangeNotifier {
   Future<void> loadAllUsers() async {
     _isLoading = true;
     _error = null;
+    _allUsers = [];
+    _lastDocument = null;
+    _hasMoreUsers = true;
     notifyListeners();
 
     try {
-      final snapshot = await _firestore
+      Query query = _firestore
           .collection('users')
           .orderBy('createdAt', descending: true)
-          .get();
+          .limit(_pageSize);
+
+      final snapshot = await query.get();
+
+      if (snapshot.docs.isNotEmpty) {
+        _lastDocument = snapshot.docs.last;
+        _hasMoreUsers = snapshot.docs.length == _pageSize;
+      } else {
+        _hasMoreUsers = false;
+      }
 
       _allUsers = snapshot.docs
           .map((doc) => UserModel.fromFirestore(doc))
           .toList();
+
+      _applyFilters();
+      _isLoading = false;
+      notifyListeners();
+    } catch (e) {
+      _error = e.toString();
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// Load next page of users (cursor-based pagination)
+  Future<void> loadMoreUsers() async {
+    if (!_hasMoreUsers || _isLoading) return;
+
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      Query query = _firestore
+          .collection('users')
+          .orderBy('createdAt', descending: true)
+          .startAfterDocument(_lastDocument!)
+          .limit(_pageSize);
+
+      final snapshot = await query.get();
+
+      if (snapshot.docs.isNotEmpty) {
+        _lastDocument = snapshot.docs.last;
+        _hasMoreUsers = snapshot.docs.length == _pageSize;
+        _allUsers.addAll(
+          snapshot.docs.map((doc) => UserModel.fromFirestore(doc)).toList(),
+        );
+      } else {
+        _hasMoreUsers = false;
+      }
 
       _applyFilters();
       _isLoading = false;
@@ -139,7 +197,7 @@ class AdminProvider extends ChangeNotifier {
       final monthStart = DateTime(now.year, now.month, 1);
 
       // Count by role
-      int students = 0, staff = 0, admins = 0, banned = 0;
+      int students = 0, studentLeaders = 0, orgOfficers = 0, admins = 0, banned = 0;
       int activeToday = 0, newThisWeek = 0, newThisMonth = 0;
       Map<String, int> byDepartment = {};
       Map<String, int> byCampus = {};
@@ -150,8 +208,11 @@ class AdminProvider extends ChangeNotifier {
           case UserRole.student:
             students++;
             break;
-          case UserRole.staff:
-            staff++;
+          case UserRole.studentLeader:
+            studentLeaders++;
+            break;
+          case UserRole.organizationOfficer:
+            orgOfficers++;
             break;
           case UserRole.admin:
             admins++;
@@ -185,7 +246,7 @@ class AdminProvider extends ChangeNotifier {
       }
 
       // Get online count from locations using aggregation (avoid downloading all docs)
-      // Count ALL location docs – staff outside campus boundaries are still online
+      // Count ALL location docs — leaders/officers outside campus boundaries are still online
       final onlineCountResult = await _firestore
           .collection('locations')
           .count()
@@ -206,7 +267,8 @@ class AdminProvider extends ChangeNotifier {
       _statistics = AppStatistics(
         totalUsers: _allUsers.length,
         totalStudents: students,
-        totalStaff: staff,
+        totalStudentLeaders: studentLeaders,
+        totalOrgOfficers: orgOfficers,
         totalAdmins: admins,
         activeToday: activeToday,
         newUsersThisWeek: newThisWeek,
@@ -311,31 +373,18 @@ class AdminProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Ban a user (disable account)
+  /// Ban a user (set isActive=false in Firestore; login flow blocks them)
   Future<bool> banUser(String userId, {String? reason}) async {
     try {
-      await _firestore.collection('users').doc(userId).set({
+      final updates = <String, dynamic>{
         'isActive': false,
         'bannedAt': FieldValue.serverTimestamp(),
-        'banReason': reason,
-      }, SetOptions(merge: true));
+      };
+      if (reason != null) updates['banReason'] = reason;
+      await _firestore.collection('users').doc(userId).update(updates);
 
-      // Log activity
-      await _logActivity(
-        userId: userId,
-        action: 'USER_BANNED',
-        details: reason ?? 'Account disabled by admin',
-      );
-
-      // Update local state
-      final index = _allUsers.indexWhere((u) => u.id == userId);
-      if (index != -1) {
-        _allUsers[index] = _allUsers[index].copyWith(isActive: false);
-        _applyFilters();
-        await loadStatistics();
-        notifyListeners();
-      }
-
+      _updateLocalUser(userId, (u) => u.copyWith(isActive: false));
+      ActivityLogService().logBanUser(userId, reason: reason);
       return true;
     } catch (e) {
       _error = e.toString();
@@ -344,31 +393,17 @@ class AdminProvider extends ChangeNotifier {
     }
   }
 
-  /// Unban a user (re-enable account)
+  /// Unban a user (set isActive=true)
   Future<bool> unbanUser(String userId) async {
     try {
-      await _firestore.collection('users').doc(userId).set({
+      await _firestore.collection('users').doc(userId).update({
         'isActive': true,
-        'bannedAt': null,
-        'banReason': null,
-      }, SetOptions(merge: true));
+        'bannedAt': FieldValue.delete(),
+        'banReason': FieldValue.delete(),
+      });
 
-      // Log activity
-      await _logActivity(
-        userId: userId,
-        action: 'USER_UNBANNED',
-        details: 'Account re-enabled by admin',
-      );
-
-      // Update local state
-      final index = _allUsers.indexWhere((u) => u.id == userId);
-      if (index != -1) {
-        _allUsers[index] = _allUsers[index].copyWith(isActive: true);
-        _applyFilters();
-        await loadStatistics();
-        notifyListeners();
-      }
-
+      _updateLocalUser(userId, (u) => u.copyWith(isActive: true));
+      ActivityLogService().logUnbanUser(userId);
       return true;
     } catch (e) {
       _error = e.toString();
@@ -377,57 +412,41 @@ class AdminProvider extends ChangeNotifier {
     }
   }
 
-  /// Delete a user permanently
+  /// Delete a user document from Firestore (Firebase Auth account becomes orphaned
+  /// — user can't log in because Firestore rules + isActive check block them).
   Future<bool> deleteUser(String userId) async {
     try {
-      // Prevent admin from deleting themselves
-      final currentUid = FirebaseAuth.instance.currentUser?.uid;
-      if (userId == currentUid) {
-        _error = 'Cannot delete your own account from admin panel';
-        notifyListeners();
-        return false;
-      }
+      final batch = _firestore.batch();
 
-      // Delete user document
-      await _firestore.collection('users').doc(userId).delete();
+      // Delete user doc
+      batch.delete(_firestore.collection('users').doc(userId));
 
-      // Delete user's location if exists
-      await _firestore.collection('locations').doc(userId).delete();
+      // Delete location doc if exists
+      batch.delete(_firestore.collection('locations').doc(userId));
 
-      // Delete user's notifications (received AND sent) using batch
-      final receivedSnapshot = await _firestore
+      // Delete notifications where user is recipient or sender
+      final receivedSnap = await _firestore
           .collection('notifications')
           .where('recipientId', isEqualTo: userId)
+          .limit(499)
           .get();
-      final sentSnapshot = await _firestore
+      final sentSnap = await _firestore
           .collection('notifications')
           .where('senderId', isEqualTo: userId)
+          .limit(499)
           .get();
-      final allNotifDocs = [...receivedSnapshot.docs, ...sentSnapshot.docs];
-      if (allNotifDocs.isNotEmpty) {
-        for (int i = 0; i < allNotifDocs.length; i += 499) {
-          final batch = _firestore.batch();
-          final chunk = allNotifDocs.skip(i).take(499);
-          for (final doc in chunk) {
-            batch.delete(doc.reference);
-          }
-          await batch.commit();
-        }
+
+      for (final doc in [...receivedSnap.docs, ...sentSnap.docs]) {
+        batch.delete(doc.reference);
       }
 
-      // Log activity
-      await _logActivity(
-        userId: userId,
-        action: 'USER_DELETED',
-        details: 'Account permanently deleted by admin',
-      );
+      await batch.commit();
 
-      // Update local state
       _allUsers.removeWhere((u) => u.id == userId);
       _applyFilters();
       await loadStatistics();
+      ActivityLogService().logDeleteUser(userId);
       notifyListeners();
-
       return true;
     } catch (e) {
       _error = e.toString();
@@ -436,34 +455,31 @@ class AdminProvider extends ChangeNotifier {
     }
   }
 
-  /// Update user role
+  /// Update user role (admin-only, secured by Firestore rules)
   Future<bool> updateUserRole(String userId, UserRole newRole) async {
     try {
-      await _firestore.collection('users').doc(userId).set({
+      await _firestore.collection('users').doc(userId).update({
         'role': newRole.name,
-      }, SetOptions(merge: true));
+      });
 
-      // Log activity
-      await _logActivity(
-        userId: userId,
-        action: 'ROLE_CHANGED',
-        details: 'Role changed to ${newRole.name}',
-      );
-
-      // Update local state
-      final index = _allUsers.indexWhere((u) => u.id == userId);
-      if (index != -1) {
-        _allUsers[index] = _allUsers[index].copyWith(role: newRole);
-        _applyFilters();
-        await loadStatistics();
-        notifyListeners();
-      }
-
+      _updateLocalUser(userId, (u) => u.copyWith(role: newRole));
+      ActivityLogService().logRoleChange(userId, newRole.name);
       return true;
     } catch (e) {
       _error = e.toString();
       notifyListeners();
       return false;
+    }
+  }
+
+  /// Helper: update a single user in the local cache and refresh stats
+  void _updateLocalUser(String userId, UserModel Function(UserModel) updater) {
+    final index = _allUsers.indexWhere((u) => u.id == userId);
+    if (index != -1) {
+      _allUsers[index] = updater(_allUsers[index]);
+      _applyFilters();
+      loadStatistics();
+      notifyListeners();
     }
   }
 
@@ -482,37 +498,6 @@ class AdminProvider extends ChangeNotifier {
       _error = e.toString();
       notifyListeners();
       return false;
-    }
-  }
-
-  /// Log admin activity
-  Future<void> _logActivity({
-    required String userId,
-    required String action,
-    String? details,
-  }) async {
-    try {
-      final user = _allUsers.firstWhere(
-        (u) => u.id == userId,
-        orElse: () => UserModel(
-          id: userId,
-          email: '',
-          firstName: 'Unknown',
-          lastName: 'User',
-          role: UserRole.student,
-          createdAt: DateTime.now(),
-        ),
-      );
-
-      await _firestore.collection('activity_logs').add({
-        'userId': userId,
-        'userName': user.fullName,
-        'action': action,
-        'details': details,
-        'timestamp': FieldValue.serverTimestamp(),
-      });
-    } catch (e) {
-      debugPrint('Error logging activity: $e');
     }
   }
 

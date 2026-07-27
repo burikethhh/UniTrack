@@ -4,3 +4,4 @@ export 'location_provider.dart';
 export 'faculty_provider.dart';
 export 'notification_provider.dart';
 export 'admin_provider.dart';
+export 'theme_provider.dart';

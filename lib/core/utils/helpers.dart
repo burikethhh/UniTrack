@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../models/models.dart';
 import '../../providers/providers.dart';
+import '../../services/activity_log_service.dart';
 import '../theme/app_colors.dart';
 import '../constants/app_constants.dart';
 import 'package:provider/provider.dart';
@@ -87,11 +88,13 @@ Future<void> pingFaculty({
 
   if (confirmed != true || !context.mounted) return;
 
+  ActivityLogService().logPing(facultyId);
+
   try {
     final success = await notificationProvider.pingStaff(
       student: currentUser,
-      staffId: facultyId,
-      staffName: facultyName,
+      recipientId: facultyId,
+      recipientName: facultyName,
     );
 
     if (!success && context.mounted) {
@@ -166,10 +169,14 @@ class RoleBadge extends StatelessWidget {
         color = Colors.purple;
         icon = Icons.admin_panel_settings;
         label = 'Admin';
-      case UserRole.staff:
-        color = Colors.blue;
-        icon = Icons.badge;
-        label = 'Staff';
+      case UserRole.organizationOfficer:
+        color = Colors.teal;
+        icon = Icons.groups;
+        label = 'Org Officer';
+      case UserRole.studentLeader:
+        color = Colors.orange;
+        icon = Icons.account_balance;
+        label = 'Leader';
       case UserRole.student:
         color = Colors.green;
         icon = Icons.school;
