@@ -50,19 +50,19 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyAY4CRN5-oadBrBfZ1mxHY36Y51AB3msCE',
-    appId: '1:142302004772:web:03dad372375e7d67103ab1',
-    messagingSenderId: '142302004772',
-    projectId: 'unitrack-sksu-app',
-    authDomain: 'unitrack-sksu-app.firebaseapp.com',
-    storageBucket: 'unitrack-sksu-app.firebasestorage.app',
+    apiKey: 'AIzaSyBhSl-KJ5bF3CtsYfm1etcwHNCgyGsSAo8',
+    appId: '1:505882301770:web:d5d1c0e7b3d6b17f9c9db3',
+    messagingSenderId: '505882301770',
+    projectId: 'isksulars-891c9',
+    authDomain: 'isksulars-891c9.firebaseapp.com',
+    storageBucket: 'isksulars-891c9.firebasestorage.app',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyAGQYoFwe5W7WbNEyPlyH2PeSUU4sFdfFc',
-    appId: '1:142302004772:android:612b99eb83d2505e103ab1',
-    messagingSenderId: '142302004772',
-    projectId: 'unitrack-sksu-app',
-    storageBucket: 'unitrack-sksu-app.firebasestorage.app',
+    apiKey: 'AIzaSyBhSl-KJ5bF3CtsYfm1etcwHNCgyGSSo8',
+    appId: '1:505882301770:android:placeholder',
+    messagingSenderId: '505882301770',
+    projectId: 'isksulars-891c9',
+    storageBucket: 'isksulars-891c9.firebasestorage.app',
   );
 }

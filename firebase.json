@@ -3,14 +3,14 @@
     "platforms": {
       "android": {
         "default": {
-          "projectId": "unitrack-sksu-app",
+          "projectId": "isksulars-891c9",
           "appId": "1:142302004772:android:612b99eb83d2505e103ab1",
           "fileOutput": "android/app/google-services.json"
         }
       },
       "dart": {
         "lib/firebase_options.dart": {
-          "projectId": "unitrack-sksu-app",
+          "projectId": "isksulars-891c9",
           "configurations": {
             "android": "1:142302004772:android:612b99eb83d2505e103ab1"
           }

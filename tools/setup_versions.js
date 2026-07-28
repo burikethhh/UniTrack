@@ -21,8 +21,8 @@ const serviceAccountPath = path.join(__dirname, '..', 'android', 'app', 'google-
 // For now, using the default credentials approach
 admin.initializeApp({
   credential: admin.credential.applicationDefault(),
-  projectId: 'unitrack-sksu-app',
-  storageBucket: 'unitrack-sksu-app.firebasestorage.app'
+  projectId: 'isksulars-891c9',
+  storageBucket: 'isksulars-891c9.firebasestorage.app'
 });
 
 const db = admin.firestore();

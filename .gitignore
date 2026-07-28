@@ -48,3 +48,5 @@ tools/service-account.json
 tools/promote_admin_rest.js
 unitrack-latest.apk
 *.apk
+
+node_modules/

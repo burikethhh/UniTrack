@@ -3,7 +3,7 @@ import 'dart:js_interop';
 /// Dart interop for web/bg_tracking.js
 /// Activates Wake Lock + beforeunload beacon for background GPS on web.
 class WebBackgroundService {
-  static const _projectId = 'unitrack-sksu-app';
+  static const _projectId = 'isksulars-891c9';
 
   /// Start background tracking helpers (Wake Lock + offline beacon).
   /// [authToken] is the Firebase Auth ID token for Firestore REST writes.
