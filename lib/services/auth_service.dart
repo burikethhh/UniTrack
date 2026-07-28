@@ -47,45 +47,17 @@ class AuthService {
       if (credential.user != null) {
         final firebaseUser = credential.user!;
 
-        // Platform-aware timeout: web Firestore is slower (no persistent connection)
-        final timeout = kIsWeb
-            ? const Duration(seconds: 15)
-            : const Duration(seconds: 8);
-
-        // Fetch user model — retry once on timeout instead of using a fallback
+        // Fetch user document — single attempt with reasonable timeout
+        // (no retry, retry doubles the wait to 30s+ for no benefit on Spark)
         UserModel? userModel;
         try {
-          userModel = await getUserById(firebaseUser.uid).timeout(timeout);
-          if (kDebugMode) debugPrint('User document found: ${userModel?.fullName}');
-        } catch (e) {
-          debugPrint('First attempt to fetch user document failed: $e');
-          // Retry once with a longer timeout
-          try {
-            userModel = await getUserById(
-              firebaseUser.uid,
-            ).timeout(const Duration(seconds: 15));
-            if (kDebugMode) debugPrint('User document found on retry: ${userModel?.fullName}');
-          } catch (e2) {
-            debugPrint('Retry also failed: $e2');
-          }
-        }
-
-        // If user document truly doesn't exist, create it via legacy migration
-        if (userModel == null) {
-          debugPrint(
-            'No user document found, creating via legacy migration...',
+          userModel = await getUserById(firebaseUser.uid).timeout(
+            kIsWeb ? const Duration(seconds: 10) : const Duration(seconds: 5),
           );
-          userModel = await createUserDocumentForLegacyUser(firebaseUser)
-              .timeout(
-                const Duration(seconds: 10),
-                onTimeout: () {
-                  debugPrint('Legacy user creation timed out');
-                  return null;
-                },
-              );
+        } catch (e) {
+          debugPrint('Error fetching user document: $e');
         }
 
-        // If we still have no user model, sign out and throw a clear error
         if (userModel == null) {
           await _auth.signOut();
           throw 'Could not load your profile. Please check your connection and try again.';
@@ -148,13 +120,10 @@ class AuthService {
       );
 
       if (credential.user != null) {
-        // Send email verification
-        try {
-          await credential.user!.sendEmailVerification();
-          if (kDebugMode) debugPrint('Verification email sent to $email');
-        } catch (e) {
+        // Fire-and-forget: send verification email in background
+        credential.user!.sendEmailVerification().catchError((e) {
           if (kDebugMode) debugPrint('Failed to send verification email: $e');
-        }
+        });
 
         final isStaffRole = role == UserRole.studentLeader || role == UserRole.organizationOfficer;
 

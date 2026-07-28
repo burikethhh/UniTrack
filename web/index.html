@@ -17,12 +17,12 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="ISKSULARS TRACK">
-  <link rel="apple-touch-icon" href="icons/Icon-circle-192.png">
-  <link rel="apple-touch-icon" sizes="152x152" href="icons/Icon-circle-192.png">
-  <link rel="apple-touch-icon" sizes="167x167" href="icons/Icon-circle-192.png">
-  <link rel="apple-touch-icon" sizes="180x180" href="icons/Icon-circle-512.png">
-  <link rel="apple-touch-icon" sizes="192x192" href="icons/Icon-circle-192.png">
-  <link rel="apple-touch-icon" sizes="512x512" href="icons/Icon-circle-512.png">
+  <link rel="apple-touch-icon" href="icons/Icon-circle-192.png?v=276">
+  <link rel="apple-touch-icon" sizes="152x152" href="icons/Icon-circle-192.png?v=276">
+  <link rel="apple-touch-icon" sizes="167x167" href="icons/Icon-circle-192.png?v=276">
+  <link rel="apple-touch-icon" sizes="180x180" href="icons/Icon-circle-512.png?v=276">
+  <link rel="apple-touch-icon" sizes="192x192" href="icons/Icon-circle-192.png?v=276">
+  <link rel="apple-touch-icon" sizes="512x512" href="icons/Icon-circle-512.png?v=276">
 
   <!-- iOS PWA Splash/Launch Images -->
   <link rel="apple-touch-startup-image" href="icons/launch-640x1136.png"
@@ -472,7 +472,7 @@
     })();
   </script>
 
-  <!-- PWA Install Logic (Android/Desktop Chrome + iOS Safari fallback) -->
+  <!-- PWA Install Logic -->
   <script>
     (function() {
       var deferredPrompt = null;
@@ -480,103 +480,83 @@
       var installBanner = document.getElementById('installBanner');
       var installBtn = document.getElementById('installBtn');
       var installClose = document.getElementById('installClose');
-      var isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
-                         window.navigator.standalone === true;
+      var DISMISS_KEY = 'pwa-dismissed-at';
 
-      // Detect iOS Safari
+      // Check if already installed as PWA
+      var isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
+                         (window.navigator.standalone === true);
+      // Check if running in iframe (some browsers don't support standalone check)
+      var isIframe = window.self !== window.top;
+
+      // Detect iOS Safari (doesn't support beforeinstallprompt)
       var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
                   (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
       var isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-
-      // ---- Dismiss persistence: store timestamp, re-show after 3 days ----
-      var DISMISS_KEY = 'pwa-install-dismissed-at';
-      var BANNER_SHOWN_KEY = 'pwa-banner-shown';
+      var isAppStore = !!window.navigator.standalone; // iOS standalone check
 
       function shouldShowBanner() {
-        if (isStandalone) return false;
+        // Don't show if already installed
+        if (isStandalone || isAppStore || isIframe) return false;
+        // Check dismiss timer
         var dismissedAt = localStorage.getItem(DISMISS_KEY);
         if (!dismissedAt) return true;
         var elapsed = Date.now() - parseInt(dismissedAt, 10);
-        var threeDays = 3 * 24 * 60 * 60 * 1000;
-        return elapsed > threeDays;
+        var oneDay = 24 * 60 * 60 * 1000;
+        // Re-prompt after 1 day
+        if (elapsed > oneDay) {
+          localStorage.removeItem(DISMISS_KEY);
+          return true;
+        }
+        return false;
       }
 
-      function dismissBanner() {
-        localStorage.setItem(DISMISS_KEY, String(Date.now()));
-        overlay.style.display = 'none';
-        installBanner.style.display = 'none';
-      }
-
-      // ---- Show the banner (called when conditions are met) ----
       function showBanner() {
         if (!shouldShowBanner()) return;
-        if (localStorage.getItem(BANNER_SHOWN_KEY)) return;
-        localStorage.setItem(BANNER_SHOWN_KEY, '1');
-
-        if (isIOS && isSafari) {
+        if (isIOS && isSafari && !isStandalone) {
           installBtn.textContent = 'How to Install';
         }
         overlay.style.display = 'block';
         installBanner.style.display = 'block';
       }
 
-      // ---- Trigger: user first interaction (scroll 200px or tap) ----
-      var interactionDetected = false;
-
-      function onFirstInteraction() {
-        if (interactionDetected) return;
-        interactionDetected = true;
-        showBanner();
+      function dismissBanner() {
+        overlay.style.display = 'none';
+        installBanner.style.display = 'none';
+        localStorage.setItem(DISMISS_KEY, String(Date.now()));
       }
 
-      window.addEventListener('scroll', function() {
-        if (window.scrollY > 200) onFirstInteraction();
-      }, { passive: true });
-
-      document.addEventListener('touchstart', onFirstInteraction, { once: true });
-      document.addEventListener('click', onFirstInteraction, { once: true });
-
-      // ---- Also show on beforeinstallprompt if not yet triggered ----
+      // ---- Android / Desktop Chrome: native install prompt ----
       window.addEventListener('beforeinstallprompt', function(e) {
         e.preventDefault();
         deferredPrompt = e;
-        if (!interactionDetected) {
-          // User hasn't scrolled/tapped yet; show the banner since the OS
-          // has signaled installability
-          showBanner();
-          interactionDetected = true;
-        }
+        showBanner();
       });
 
-      // ---- Button handlers ----
+      // ---- Safari iOS: show banner after a short delay ----
+      if (isIOS && isSafari && !isStandalone) {
+        setTimeout(showBanner, 2500);
+      }
+
+      // ---- Button clicks ----
       installBtn.addEventListener('click', function() {
         if (deferredPrompt) {
           deferredPrompt.prompt();
           deferredPrompt.userChoice.then(function() {
             deferredPrompt = null;
+            dismissBanner();
           });
         } else if (isIOS && isSafari) {
           alert('To install ISKSULARS TRACK:\n\n1. Tap the Share button (square with arrow)\n2. Scroll down and tap "Add to Home Screen"\n3. Tap "Add"');
+          dismissBanner();
         }
-        overlay.style.display = 'none';
-        installBanner.style.display = 'none';
-        localStorage.removeItem(BANNER_SHOWN_KEY);
       });
 
-      installClose.addEventListener('click', function() {
-        dismissBanner();
-        localStorage.removeItem(BANNER_SHOWN_KEY);
-      });
+      installClose.addEventListener('click', dismissBanner);
+      overlay.addEventListener('click', dismissBanner);
 
-      overlay.addEventListener('click', function() {
-        dismissBanner();
-        localStorage.removeItem(BANNER_SHOWN_KEY);
-      });
-
-      // Never show if already installed in standalone mode
-      if (isStandalone) {
-        overlay.style.display = 'none';
-        installBanner.style.display = 'none';
+      // ---- Failsafe show for non-iOS, non-Android (desktop Chrome etc) ----
+      if (!isStandalone && !isAppStore && !isIframe && !isIOS) {
+        setTimeout(showBanner, 3000);
       }
     })();
   </script>
