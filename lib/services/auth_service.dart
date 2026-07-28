@@ -120,11 +120,6 @@ class AuthService {
       );
 
       if (credential.user != null) {
-        // Fire-and-forget: send verification email in background
-        credential.user!.sendEmailVerification().catchError((e) {
-          if (kDebugMode) debugPrint('Failed to send verification email: $e');
-        });
-
         final isStaffRole = role == UserRole.studentLeader || role == UserRole.organizationOfficer;
 
         final user = UserModel(
@@ -144,11 +139,14 @@ class AuthService {
           currentStatus: isStaffRole ? 'Available' : null,
         );
 
-        // Save user to Firestore
-        await _firestore
-            .collection('users')
-            .doc(credential.user!.uid)
-            .set(user.toFirestore());
+        // Run Firestore write + email verification in parallel
+        await Future.wait([
+          _firestore
+              .collection('users')
+              .doc(credential.user!.uid)
+              .set(user.toFirestore()),
+          credential.user!.sendEmailVerification(),
+        ], eagerError: false).catchError((_) => []);
 
         return user;
       }
