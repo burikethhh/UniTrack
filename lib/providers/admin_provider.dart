@@ -100,6 +100,10 @@ class AdminProvider extends ChangeNotifier {
       _allUsers.where((u) => u.role == UserRole.admin).toList();
   List<UserModel> get bannedUsers =>
       _allUsers.where((u) => !u.isActive).toList();
+  List<UserModel> get pendingApprovalUsers =>
+      _allUsers.where((u) => !u.isActive &&
+          (u.role == UserRole.studentLeader ||
+           u.role == UserRole.organizationOfficer)).toList();
   AppStatistics get statistics => _statistics;
   bool get isLoading => _isLoading;
   String? get error => _error;
@@ -404,6 +408,23 @@ class AdminProvider extends ChangeNotifier {
 
       _updateLocalUser(userId, (u) => u.copyWith(isActive: true));
       ActivityLogService().logUnbanUser(userId);
+      return true;
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Approve a pending staff registration
+  Future<bool> approveUser(String userId) async {
+    try {
+      await _firestore.collection('users').doc(userId).update({
+        'isActive': true,
+      });
+
+      _updateLocalUser(userId, (u) => u.copyWith(isActive: true));
+      ActivityLogService().logApproveUser(userId);
       return true;
     } catch (e) {
       _error = e.toString();

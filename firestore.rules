@@ -23,33 +23,48 @@ service cloud.firestore {
     }
 
     // Roles that a user may assign to THEMSELVES at registration.
-    // Privileged trackable roles (studentleader, organizationofficer) require
-    // admin approval — a user cannot self-promote to them.
+    // Student role gets immediate approval (isActive: true).
+    // Staff roles (studentLeader, organizationOfficer) get isActive: false
+    // and require admin approval before they appear on the map.
     function isSelfRegistrationRole(role) {
-      return role == 'student';
+      return role is string
+             && (role == 'student'
+                 || role == 'studentleader'
+                 || role == 'organizationOfficer');
     }
 
     function isValidUserRole(role) {
       return role is string
              && (role == 'student'
                  || role == 'studentleader'
-                 || role == 'organizationofficer'
+                 || role == 'organizationOfficer'
                  || role == 'admin');
+    }
+
+function isStaffRole(role) {
+      return role is string
+             && (role == 'studentleader'
+                 || role == 'organizationOfficer');
     }
 
     // ── Users collection ──────────────────────────────────────────────
     // Authenticated users can read any profile (needed for faculty lookup).
     // Users can update their OWN doc (but not role/isActive fields).
     // Admins can update ANY user doc including role/isActive.
+    // Students auto-approve (isActive = true). Staff roles require admin
+    // approval and must register with isActive = false.
     match /users/{userId} {
       allow read: if isSignedIn();
       allow create: if isOwner(userId)
                     && isValidUserRole(request.resource.data.role)
-                    && isSelfRegistrationRole(request.resource.data.role);
+                    && isSelfRegistrationRole(request.resource.data.role)
+                    && (request.resource.data.role == 'student'
+                        || (isStaffRole(request.resource.data.role)
+                            && request.resource.data.isActive == false));
       allow update: if (isOwner(userId)
-                       && !request.resource.data.diff(resource.data).affectedKeys()
-                           .hasAny(['role', 'isActive']))
-                    || isAdmin();
+                        && !request.resource.data.diff(resource.data).affectedKeys()
+                            .hasAny(['role', 'isActive']))
+                     || isAdmin();
       allow delete: if isAdmin();
     }
 

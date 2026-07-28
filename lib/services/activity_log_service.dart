@@ -87,4 +87,9 @@ class ActivityLogService {
   void logBroadcast(String audience, int recipientCount) {
     log(action: 'BROADCAST_SENT', details: '$audience ($recipientCount)');
   }
+
+  /// Log when an admin approves a pending staff user
+  void logApproveUser(String targetUserId) {
+    log(action: 'APPROVE_USER', targetId: targetUserId);
+  }
 }

@@ -8,7 +8,7 @@ class AppConstants {
   static const String appVersion =
       '2.5.0'; // Firestore-direct admin ops + activity audit trail
   static const int versionCode =
-      274; // Version code for update checks
+      275; // Version code for update checks
   static const String appTagline = 'Real-Time Campus Locator & Directory';
 
   // Version Compatibility - for older app versions to update

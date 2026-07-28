@@ -3,7 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import '../models/user_model.dart';
 
-/// Authentication Service for UniTrack
+/// Authentication Service for ISKSULARS TRACK
 class AuthService {
   final FirebaseAuth _auth;
   final FirebaseFirestore _firestore;
@@ -36,13 +36,13 @@ class AuthService {
     required String password,
   }) async {
     try {
-      debugPrint('Attempting login for: $email');
+      if (kDebugMode) debugPrint('Attempting login for: $email');
       final credential = await _auth.signInWithEmailAndPassword(
         email: email,
         password: password,
       );
 
-      debugPrint('Firebase Auth successful: uid=${credential.user?.uid}');
+      if (kDebugMode) debugPrint('Firebase Auth successful: uid=${credential.user?.uid}');
 
       if (credential.user != null) {
         final firebaseUser = credential.user!;
@@ -56,7 +56,7 @@ class AuthService {
         UserModel? userModel;
         try {
           userModel = await getUserById(firebaseUser.uid).timeout(timeout);
-          debugPrint('User document found: ${userModel?.fullName}');
+          if (kDebugMode) debugPrint('User document found: ${userModel?.fullName}');
         } catch (e) {
           debugPrint('First attempt to fetch user document failed: $e');
           // Retry once with a longer timeout
@@ -64,7 +64,7 @@ class AuthService {
             userModel = await getUserById(
               firebaseUser.uid,
             ).timeout(const Duration(seconds: 15));
-            debugPrint('User document found on retry: ${userModel?.fullName}');
+            if (kDebugMode) debugPrint('User document found on retry: ${userModel?.fullName}');
           } catch (e2) {
             debugPrint('Retry also failed: $e2');
           }
@@ -91,11 +91,15 @@ class AuthService {
           throw 'Could not load your profile. Please check your connection and try again.';
         }
 
-        // Check if user is banned
+        // Check if user is banned / pending approval
         if (!userModel.isActive) {
           debugPrint('User is banned/inactive');
           await _auth.signOut();
-          throw 'Your account has been disabled. Please contact an administrator.';
+          final isStaffRole = userModel.role == UserRole.studentLeader ||
+              userModel.role == UserRole.organizationOfficer;
+          throw isStaffRole
+              ? 'Your account is pending admin approval. You\'ll be able to log in once approved.'
+              : 'Your account has been disabled. Please contact an administrator.';
         }
 
         // Update last login time in background (fire-and-forget, don't block)
@@ -107,7 +111,7 @@ class AuthService {
               debugPrint('Error updating last login: $e');
             });
 
-        debugPrint('Login successful for: ${userModel.fullName}');
+        if (kDebugMode) debugPrint('Login successful for: ${userModel.fullName}');
         return userModel;
       }
       return null;
@@ -129,8 +133,14 @@ class AuthService {
     required UserRole role,
     String? department,
     String? position,
+    String? organization,
     String campusId = 'isulan', // Default to Isulan campus
   }) async {
+    // Enforce SKSU email domain
+    if (!email.toLowerCase().endsWith('@sksu.edu.ph')) {
+      throw 'Only SKSU email addresses (@sksu.edu.ph) are allowed to register.';
+    }
+
     try {
       final credential = await _auth.createUserWithEmailAndPassword(
         email: email,
@@ -141,10 +151,12 @@ class AuthService {
         // Send email verification
         try {
           await credential.user!.sendEmailVerification();
-          debugPrint('Verification email sent to $email');
+          if (kDebugMode) debugPrint('Verification email sent to $email');
         } catch (e) {
-          debugPrint('Failed to send verification email: $e');
+          if (kDebugMode) debugPrint('Failed to send verification email: $e');
         }
+
+        final isStaffRole = role == UserRole.studentLeader || role == UserRole.organizationOfficer;
 
         final user = UserModel(
           id: credential.user!.uid,
@@ -154,11 +166,13 @@ class AuthService {
           role: role,
           department: department,
           position: position,
+          organization: organization,
           campusId: campusId,
           createdAt: DateTime.now(),
           lastLoginAt: DateTime.now(),
           isTrackingEnabled: false,
-          currentStatus: role == UserRole.staff ? 'Available' : null,
+          isActive: !isStaffRole,
+          currentStatus: isStaffRole ? 'Available' : null,
         );
 
         // Save user to Firestore
@@ -241,7 +255,7 @@ class AuthService {
           .doc(firebaseUser.uid)
           .set(user.toFirestore());
 
-      debugPrint('Created user document for legacy user: ${firebaseUser.uid}');
+      if (kDebugMode) debugPrint('Created user document for legacy user: ${firebaseUser.uid}');
       return user;
     } catch (e) {
       debugPrint('Error creating legacy user document: $e');
@@ -285,9 +299,11 @@ class AuthService {
             .collection('users')
             .doc(userId)
             .set(updates, SetOptions(merge: true));
-        debugPrint(
-          'Migrated user document $userId with fields: ${updates.keys.join(', ')}',
-        );
+        if (kDebugMode) {
+          debugPrint(
+            'Migrated user document $userId with fields: ${updates.keys.join(', ')}',
+          );
+        }
       }
 
       // Re-fetch and parse — don't recurse through getUserById
@@ -317,13 +333,15 @@ class AuthService {
   /// Send password reset email
   Future<void> sendPasswordResetEmail(String email) async {
     try {
-      debugPrint('🔑 Sending password reset email to: $email');
+      if (kDebugMode) debugPrint('🔑 Sending password reset email to: $email');
       await _auth.sendPasswordResetEmail(email: email);
-      debugPrint('✅ Password reset email sent successfully to: $email');
+      if (kDebugMode) debugPrint('✅ Password reset email sent successfully to: $email');
     } on FirebaseAuthException catch (e) {
-      debugPrint(
-        '❌ Password reset error: code=${e.code}, message=${e.message}',
-      );
+      if (kDebugMode) {
+        debugPrint(
+          '❌ Password reset error: code=${e.code}, message=${e.message}',
+        );
+      }
       throw _handleAuthException(e);
     } catch (e) {
       debugPrint('❌ Password reset unexpected error: $e');
