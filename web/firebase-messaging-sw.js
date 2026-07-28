@@ -8,9 +8,9 @@ firebase.initializeApp({
   apiKey: 'AIzaSyBhSl-KJ5bF3CtsYfm1etcwHNCgyGsSAo8',
   appId: '1:505882301770:web:d5d1c0e7b3d6b17f9c9db3',
   messagingSenderId: '505882301770',
-  projectId: 'isksulars-891c9',
-  authDomain: 'isksulars-891c9.firebaseapp.com',
-  storageBucket: 'isksulars-891c9.firebasestorage.app',
+  projectId: 'isksulars-track',
+  authDomain: 'isksulars-track.firebaseapp.com',
+  storageBucket: 'isksulars-track.firebasestorage.app',
 });
 
 const messaging = firebase.messaging();

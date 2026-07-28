@@ -4,16 +4,6 @@ import 'package:firebase_core/firebase_core.dart' show FirebaseOptions;
 import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, kIsWeb, TargetPlatform;
 
-/// Default [FirebaseOptions] for use with your Firebase apps.
-///
-/// Example:
-/// ```dart
-/// import 'firebase_options.dart';
-/// // ...
-/// await Firebase.initializeApp(
-///   options: DefaultFirebaseOptions.currentPlatform,
-/// );
-/// ```
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
     if (kIsWeb) {
@@ -50,19 +40,19 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyBhSl-KJ5bF3CtsYfm1etcwHNCgyGsSAo8',
-    appId: '1:505882301770:web:d5d1c0e7b3d6b17f9c9db3',
-    messagingSenderId: '505882301770',
-    projectId: 'isksulars-891c9',
-    authDomain: 'isksulars-891c9.firebaseapp.com',
-    storageBucket: 'isksulars-891c9.firebasestorage.app',
+    apiKey: 'AIzaSyBBpAsroGKwFelz0Xf4rvFzwvUl9Ht9wv8',
+    appId: '1:568922390866:web:f2d09e42176dcb1b7a3a8b',
+    messagingSenderId: '568922390866',
+    projectId: 'isksulars-track',
+    authDomain: 'isksulars-track.firebaseapp.com',
+    storageBucket: 'isksulars-track.firebasestorage.app',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyBhSl-KJ5bF3CtsYfm1etcwHNCgyGSSo8',
-    appId: '1:505882301770:android:placeholder',
-    messagingSenderId: '505882301770',
-    projectId: 'isksulars-891c9',
-    storageBucket: 'isksulars-891c9.firebasestorage.app',
+    apiKey: 'AIzaSyBBpAsroGKwFelz0Xf4rvFzwvUl9Ht9wv8',
+    appId: '1:568922390866:android:placeholder',
+    messagingSenderId: '568922390866',
+    projectId: 'isksulars-track',
+    storageBucket: 'isksulars-track.firebasestorage.app',
   );
 }

@@ -2,7 +2,7 @@
 
 **Real-Time Student Leader & Organization Officer Locator for SKSU**
 
-> [https://isksulars-891c9.web.app](https://isksulars-891c9.web.app)
+> [https://isksulars-track.web.app](https://isksulars-track.web.app)
 
 ## What it does
 

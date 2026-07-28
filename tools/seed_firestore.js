@@ -12,8 +12,8 @@ const serviceAccount = require(path.join(__dirname, 'service-account.json'));
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
-  projectId: 'isksulars-891c9',
-  storageBucket: 'isksulars-891c9.firebasestorage.app'
+  projectId: 'isksulars-track',
+  storageBucket: 'isksulars-track.firebasestorage.app'
 });
 
 const db = admin.firestore();
