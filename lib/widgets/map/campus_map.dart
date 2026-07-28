@@ -117,6 +117,14 @@ class CampusMapState extends State<CampusMap> with TickerProviderStateMixin {
     if (widget.faculty == null) return;
     bool hasChange = false;
 
+    // Clean up stale entries for faculty no longer in the list
+    final activeIds = widget.faculty!
+        .where((f) => f.location != null)
+        .map((f) => f.user.id)
+        .toSet();
+    _prevPositions.removeWhere((id, _) => !activeIds.contains(id));
+    _targetPositions.removeWhere((id, _) => !activeIds.contains(id));
+
     for (final f in widget.faculty!) {
       if (f.location == null) continue;
       final id = f.user.id;
@@ -338,7 +346,8 @@ class CampusMapState extends State<CampusMap> with TickerProviderStateMixin {
     return online.map((f) => _buildSingleFacultyMarker(f)).toList();
   }
 
-  /// Build a single faculty marker — uses customMarkerBuilder if provided
+  /// Build a single faculty marker — uses customMarkerBuilder if provided,
+  /// otherwise shows photo avatar in a colored status ring with pulse animation.
   Marker _buildSingleFacultyMarker(FacultyWithLocation faculty) {
     final isSelected = widget.selectedFaculty?.user.id == faculty.user.id;
     final point = _interpolatedPosition(
@@ -346,6 +355,7 @@ class CampusMapState extends State<CampusMap> with TickerProviderStateMixin {
       faculty.location!.latLng,
     );
     final markerSize = isSelected ? 54.0 : 44.0;
+    final avatarSize = isSelected ? 44.0 : 36.0;
 
     if (widget.customMarkerBuilder != null) {
       return Marker(
@@ -360,39 +370,56 @@ class CampusMapState extends State<CampusMap> with TickerProviderStateMixin {
     }
 
     final color = AppColors.getStatusColor(faculty.displayStatus);
+    final hasPhoto = faculty.user.photoUrl != null && faculty.user.photoUrl!.isNotEmpty;
+
     return Marker(
       point: point,
       width: markerSize,
       height: markerSize,
       child: GestureDetector(
         onTap: () => widget.onMarkerTap?.call(faculty),
-        child: Container(
-          decoration: BoxDecoration(
-            color: color,
-            shape: BoxShape.circle,
-            border: Border.all(
-              color: isSelected ? Colors.amber : Colors.white,
-              width: isSelected ? 4 : 2,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: isSelected
-                    ? Colors.amber.withValues(alpha: 0.6)
-                    : color.withValues(alpha: 0.4),
-                blurRadius: isSelected ? 12 : 6,
-                spreadRadius: isSelected ? 3 : 1,
+        child: _PulseMarker(
+          color: color,
+          isSelected: isSelected,
+          markerSize: markerSize,
+          child: Container(
+            width: avatarSize,
+            height: avatarSize,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: isSelected ? Colors.amber : Colors.white,
+                width: isSelected ? 3 : 2,
               ),
-            ],
+            ),
+            child: ClipOval(
+              child: hasPhoto
+                  ? Image.network(
+                      faculty.user.photoUrl!,
+                      width: avatarSize,
+                      height: avatarSize,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) =>
+          _buildInitials(faculty, color, isSelected),
+                    )
+                  : _buildInitials(faculty, color, isSelected),
+            ),
           ),
-          child: Center(
-            child: Text(
-              faculty.user.initials,
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: isSelected ? 14 : 12,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+            ), // _PulseMarker
+          ), // GestureDetector
+        ); // Marker
+  }
+
+  Widget _buildInitials(FacultyWithLocation faculty, Color color, bool isSelected) {
+    return Container(
+      color: color,
+      child: Center(
+        child: Text(
+          faculty.user.initials,
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: isSelected ? 13 : 11,
+            fontWeight: FontWeight.bold,
           ),
         ),
       ),
@@ -638,5 +665,76 @@ class _CampusMapCluster {
       lng += u.location!.latLng.longitude;
     }
     return LatLng(lat / users.length, lng / users.length);
+  }
+}
+
+/// Animated pulse ring around map markers — subtle breathing effect
+/// that draws attention to recently active faculty.
+class _PulseMarker extends StatefulWidget {
+  final Color color;
+  final bool isSelected;
+  final double markerSize;
+  final Widget child;
+
+  const _PulseMarker({
+    required this.color,
+    required this.isSelected,
+    required this.markerSize,
+    required this.child,
+  });
+
+  @override
+  State<_PulseMarker> createState() => _PulseMarkerState();
+}
+
+class _PulseMarkerState extends State<_PulseMarker>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _pulse;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    );
+    _pulse = Tween<double>(begin: 0.7, end: 1.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+    _controller.repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _pulse,
+      builder: (context, _) {
+        return Container(
+          width: widget.markerSize,
+          height: widget.markerSize,
+          decoration: BoxDecoration(
+            color: widget.color.withValues(alpha: 0.15),
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: widget.isSelected
+                    ? Colors.amber.withValues(alpha: 0.5 * _pulse.value)
+                    : widget.color.withValues(alpha: 0.3 * _pulse.value),
+                blurRadius: widget.isSelected ? 14 : 8,
+                spreadRadius: widget.isSelected ? 4 : 1,
+              ),
+            ],
+          ),
+          child: Center(child: widget.child),
+        );
+      },
+    );
   }
 }

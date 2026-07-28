@@ -1,7 +1,7 @@
 name: unitrack
 description: "ISKSULARS TRACK - Real-Time Student Leader & Officer Locator for SKSU"
 publish_to: 'none'
-version: 2.5.0+275
+version: 2.5.0+276
 
 environment:
   sdk: ^3.8.0

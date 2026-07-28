@@ -1,12 +1,12 @@
 {
-    "name": "iSKSUlars Track - SKSU Faculty Tracker",
-    "short_name": "iSKSUlars Track",
+    "name": "ISKSULARS TRACK - SKSU Student Leader Tracker",
+    "short_name": "ISKSULARS TRACK",
     "start_url": "./",
     "scope": "./",
     "display": "standalone",
     "background_color": "#0a2540",
-    "theme_color": "#00f5b8",
-    "description": "Real-Time Faculty & Staff Locator for Sultan Kudarat State University",
+    "theme_color": "#00C896",
+    "description": "Real-Time Student Leader & Officer Locator for Sultan Kudarat State University",
     "orientation": "any",
     "prefer_related_applications": false,
     "categories": [
@@ -15,16 +15,32 @@
     ],
     "lang": "en",
     "dir": "ltr",
+    "shortcuts": [
+        {
+            "name": "Find Leaders",
+            "short_name": "Leaders",
+            "description": "View all student leaders on campus",
+            "url": "./?page=directory"
+        },
+        {
+            "name": "Campus Map",
+            "short_name": "Map",
+            "description": "Open the campus map",
+            "url": "./?page=map"
+        }
+    ],
     "icons": [
         {
             "src": "icons/Icon-192.png",
             "sizes": "192x192",
-            "type": "image/png"
+            "type": "image/png",
+            "purpose": "any"
         },
         {
             "src": "icons/Icon-512.png",
             "sizes": "512x512",
-            "type": "image/png"
+            "type": "image/png",
+            "purpose": "any"
         },
         {
             "src": "icons/Icon-maskable-192.png",
@@ -37,6 +53,15 @@
             "sizes": "512x512",
             "type": "image/png",
             "purpose": "maskable"
+        }
+    ],
+    "screenshots": [
+        {
+            "src": "icons/Icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "form_factor": "wide",
+            "label": "Campus Map"
         }
     ]
 }

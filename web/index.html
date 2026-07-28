@@ -4,12 +4,11 @@
   <base href="$FLUTTER_BASE_HREF">
 
   <meta charset="UTF-8">
-  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="iSKSUlars Track - Real-Time Faculty & Staff Locator for SKSU">
+  <meta name="description" content="ISKSULARS TRACK - Real-Time Student Leader & Officer Locator for SKSU">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
 
   <!-- Security Headers (meta-tag equivalents for static hosting) -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.googleapis.com https://*.gstatic.com https://apis.google.com https://*.firebaseio.com https://*.firebaseapp.com https://unpkg.com blob:; worker-src blob: 'self' https://unpkg.com; style-src 'self' 'unsafe-inline' https://*.googleapis.com https://unpkg.com; font-src 'self' https://*.gstatic.com data:; img-src 'self' data: blob: https://*.googleapis.com https://*.gstatic.com https://*.tile.openstreetmap.org https://*.arcgisonline.com https://api.maptiler.com; connect-src 'self' https://*.googleapis.com https://*.gstatic.com https://*.firebaseio.com https://*.firebaseapp.com https://firestore.googleapis.com https://api.maptiler.com https://unpkg.com https://*.tile.openstreetmap.org https://*.arcgisonline.com wss://*.firebaseio.com; frame-src 'self' https://*.firebaseapp.com https://apis.google.com; object-src 'none'; base-uri 'self'; form-action 'self';">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://apis.google.com https://identitytoolkit.googleapis.com https://firestore.googleapis.com https://www.gstatic.com https://*.firebaseio.com https://*.firebaseapp.com https://unpkg.com blob:; worker-src blob: 'self' https://unpkg.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://unpkg.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https://firestore.googleapis.com https://www.gstatic.com https://*.tile.openstreetmap.org https://*.arcgisonline.com https://api.maptiler.com; connect-src 'self' https://identitytoolkit.googleapis.com https://firestore.googleapis.com https://securetoken.googleapis.com https://www.gstatic.com https://fonts.gstatic.com https://*.firebaseio.com https://*.firebaseapp.com https://api.maptiler.com https://unpkg.com https://*.tile.openstreetmap.org https://*.arcgisonline.com wss://*.firebaseio.com; frame-src 'self' https://*.firebaseapp.com https://apis.google.com; object-src 'none'; base-uri 'self'; form-action 'self';">
   <meta http-equiv="X-Content-Type-Options" content="nosniff">
   <meta name="referrer" content="strict-origin-when-cross-origin">
 
@@ -17,8 +16,10 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="iSKSUlars Track">
-  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+  <meta name="apple-mobile-web-app-title" content="ISKSULARS TRACK">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png">
+  <link rel="apple-touch-icon" sizes="192x192" href="icons/Icon-192.png">
   <link rel="apple-touch-icon" sizes="512x512" href="icons/Icon-512.png">
 
   <!-- iOS PWA Splash/Launch Images -->
@@ -49,9 +50,12 @@
   <meta name="msapplication-TileColor" content="#0a2540">
 
   <!-- Favicon -->
-  <link rel="icon" type="image/png" sizes="32x32" href="favicon.png"/>
+  <link rel="icon" type="image/png" sizes="64x64" href="icons/favicon-64.png"/>
+  <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png"/>
+  <link rel="icon" type="image/png" sizes="16x16" href="icons/favicon-16.png"/>
+  <link rel="shortcut icon" href="favicon.ico"/>
 
-  <title>iSKSUlars Track - SKSU Faculty Tracker</title>
+  <title>ISKSULARS TRACK - SKSU Student Leader Tracker</title>
   <link rel="manifest" href="manifest.json">
 
   <!-- Preconnect to external origins for faster loading -->
@@ -208,259 +212,352 @@
       50% { transform: scale(1.05); }
     }
 
-    /* ===== PWA Install Banner ===== */
-    @keyframes slideUp {
-      from { transform: translateY(100%); opacity: 0; }
-      to { transform: translateY(0); opacity: 1; }
+    /* ===== PWA Install Banner (App Store–style card) ===== */
+    @keyframes installCardSpring {
+      0%   { transform: translate(-50%, -50%) scale(0.88) translateY(40px); opacity: 0; }
+      60%  { transform: translate(-50%, -50%) scale(1.02) translateY(-4px); opacity: 1; }
+      80%  { transform: translate(-50%, -50%) scale(0.98) translateY(2px); opacity: 1; }
+      100% { transform: translate(-50%, -50%) scale(1) translateY(0); opacity: 1; }
     }
+    @keyframes installCardSpringMobile {
+      0%  { transform: translateY(60px); opacity: 0; }
+      60%  { transform: translateY(-6px); opacity: 1; }
+      80%  { transform: translateY(3px); opacity: 1; }
+      100% { transform: translateY(0); opacity: 1; }
+    }
+
+    #installOverlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 199999;
+      background: rgba(0,0,0,0.5);
+      -webkit-backdrop-filter: blur(8px);
+      backdrop-filter: blur(8px);
+    }
+
     #installBanner {
       display: none;
       position: fixed;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      z-index: 99999;
-      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      z-index: 200000;
+      max-width: 380px;
+      width: calc(100vw - 48px);
+      background: linear-gradient(150deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
       color: white;
-      padding: 16px 20px;
-      padding-bottom: max(16px, env(safe-area-inset-bottom));
-      box-shadow: 0 -4px 20px rgba(0,0,0,0.3);
+      border-radius: 24px;
+      padding: 28px 24px 24px;
+      box-shadow:
+        0 0 0 1px rgba(255,255,255,0.06),
+        0 8px 32px rgba(0,0,0,0.5),
+        0 0 80px rgba(0,200,150,0.08);
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      animation: slideUp 0.4s ease-out;
+      text-align: center;
     }
-    #installBanner .install-content {
+
+    /* Desktop: centered card */
+    @media (min-width: 601px) {
+      #installBanner {
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        animation: installCardSpring 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+      }
+    }
+
+    /* Mobile: card at bottom */
+    @media (max-width: 600px) {
+      #installBanner {
+        bottom: 30px;
+        left: 50%;
+        transform: translateX(-50%);
+        animation: installCardSpringMobile 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+      }
+    }
+
+    #installBanner .install-icon {
+      width: 52px;
+      height: 52px;
+      border-radius: 13px;
+      object-fit: cover;
+      box-shadow: 0 4px 16px rgba(0,200,150,0.3);
+      margin-bottom: 14px;
+    }
+
+    #installBanner .install-app-name {
+      font-size: 20px;
+      font-weight: 700;
+      margin: 0 0 4px 0;
+      letter-spacing: -0.3px;
+    }
+
+    #installBanner .install-stars {
+      color: #FFB800;
+      font-size: 13px;
+      margin: 0 0 14px 0;
       display: flex;
       align-items: center;
-      max-width: 480px;
-      margin: 0 auto;
-      gap: 12px;
+      justify-content: center;
+      gap: 6px;
     }
-    #installBanner .install-icon {
-      width: 44px;
-      height: 44px;
-      border-radius: 10px;
-      flex-shrink: 0;
-    }
-    #installBanner .install-text { flex: 1; min-width: 0; }
-    #installBanner .install-title {
-      font-size: 15px;
-      font-weight: 600;
-      margin: 0 0 2px 0;
-    }
-    #installBanner .install-subtitle {
+    #installBanner .install-stars .rating-text {
+      color: rgba(255,255,255,0.55);
       font-size: 12px;
-      color: rgba(255,255,255,0.65);
-      margin: 0;
+      font-weight: 400;
     }
+
+    #installBanner .install-features {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      margin: 0 0 20px 0;
+      padding: 0;
+      list-style: none;
+      flex-wrap: wrap;
+    }
+    #installBanner .install-features li {
+      background: rgba(255,255,255,0.07);
+      color: rgba(255,255,255,0.7);
+      font-size: 11px;
+      font-weight: 500;
+      padding: 6px 12px;
+      border-radius: 20px;
+      white-space: nowrap;
+    }
+
     #installBanner .install-btn {
+      display: block;
+      width: 100%;
       background: #00C896;
       color: white;
       border: none;
-      padding: 10px 20px;
-      border-radius: 24px;
-      font-size: 14px;
-      font-weight: 600;
+      padding: 14px 24px;
+      border-radius: 14px;
+      font-size: 16px;
+      font-weight: 700;
       cursor: pointer;
-      white-space: nowrap;
-      transition: background 0.2s;
+      transition: background 0.2s, transform 0.15s;
       -webkit-tap-highlight-color: transparent;
+      box-shadow: 0 4px 18px rgba(0,200,150,0.35);
+      margin-bottom: 16px;
     }
     #installBanner .install-btn:hover { background: #00b386; }
-    #installBanner .install-btn:active { background: #009e75; }
+    #installBanner .install-btn:active { background: #009e75; transform: scale(0.97); }
+
     #installBanner .install-close {
       background: none;
       border: none;
-      color: rgba(255,255,255,0.4);
-      font-size: 22px;
+      color: rgba(255,255,255,0.35);
+      font-size: 13px;
       cursor: pointer;
-      padding: 4px 8px;
-      line-height: 1;
+      padding: 4px 12px;
       -webkit-tap-highlight-color: transparent;
+      transition: color 0.2s;
     }
-    #installBanner .install-close:hover { color: white; }
+    #installBanner .install-close:hover { color: rgba(255,255,255,0.7); }
   </style>
 </head>
 <body>
   <!-- Loading Splash (shown while Flutter engine loads) -->
   <div id="loading">
-    <img src="icons/Icon-192.png" alt="iSKSUlars Track" class="logo">
-    <div class="app-name">iSKSUlars Track</div>
-    <div class="app-tagline">Real-Time Faculty & Staff Locator</div>
+    <img src="icons/Icon-192.png" alt="ISKSULARS TRACK" class="logo">
+    <div class="app-name">ISKSULARS TRACK</div>
+    <div class="app-tagline">Real-Time Student Leader Locator</div>
     <div class="spinner"></div>
   </div>
 
-  <!-- PWA Install Prompt Banner -->
+  <!-- PWA Install Prompt Banner (App Store–style card) -->
+  <div id="installOverlay"></div>
   <div id="installBanner">
-    <div class="install-content">
-      <img src="icons/Icon-192.png" alt="iSKSUlars Track" class="install-icon">
-      <div class="install-text">
-        <p class="install-title">Install iSKSUlars Track</p>
-        <p class="install-subtitle">Add to your home screen for quick access</p>
-      </div>
-      <button class="install-btn" id="installBtn">Install</button>
-      <button class="install-close" id="installClose">&times;</button>
+    <img src="icons/Icon-192.png" alt="ISKSULARS TRACK" class="install-icon">
+    <p class="install-app-name">ISKSULARS TRACK</p>
+    <div class="install-stars">
+      &#9733;&#9733;&#9733;&#9733;&#9733;
+      <span class="rating-text">4.8</span>
     </div>
+    <ul class="install-features">
+      <li>GPS Tracking</li>
+      <li>Find Leaders</li>
+      <li>Quick Ping</li>
+    </ul>
+    <button class="install-btn" id="installBtn">Install</button>
+    <button class="install-close" id="installClose">Not now</button>
   </div>
 
-  <!-- Register service worker + auto-update detection -->
-  <!-- Flutter's aggressive SW is disabled (--pwa-strategy=none); we use our own -->
+  <!-- Unregister legacy sw.js one-time (gated by localStorage) -->
   <script>
     if ('serviceWorker' in navigator) {
-      window.addEventListener('load', function() {
-        // Register immediately — no delay
-        navigator.serviceWorker.register('sw.js').then(function(reg) {
-          console.log('[App] SW registered');
-
-          // Check for SW updates every 30 seconds (aggressive freshness)
-          setInterval(function() {
-            reg.update().catch(function() {});
-          }, 30 * 1000);
-
-          // Also check when tab regains focus (user returns to app)
-          document.addEventListener('visibilitychange', function() {
-            if (document.visibilityState === 'visible') {
-              reg.update().catch(function() {});
-            }
-          });
-
-          // Detect when a new SW is waiting
-          reg.addEventListener('updatefound', function() {
-            var newWorker = reg.installing;
-            if (!newWorker) return;
-            newWorker.addEventListener('statechange', function() {
-              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                console.log('[App] New version detected, activating...');
-                newWorker.postMessage('SKIP_WAITING');
+      try {
+        if (!localStorage.getItem('sw-cleanup-done')) {
+          navigator.serviceWorker.getRegistrations().then(function(regs) {
+            var cleaned = false;
+            regs.forEach(function(reg) {
+              var url = (reg.active && reg.active.scriptURL) || '';
+              if (url.indexOf('sw.js') !== -1) {
+                reg.unregister();
+                cleaned = true;
               }
             });
+            localStorage.setItem('sw-cleanup-done', '1');
+            if (cleaned) console.log('[App] Unregistered old sw.js');
           });
-        }).catch(function(e) {
-          console.warn('[App] SW registration failed:', e);
-        });
-
-        // Listen for messages from the SW
-        navigator.serviceWorker.addEventListener('message', function(event) {
-          if (event.data && event.data.type === 'SW_UPDATED') {
-            console.log('[App] SW updated to:', event.data.version);
-            // Clear all caches then hard-reload
-            caches.keys().then(function(names) {
-              return Promise.all(names.map(function(n) { return caches.delete(n); }));
-            }).then(function() {
-              window.location.reload();
-            });
-          }
-          if (event.data && event.data.type === 'CACHES_CLEARED') {
-            console.log('[App] All caches cleared');
-            window.location.reload();
-          }
-        });
-
-        // When a new SW takes over, reload for fresh assets
-        var refreshing = false;
-        navigator.serviceWorker.addEventListener('controllerchange', function() {
-          if (!refreshing) {
-            refreshing = true;
-            console.log('[App] New SW controller, reloading...');
-            window.location.reload();
-          }
-        });
-      });
+        }
+      } catch (e) {}
     }
+  </script>
 
-    // ── Version polling — catches updates even when SW lifecycle is stuck ──
-    // Fetches version.json every 2 minutes; if the version changes, clears
-    // caches and reloads. This handles iOS Safari PWAs where SW updates
-    // are unreliable, and any other edge-case.
+  <!-- Version polling — detect new deploys and reload (pauses when tab hidden) -->
+  <script>
     (function() {
       var knownVersion = null;
+      var pollTimer = null;
+
       function checkVersion() {
+        if (document.visibilityState && document.visibilityState !== 'visible') return;
         fetch('version.json?_t=' + Date.now(), { cache: 'no-store' })
           .then(function(r) { return r.json(); })
           .then(function(data) {
             if (!data || !data.version) return;
             if (knownVersion === null) {
-              // First load — just record the current version
               knownVersion = data.version;
               return;
             }
             if (data.version !== knownVersion) {
-              console.log('[App] New app version detected via poll:', data.version);
-              knownVersion = data.version;
-              // Clear SW caches then reload
-              caches.keys().then(function(names) {
-                return Promise.all(names.map(function(n) { return caches.delete(n); }));
-              }).then(function() {
-                window.location.reload();
-              });
+              console.log('[App] New version detected:', data.version, '— reloading');
+              window.location.reload();
             }
           })
-          .catch(function() { /* offline — skip */ });
+          .catch(function() {});
       }
-      // Check on load and every 30 seconds
-      setTimeout(checkVersion, 1500);
-      setInterval(checkVersion, 30 * 1000);
-      // Also check when tab becomes visible
+
+      function startPolling() {
+        setTimeout(checkVersion, 3000);
+        pollTimer = setInterval(checkVersion, 60000);
+      }
+
+      function stopPolling() {
+        if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+      }
+
       document.addEventListener('visibilitychange', function() {
-        if (document.visibilityState === 'visible') checkVersion();
+        if (document.visibilityState === 'visible') {
+          checkVersion();
+          if (!pollTimer) startPolling();
+        } else {
+          stopPolling();
+        }
       });
+
+      startPolling();
     })();
   </script>
 
   <!-- PWA Install Logic (Android/Desktop Chrome + iOS Safari fallback) -->
   <script>
-    var deferredPrompt = null;
-    var installBanner = document.getElementById('installBanner');
-    var installBtn = document.getElementById('installBtn');
-    var installClose = document.getElementById('installClose');
-    var dismissed = localStorage.getItem('pwa-install-dismissed');
-    var isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
-                       window.navigator.standalone === true;
+    (function() {
+      var deferredPrompt = null;
+      var overlay = document.getElementById('installOverlay');
+      var installBanner = document.getElementById('installBanner');
+      var installBtn = document.getElementById('installBtn');
+      var installClose = document.getElementById('installClose');
+      var isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
+                         window.navigator.standalone === true;
 
-    // Detect iOS Safari
-    var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-                (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-    var isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+      // Detect iOS Safari
+      var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+                  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+      var isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
 
-    // Android/Desktop: native install prompt
-    window.addEventListener('beforeinstallprompt', function(e) {
-      e.preventDefault();
-      deferredPrompt = e;
-      if (!dismissed && !isStandalone) {
-        setTimeout(function() { installBanner.style.display = 'block'; }, 3000);
+      // ---- Dismiss persistence: store timestamp, re-show after 3 days ----
+      var DISMISS_KEY = 'pwa-install-dismissed-at';
+      var BANNER_SHOWN_KEY = 'pwa-banner-shown';
+
+      function shouldShowBanner() {
+        if (isStandalone) return false;
+        var dismissedAt = localStorage.getItem(DISMISS_KEY);
+        if (!dismissedAt) return true;
+        var elapsed = Date.now() - parseInt(dismissedAt, 10);
+        var threeDays = 3 * 24 * 60 * 60 * 1000;
+        return elapsed > threeDays;
       }
-    });
 
-    installBtn.addEventListener('click', function() {
-      if (deferredPrompt) {
-        deferredPrompt.prompt();
-        deferredPrompt.userChoice.then(function() {
-          deferredPrompt = null;
-          installBanner.style.display = 'none';
-        });
-      } else if (isIOS) {
-        // iOS: show instructions since there's no native install API
-        alert('To install iSKSUlars Track:\n\n1. Tap the Share button (square with arrow)\n2. Scroll down and tap "Add to Home Screen"\n3. Tap "Add"');
+      function dismissBanner() {
+        localStorage.setItem(DISMISS_KEY, String(Date.now()));
+        overlay.style.display = 'none';
         installBanner.style.display = 'none';
       }
-    });
 
-    installClose.addEventListener('click', function() {
-      installBanner.style.display = 'none';
-      localStorage.setItem('pwa-install-dismissed', 'true');
-    });
+      // ---- Show the banner (called when conditions are met) ----
+      function showBanner() {
+        if (!shouldShowBanner()) return;
+        if (localStorage.getItem(BANNER_SHOWN_KEY)) return;
+        localStorage.setItem(BANNER_SHOWN_KEY, '1');
 
-    // iOS Safari: show custom banner (no beforeinstallprompt on iOS)
-    if (isIOS && isSafari && !isStandalone && !dismissed) {
-      setTimeout(function() {
-        installBtn.textContent = 'How to Install';
+        if (isIOS && isSafari) {
+          installBtn.textContent = 'How to Install';
+        }
+        overlay.style.display = 'block';
         installBanner.style.display = 'block';
-      }, 3000);
-    }
+      }
 
-    // Never show if already installed
-    if (isStandalone) {
-      installBanner.style.display = 'none';
-    }
+      // ---- Trigger: user first interaction (scroll 200px or tap) ----
+      var interactionDetected = false;
+
+      function onFirstInteraction() {
+        if (interactionDetected) return;
+        interactionDetected = true;
+        showBanner();
+      }
+
+      window.addEventListener('scroll', function() {
+        if (window.scrollY > 200) onFirstInteraction();
+      }, { passive: true });
+
+      document.addEventListener('touchstart', onFirstInteraction, { once: true });
+      document.addEventListener('click', onFirstInteraction, { once: true });
+
+      // ---- Also show on beforeinstallprompt if not yet triggered ----
+      window.addEventListener('beforeinstallprompt', function(e) {
+        e.preventDefault();
+        deferredPrompt = e;
+        if (!interactionDetected) {
+          // User hasn't scrolled/tapped yet; show the banner since the OS
+          // has signaled installability
+          showBanner();
+          interactionDetected = true;
+        }
+      });
+
+      // ---- Button handlers ----
+      installBtn.addEventListener('click', function() {
+        if (deferredPrompt) {
+          deferredPrompt.prompt();
+          deferredPrompt.userChoice.then(function() {
+            deferredPrompt = null;
+          });
+        } else if (isIOS && isSafari) {
+          alert('To install ISKSULARS TRACK:\n\n1. Tap the Share button (square with arrow)\n2. Scroll down and tap "Add to Home Screen"\n3. Tap "Add"');
+        }
+        overlay.style.display = 'none';
+        installBanner.style.display = 'none';
+        localStorage.removeItem(BANNER_SHOWN_KEY);
+      });
+
+      installClose.addEventListener('click', function() {
+        dismissBanner();
+        localStorage.removeItem(BANNER_SHOWN_KEY);
+      });
+
+      overlay.addEventListener('click', function() {
+        dismissBanner();
+        localStorage.removeItem(BANNER_SHOWN_KEY);
+      });
+
+      // Never show if already installed in standalone mode
+      if (isStandalone) {
+        overlay.style.display = 'none';
+        installBanner.style.display = 'none';
+      }
+    })();
   </script>
 
   <!-- Flutter bootstrap — fade out loading screen when ready -->
@@ -485,16 +582,14 @@
   </script>
   <script src="flutter_bootstrap.js" async></script>
 
-  <!-- Security: Anti-theft protections -->
+  <!-- Iframe clickjacking defense (X-Frame-Options header handles the robust side) -->
   <script>
     (function() {
       'use strict';
-      // Prevent iframe embedding (clickjacking)
       if (window.self !== window.top) {
         document.body.innerHTML = '<h1 style="color:red;text-align:center;margin-top:40vh">Access Denied: This app cannot be embedded in an iframe.</h1>';
         return;
       }
-      // Security protections disabled for debugging
     })();
   </script>
 </body>
