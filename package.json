@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "firebase-admin": "^14.2.0",
     "firebase-tools": "^13.35.0",
     "sharp": "^0.35.3"
   }
