@@ -271,6 +271,24 @@ class AuthService {
     }
   }
 
+  /// Real-time stream of a user's Firestore document.
+  /// Emits a new [UserModel] whenever the document changes.
+  Stream<UserModel?> userStream(String userId) {
+    return _firestore
+        .collection('users')
+        .doc(userId)
+        .snapshots()
+        .map((doc) {
+          if (!doc.exists) return null;
+          try {
+            return UserModel.fromFirestore(doc);
+          } catch (e) {
+            if (kDebugMode) debugPrint('userStream parse error: $e');
+            return null;
+          }
+        });
+  }
+
   /// Get user by ID (with automatic migration for old documents)
   Future<UserModel?> getUserById(String userId) async {
     try {

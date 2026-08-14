@@ -11,6 +11,7 @@ class AuthProvider extends ChangeNotifier {
   final AuthService _authService;
   final LocationProvider? _locationProvider;
   StreamSubscription? _authStateSubscription;
+  StreamSubscription? _userDocSubscription; // Real-time Firestore role/status watcher
   bool _isSigningIn =
       false; // Guard to prevent auth listener interference during sign-in
 
@@ -105,6 +106,43 @@ class AuthProvider extends ChangeNotifier {
     });
   }
 
+  /// Subscribe to real-time Firestore changes for the signed-in user.
+  /// Handles role promotions, bans, and isActive changes from the Admin.
+  void _subscribeToUserDoc(String userId) {
+    _userDocSubscription?.cancel();
+    _userDocSubscription = _authService.userStream(userId).listen(
+      (updatedUser) {
+        if (updatedUser == null) return;
+        // Only notify if something meaningful changed
+        final changed = _user == null ||
+            updatedUser.role != _user!.role ||
+            updatedUser.isActive != _user!.isActive ||
+            updatedUser.campusId != _user!.campusId ||
+            updatedUser.currentStatus != _user!.currentStatus ||
+            updatedUser.quickMessage != _user!.quickMessage ||
+            updatedUser.availabilityStatus != _user!.availabilityStatus;
+        if (changed) {
+          if (kDebugMode) {
+            debugPrint(
+              'userStream: role=${updatedUser.role.name}, '
+              'isActive=${updatedUser.isActive} — rebuilding UI',
+            );
+          }
+          _user = updatedUser;
+          notifyListeners();
+        }
+      },
+      onError: (e) {
+        if (kDebugMode) debugPrint('userStream error: $e');
+      },
+    );
+  }
+
+  void _unsubscribeFromUserDoc() {
+    _userDocSubscription?.cancel();
+    _userDocSubscription = null;
+  }
+
   Future<void> _checkAuthState() async {
     _isLoading = true;
     notifyListeners();
@@ -139,6 +177,12 @@ class AuthProvider extends ChangeNotifier {
           if (kDebugMode) {
             debugPrint('User is inactive — AuthWrapper will handle routing');
           }
+        }
+
+        // Start real-time Firestore listener so role/ban changes from
+        // the Admin are reflected immediately without a restart.
+        if (_user != null) {
+          _subscribeToUserDoc(_user!.id);
         }
       }
     } catch (e) {
@@ -180,6 +224,12 @@ class AuthProvider extends ChangeNotifier {
         try {
           PushNotificationService().saveTokenForUser(_user!.id);
         } catch (_) {}
+      }
+
+      // Subscribe to real-time Firestore changes so role promotions and
+      // bans from Admin are reflected immediately without a restart.
+      if (_user != null) {
+        _subscribeToUserDoc(_user!.id);
       }
 
       // On web, Provider's Consumer rebuild can be dropped on the same
@@ -308,6 +358,7 @@ class AuthProvider extends ChangeNotifier {
 
   /// Sign out
   Future<void> signOut() async {
+    _unsubscribeFromUserDoc(); // Cancel real-time listener before signing out
     await _locationProvider?.stopTracking();
     // Remove FCM token before signing out
     if (_user != null) {
@@ -339,6 +390,7 @@ class AuthProvider extends ChangeNotifier {
   @override
   void dispose() {
     _authStateSubscription?.cancel();
+    _userDocSubscription?.cancel();
     super.dispose();
   }
 }
