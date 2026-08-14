@@ -514,7 +514,11 @@ class UserModel {
     data['campusId'] = campusId;
     data['searchName'] = '${firstName.toLowerCase()} ${lastName.toLowerCase()}';
     if (quickMessage != null) data['quickMessage'] = quickMessage;
-    data['officeHours'] = officeHours ?? FieldValue.delete();
+    if (includeDeleteSentinels) {
+      data['officeHours'] = officeHours ?? FieldValue.delete();
+    } else {
+      if (officeHours != null) data['officeHours'] = officeHours;
+    }
     if (availabilityStatus != null) {
       data['availabilityStatus'] = availabilityStatus?.name;
     }

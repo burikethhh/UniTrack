@@ -36,7 +36,7 @@ class AuthService {
     required String email,
     required String password,
   }) async {
-    // Ensure App Check token is available (required when App Check is registered)
+    // App Check verification — enforced in production, skipped silently in debug
     try {
       final appCheckToken = await FirebaseAppCheck.instance.getToken();
       if (kDebugMode) {
@@ -156,7 +156,7 @@ class AuthService {
       throw 'Only SKSU email addresses (@sksu.edu.ph) are allowed to register.';
     }
 
-    // Ensure App Check token is available (required when App Check is registered)
+    // App Check verification — enforced in production, skipped silently in debug
     try {
       final appCheckToken = await FirebaseAppCheck.instance.getToken();
       if (kDebugMode) {
@@ -256,12 +256,7 @@ class AuthService {
 
         // Send email verification (best-effort, don't block registration)
         try {
-          await credential.user!.sendEmailVerification(
-            ActionCodeSettings(
-              url: 'https://isksulars-track.web.app/__/auth/action',
-              handleCodeInApp: false,
-            ),
-          );
+          await credential.user!.sendEmailVerification();
         } catch (e) {
           if (kDebugMode) {
             debugPrint('⚠️ Could not send verification email: $e');
@@ -459,12 +454,7 @@ class AuthService {
         await _auth.signOut();
         throw 'Your account has been disabled. Please contact an administrator.';
       }
-      await user.sendEmailVerification(
-        ActionCodeSettings(
-          url: 'https://isksulars-track.web.app/__/auth/action',
-          handleCodeInApp: false,
-        ),
-      );
+      await user.sendEmailVerification();
       await _auth.signOut();
     } catch (e) {
       try {

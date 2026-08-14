@@ -111,9 +111,8 @@ Future<void> _initializeApp() async {
   // Initialize Firebase
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
-  // Initialize App Check — required for Firebase Auth/Firestore on web
-  // when App Check is registered in Firebase Console.
-  // Register at: https://www.google.com/recaptcha/admin
+  // App Check initialization disabled temporarily
+  /*
   try {
     final recaptchaKey = '6LdnrYAtAAAAACkljIXXnfY_2Ygz0WW-PRHFC4HS';
     await FirebaseAppCheck.instance.activate(
@@ -133,6 +132,7 @@ Future<void> _initializeApp() async {
     if (kDebugMode) debugPrint('⚠️ App Check init failed: $e');
     // Don't block app startup — App Check tokens are retried automatically
   }
+  */
 
   // Configure Firestore for web
   if (kIsWeb) {

@@ -50,3 +50,9 @@ unitrack-latest.apk
 *.apk
 
 node_modules/
+
+# Temporary admin/test scripts - never commit these
+create_admin.js
+setup_test_users.js
+*_test_users.js
+*_admin*.js
