@@ -36,18 +36,20 @@ class AuthService {
     required String email,
     required String password,
   }) async {
-    // App Check verification — enforced in production, skipped silently in debug
+    // App Check verification — enforced in production web only.
+    // On Android/iOS the SDK attaches tokens automatically; manual check
+    // would break sideloaded APKs (no Play Store = no Play Integrity token).
     try {
       final appCheckToken = await FirebaseAppCheck.instance.getToken();
       if (kDebugMode) {
         debugPrint('🔐 App Check token before sign-in: ${appCheckToken != null ? 'present' : 'null'}');
       }
-      if (appCheckToken == null && !kDebugMode) {
+      if (appCheckToken == null && !kDebugMode && kIsWeb) {
         throw 'Security verification failed. Please refresh the page and try again.';
       }
     } catch (e) {
       if (kDebugMode) debugPrint('⚠️ App Check token check failed: $e');
-      if (!kDebugMode) rethrow;
+      if (!kDebugMode && kIsWeb) rethrow;
     }
 
     try {
@@ -156,20 +158,22 @@ class AuthService {
       throw 'Only SKSU email addresses (@sksu.edu.ph) are allowed to register.';
     }
 
-    // App Check verification — enforced in production, skipped silently in debug
+    // App Check verification — enforced in production web only.
+    // On Android/iOS the SDK attaches tokens automatically; manual check
+    // would break sideloaded APKs (no Play Store = no Play Integrity token).
     try {
       final appCheckToken = await FirebaseAppCheck.instance.getToken();
       if (kDebugMode) {
         debugPrint('🔐 App Check token before registration: ${appCheckToken != null ? 'present' : 'null'}');
       }
-      if (appCheckToken == null && !kDebugMode) {
-        // In production, require a valid token
+      if (appCheckToken == null && !kDebugMode && kIsWeb) {
+        // In production web, require a valid token
         throw 'Security verification failed. Please refresh the page and try again.';
       }
     } catch (e) {
       if (kDebugMode) debugPrint('⚠️ App Check token check failed: $e');
-      // Don't block registration in debug mode — allow fallback
-      if (!kDebugMode) rethrow;
+      // Don't block registration on native apps — allow fallback
+      if (!kDebugMode && kIsWeb) rethrow;
     }
 
     try {

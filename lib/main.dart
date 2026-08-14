@@ -111,15 +111,20 @@ Future<void> _initializeApp() async {
   // Initialize Firebase
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
-  // App Check initialization disabled temporarily
-  /*
   try {
     final recaptchaKey = '6LdnrYAtAAAAACkljIXXnfY_2Ygz0WW-PRHFC4HS';
     await FirebaseAppCheck.instance.activate(
       providerWeb: ReCaptchaV3Provider(recaptchaKey),
-      providerAndroid: kDebugMode
-          ? const AndroidDebugProvider()
-          : const AndroidPlayIntegrityProvider(),
+      // APK is distributed via GitHub (sideloaded), not Play Store.
+      // AndroidPlayIntegrityProvider only works for Play Store installs.
+      // Switch to AndroidPlayIntegrityProvider when publishing to Play Store:
+      //   flutter build apk --dart-define=USE_PLAY_INTEGRITY=true
+      providerAndroid: const bool.fromEnvironment(
+              'USE_PLAY_INTEGRITY',
+              defaultValue: false,
+            )
+          ? const AndroidPlayIntegrityProvider()
+          : const AndroidDebugProvider(),
     );
     // Ensure tokens are auto-refreshed so Auth/Firestore requests succeed
     await FirebaseAppCheck.instance.setTokenAutoRefreshEnabled(true);
@@ -132,7 +137,6 @@ Future<void> _initializeApp() async {
     if (kDebugMode) debugPrint('⚠️ App Check init failed: $e');
     // Don't block app startup — App Check tokens are retried automatically
   }
-  */
 
   // Configure Firestore for web
   if (kIsWeb) {
