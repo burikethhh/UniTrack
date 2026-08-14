@@ -132,7 +132,7 @@ class UsersTab extends StatelessWidget {
                               ? Colors.orange.shade300
                               : Colors.teal.shade300,
                           child: Text(
-                            user.firstName[0].toUpperCase(),
+                            user.firstName.isNotEmpty ? user.firstName[0].toUpperCase() : '?',
                             style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
                           ),
                         ),
@@ -151,26 +151,76 @@ class UsersTab extends StatelessWidget {
                         ),
                         SizedBox(
                           height: 30,
-                          child: ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.green.shade600,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(horizontal: 12),
-                              textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-                            ),
-                            onPressed: () {
-                              provider.approveUser(user.id).then((ok) {
-                                if (ok && context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text('${user.fullName} approved'),
-                                      backgroundColor: Colors.green,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.green.shade600,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                                  textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                                ),
+                                onPressed: () {
+                                  provider.approveUser(user.id).then((ok) {
+                                    if (ok && context.mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text('${user.fullName} approved'),
+                                          backgroundColor: Colors.green,
+                                        ),
+                                      );
+                                    }
+                                  });
+                                },
+                                child: const Text('Approve'),
+                              ),
+                              const SizedBox(width: 6),
+                              TextButton(
+                                style: TextButton.styleFrom(
+                                  foregroundColor: Colors.red.shade700,
+                                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                                  textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                                ),
+                                onPressed: () async {
+                                  final confirmed = await showDialog<bool>(
+                                    context: context,
+                                    builder: (ctx) => AlertDialog(
+                                      title: const Text('Reject registration?'),
+                                      content: Text(
+                                        'This will permanently delete ${user.fullName}\'s pending account. '
+                                        'They will need to register again. This cannot be undone.',
+                                      ),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () => Navigator.pop(ctx, false),
+                                          child: const Text('Cancel'),
+                                        ),
+                                        ElevatedButton(
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: Colors.red,
+                                            foregroundColor: Colors.white,
+                                          ),
+                                          onPressed: () => Navigator.pop(ctx, true),
+                                          child: const Text('Reject'),
+                                        ),
+                                      ],
                                     ),
                                   );
-                                }
-                              });
-                            },
-                            child: const Text('Approve'),
+                                  if (confirmed != true || !context.mounted) return;
+                                  final ok = await provider.rejectUser(user.id);
+                                  if (ok && context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text('${user.fullName}\'s registration rejected'),
+                                        backgroundColor: Colors.red,
+                                      ),
+                                    );
+                                  }
+                                },
+                                child: const Text('Reject'),
+                              ),
+                            ],
                           ),
                         ),
                       ],

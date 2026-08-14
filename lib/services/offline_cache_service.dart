@@ -2,16 +2,22 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
-import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../core/utils/connectivity_service.dart';
 import '../models/user_model.dart';
 import '../models/location_model.dart';
 
 /// Service for offline caching of faculty data and locations
 /// On web: uses SharedPreferences + in-memory cache
 /// On mobile: uses SQLite database
+///
+/// Connectivity state is sourced from the [ConnectivityService] singleton
+/// (the canonical single source of truth). This service does NOT re-derive
+/// `isOnline` from `connectivity_plus` independently — it listens to
+/// [ConnectivityService] and only adds the offline-write-queue side effect
+/// on top.
 class OfflineCacheService {
   static Database? _database;
   static final OfflineCacheService _instance = OfflineCacheService._internal();
@@ -19,13 +25,12 @@ class OfflineCacheService {
   factory OfflineCacheService() => _instance;
   OfflineCacheService._internal();
 
-  final Connectivity _connectivity = Connectivity();
-  StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
-  final _connectivityController = StreamController<bool>.broadcast();
+  final ConnectivityService _connectivityService = ConnectivityService();
+  StreamSubscription<bool>? _connectivitySubscription;
 
-  bool _isOnline = true;
-  bool get isOnline => _isOnline;
-  Stream<bool> get connectivityStream => _connectivityController.stream;
+  // Backed by ConnectivityService — single source of truth
+  bool get isOnline => _connectivityService.isConnected;
+  Stream<bool> get connectivityStream => _connectivityService.connectivityStream;
 
   // Web in-memory cache
   List<UserModel>? _webFacultyCache;
@@ -145,7 +150,9 @@ class OfflineCacheService {
     }
   }
 
-  /// Initialize connectivity monitoring
+  /// Initialize connectivity monitoring.
+  /// Subscribes to [ConnectivityService] (the single source of truth) and
+  /// only adds the pending-write-queue auto-sync side effect on top.
   Future<void> initialize() async {
     // Restore pending operations from SharedPreferences on web
     if (kIsWeb) {
@@ -155,37 +162,28 @@ class OfflineCacheService {
         if (stored != null) {
           final decoded = jsonDecode(stored) as List;
           _webPendingOps.addAll(decoded.cast<Map<String, dynamic>>());
-          debugPrint(
+          if (kDebugMode) {
+            debugPrint(
             '📦 Restored ${_webPendingOps.length} pending operations from storage',
           );
+          }
         }
       } catch (e) {
-        debugPrint('⚠️ Error restoring pending operations: $e');
+        if (kDebugMode) debugPrint('⚠️ Error restoring pending operations: $e');
       }
     }
 
-    // Check initial connectivity
-    final results = await _connectivity.checkConnectivity();
-    _isOnline = !results.contains(ConnectivityResult.none);
-    _connectivityController.add(_isOnline);
+    // Ensure ConnectivityService is monitoring (idempotent — it's a singleton)
+    _connectivityService.startMonitoring();
 
-    // Listen for changes
-    _connectivitySubscription = _connectivity.onConnectivityChanged.listen((
-      results,
+    // Subscribe to the canonical connectivity stream
+    _connectivitySubscription = _connectivityService.connectivityStream.listen((
+      isOnline,
     ) {
-      final wasOnline = _isOnline;
-      _isOnline = !results.contains(ConnectivityResult.none);
-
-      if (wasOnline != _isOnline) {
-        _connectivityController.add(_isOnline);
-        debugPrint(
-          '📶 Connectivity changed: ${_isOnline ? "Online" : "Offline"}',
-        );
-
-        // Auto-sync pending operations when coming back online
-        if (_isOnline && !wasOnline) {
-          syncPendingOperations();
-        }
+      if (kDebugMode) debugPrint('📶 Connectivity changed: ${isOnline ? "Online" : "Offline"}');
+      // Auto-sync pending operations when coming back online
+      if (isOnline) {
+        syncPendingOperations();
       }
     });
   }
@@ -193,7 +191,8 @@ class OfflineCacheService {
   /// Dispose resources
   void dispose() {
     _connectivitySubscription?.cancel();
-    _connectivityController.close();
+    // Do NOT stop monitoring or close the stream here — ConnectivityService is
+    // a shared singleton; other subscribers may still be listening.
   }
 
   // ==================== FACULTY CACHE ====================
@@ -208,9 +207,9 @@ class OfflineCacheService {
         final jsonList = faculty.map((u) => _userToJson(u)).toList();
         await prefs.setString('faculty_cache', jsonEncode(jsonList));
       } catch (e) {
-        debugPrint('⚠️ Web cache save error: $e');
+        if (kDebugMode) debugPrint('⚠️ Web cache save error: $e');
       }
-      debugPrint('💾 Web-cached ${faculty.length} faculty members');
+      if (kDebugMode) debugPrint('💾 Web-cached ${faculty.length} faculty members');
       return;
     }
 
@@ -239,7 +238,7 @@ class OfflineCacheService {
 
     await batch.commit(noResult: true);
     await _updateSyncMeta('faculty_last_sync', now.toString());
-    debugPrint('💾 Cached ${faculty.length} faculty members');
+    if (kDebugMode) debugPrint('💾 Cached ${faculty.length} faculty members');
   }
 
   /// Get cached faculty list
@@ -258,7 +257,7 @@ class OfflineCacheService {
           return _webFacultyCache!;
         }
       } catch (e) {
-        debugPrint('⚠️ Web cache load error: $e');
+        if (kDebugMode) debugPrint('⚠️ Web cache load error: $e');
       }
       return [];
     }
@@ -324,7 +323,11 @@ class OfflineCacheService {
       case 'admin':
         return UserRole.admin;
       case 'staff':
-        return UserRole.staff;
+        return UserRole.studentLeader;
+      case 'organizationOfficer':
+        return UserRole.organizationOfficer;
+      case 'studentLeader':
+        return UserRole.studentLeader;
       default:
         return UserRole.student;
     }
@@ -371,7 +374,7 @@ class OfflineCacheService {
     if (kIsWeb) {
       _webLocationCache ??= {};
       _webLocationCache!.addAll(locations);
-      debugPrint('💾 Web-cached ${locations.length} locations');
+      if (kDebugMode) debugPrint('💾 Web-cached ${locations.length} locations');
       return;
     }
 
@@ -397,7 +400,7 @@ class OfflineCacheService {
     }
 
     await batch.commit(noResult: true);
-    debugPrint('💾 Cached ${locations.length} locations');
+    if (kDebugMode) debugPrint('💾 Cached ${locations.length} locations');
   }
 
   /// Get cached location for a user
@@ -544,7 +547,7 @@ class OfflineCacheService {
         await prefs.remove('faculty_cache');
         await prefs.remove('pending_operations');
       } catch (_) {}
-      debugPrint('🗑️ Web cache cleared');
+      if (kDebugMode) debugPrint('🗑️ Web cache cleared');
       return;
     }
 
@@ -553,7 +556,7 @@ class OfflineCacheService {
     await db.delete('location_cache');
     await db.delete('sync_meta');
     await db.delete('pending_operations');
-    debugPrint('🗑️ Cache cleared');
+    if (kDebugMode) debugPrint('🗑️ Cache cleared');
   }
 
   // ==================== OFFLINE WRITE QUEUE ====================
@@ -573,15 +576,17 @@ class OfflineCacheService {
     required Map<String, dynamic> data,
   }) async {
     // If online, execute immediately
-    if (_isOnline) {
+    if (isOnline) {
       try {
         await _executeFirestoreOp(collection, docId, operation, data);
-        debugPrint(
+        if (kDebugMode) {
+          debugPrint(
           '✅ Executed operation immediately: $operation on $collection/$docId',
         );
+        }
         return;
       } catch (e) {
-        debugPrint('⚠️ Immediate write failed, queuing: $e');
+        if (kDebugMode) debugPrint('⚠️ Immediate write failed, queuing: $e');
       }
     }
 
@@ -600,13 +605,13 @@ class OfflineCacheService {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('pending_operations', jsonEncode(_webPendingOps));
       } catch (_) {}
-      debugPrint('📝 Queued operation (web): $operation on $collection/$docId');
+      if (kDebugMode) debugPrint('📝 Queued operation (web): $operation on $collection/$docId');
       return;
     }
 
     final db = await database;
     await db.insert('pending_operations', entry);
-    debugPrint('📝 Queued operation: $operation on $collection/$docId');
+    if (kDebugMode) debugPrint('📝 Queued operation: $operation on $collection/$docId');
   }
 
   /// Get count of pending operations
@@ -621,7 +626,7 @@ class OfflineCacheService {
 
   /// Sync all pending operations to Firestore
   Future<int> syncPendingOperations() async {
-    if (!_isOnline) return 0;
+    if (!isOnline) return 0;
 
     int synced = 0;
 
@@ -639,7 +644,7 @@ class OfflineCacheService {
           _webPendingOps.remove(op);
           synced++;
         } catch (e) {
-          debugPrint('⚠️ Sync failed for operation: $e');
+          if (kDebugMode) debugPrint('⚠️ Sync failed for operation: $e');
           op['retries'] = (op['retries'] as int? ?? 0) + 1;
           // Remove after 5 retries
           if ((op['retries'] as int) >= 5) {
@@ -659,7 +664,7 @@ class OfflineCacheService {
           );
         }
       } catch (_) {}
-      debugPrint('🔄 Web sync complete: $synced operations synced');
+      if (kDebugMode) debugPrint('🔄 Web sync complete: $synced operations synced');
       return synced;
     }
 
@@ -682,15 +687,15 @@ class OfflineCacheService {
         );
         synced++;
       } catch (e) {
-        debugPrint('⚠️ Sync failed for op ${op['id']}: $e');
+        if (kDebugMode) debugPrint('⚠️ Sync failed for op ${op['id']}: $e');
         final retries = (op['retries'] as int? ?? 0) + 1;
-        if (retries >= 5) {
+        if (retries >= 10) {
           await db.delete(
             'pending_operations',
             where: 'id = ?',
             whereArgs: [op['id']],
           );
-          debugPrint('🗑️ Dropped op ${op['id']} after 5 retries');
+          if (kDebugMode) debugPrint('🗑️ Dropped op ${op['id']} after 10 retries');
         } else {
           await db.update(
             'pending_operations',
@@ -702,7 +707,7 @@ class OfflineCacheService {
       }
     }
 
-    debugPrint('🔄 Sync complete: $synced/${ops.length} operations synced');
+    if (kDebugMode) debugPrint('🔄 Sync complete: $synced/${ops.length} operations synced');
     return synced;
   }
 

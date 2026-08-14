@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/models.dart';
 import '../services/activity_log_service.dart';
@@ -19,6 +19,14 @@ class AppStatistics {
   final Map<String, int> usersByCampus;
   final List<ActivityLog> recentActivity;
 
+  // Notification analytics
+  final int totalNotifications;
+  final int sentNotifications;
+  final int deliveredNotifications;
+  final int openedNotifications;
+  final double deliveryRate;
+  final double openRate;
+
   AppStatistics({
     this.totalUsers = 0,
     this.totalStudents = 0,
@@ -33,6 +41,12 @@ class AppStatistics {
     this.usersByDepartment = const {},
     this.usersByCampus = const {},
     this.recentActivity = const [],
+    this.totalNotifications = 0,
+    this.sentNotifications = 0,
+    this.deliveredNotifications = 0,
+    this.openedNotifications = 0,
+    this.deliveryRate = 0.0,
+    this.openRate = 0.0,
   });
 }
 
@@ -200,52 +214,55 @@ class AdminProvider extends ChangeNotifier {
       final weekStart = todayStart.subtract(const Duration(days: 7));
       final monthStart = DateTime(now.year, now.month, 1);
 
-      // Count by role
-      int students = 0, studentLeaders = 0, orgOfficers = 0, admins = 0, banned = 0;
-      int activeToday = 0, newThisWeek = 0, newThisMonth = 0;
-      Map<String, int> byDepartment = {};
-      Map<String, int> byCampus = {};
+      // Use Firestore aggregation count queries for accurate stats
+      // (avoid relying on _allUsers which may only contain the first page)
 
+      final totalUsersResult = await _firestore
+          .collection('users').count().get();
+      final totalAllUsers = totalUsersResult.count ?? 0;
+
+      Future<int> countWhere(String field, {Object? isEqualTo}) async {
+        final result = await _firestore
+            .collection('users')
+            .where(field, isEqualTo: isEqualTo)
+            .count()
+            .get();
+        return result.count ?? 0;
+      }
+
+      final students = await countWhere('role', isEqualTo: 'student');
+      final studentLeaders = await countWhere('role', isEqualTo: 'studentLeader');
+      final orgOfficers = await countWhere('role', isEqualTo: 'organizationOfficer');
+      final admins = await countWhere('role', isEqualTo: 'admin');
+      final banned = await countWhere('isActive', isEqualTo: false);
+
+      final newThisMonth = await _firestore
+          .collection('users')
+          .where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(monthStart))
+          .count()
+          .get()
+          .then((r) => r.count ?? 0);
+
+      final newThisWeek = await _firestore
+          .collection('users')
+          .where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(weekStart))
+          .count()
+          .get()
+          .then((r) => r.count ?? 0);
+
+      final activeToday = await _firestore
+          .collection('users')
+          .where('lastLoginAt', isGreaterThanOrEqualTo: Timestamp.fromDate(todayStart))
+          .count()
+          .get()
+          .then((r) => r.count ?? 0);
+
+      // Per-campus and per-department use loaded data as approximation
+      final byDepartment = <String, int>{};
+      final byCampus = <String, int>{};
       for (final user in _allUsers) {
-        // Role counts
-        switch (user.role) {
-          case UserRole.student:
-            students++;
-            break;
-          case UserRole.studentLeader:
-            studentLeaders++;
-            break;
-          case UserRole.organizationOfficer:
-            orgOfficers++;
-            break;
-          case UserRole.admin:
-            admins++;
-            break;
-        }
-
-        // Banned count
-        if (!user.isActive) banned++;
-
-        // Active today
-        if (user.lastLoginAt != null && user.lastLoginAt!.isAfter(todayStart)) {
-          activeToday++;
-        }
-
-        // New this week
-        if (user.createdAt.isAfter(weekStart)) {
-          newThisWeek++;
-        }
-
-        // New this month
-        if (user.createdAt.isAfter(monthStart)) {
-          newThisMonth++;
-        }
-
-        // By department
         final dept = user.department ?? 'Unassigned';
         byDepartment[dept] = (byDepartment[dept] ?? 0) + 1;
-
-        // By campus
         byCampus[user.campusId] = (byCampus[user.campusId] ?? 0) + 1;
       }
 
@@ -268,8 +285,43 @@ class AdminProvider extends ChangeNotifier {
           .map((doc) => ActivityLog.fromFirestore(doc))
           .toList();
 
+      // Notification analytics — server-side count queries to avoid downloading all docs
+      final totalNotifResult = await _firestore
+          .collection('notifications')
+          .count()
+          .get();
+      final totalNotifications = totalNotifResult.count ?? 0;
+
+      final sentNotifResult = await _firestore
+          .collection('notifications')
+          .where('pushStatus', isEqualTo: 'sent')
+          .count()
+          .get();
+      final sentNotifications = sentNotifResult.count ?? 0;
+
+      final deliveredNotifResult = await _firestore
+          .collection('notifications')
+          .where('pushStatus', isEqualTo: 'delivered')
+          .count()
+          .get();
+      final deliveredNotifications = deliveredNotifResult.count ?? 0;
+
+      final openedNotifResult = await _firestore
+          .collection('notifications')
+          .where('pushStatus', isEqualTo: 'opened')
+          .count()
+          .get();
+      final openedNotifications = openedNotifResult.count ?? 0;
+
+      final deliveryRate = totalNotifications > 0
+          ? (sentNotifications / totalNotifications * 100)
+          : 0.0;
+      final openRate = sentNotifications > 0
+          ? (openedNotifications / sentNotifications * 100)
+          : 0.0;
+
       _statistics = AppStatistics(
-        totalUsers: _allUsers.length,
+        totalUsers: totalAllUsers,
         totalStudents: students,
         totalStudentLeaders: studentLeaders,
         totalOrgOfficers: orgOfficers,
@@ -282,11 +334,17 @@ class AdminProvider extends ChangeNotifier {
         usersByDepartment: byDepartment,
         usersByCampus: byCampus,
         recentActivity: recentActivity,
+        totalNotifications: totalNotifications,
+        sentNotifications: sentNotifications,
+        deliveredNotifications: deliveredNotifications,
+        openedNotifications: openedNotifications,
+        deliveryRate: deliveryRate,
+        openRate: openRate,
       );
 
       notifyListeners();
     } catch (e) {
-      debugPrint('Error loading statistics: $e');
+      if (kDebugMode) debugPrint('Error loading statistics: $e');
     }
   }
 
@@ -416,7 +474,7 @@ class AdminProvider extends ChangeNotifier {
     }
   }
 
-  /// Approve a pending staff registration
+  /// Approve a pending student leader/organization officer registration
   Future<bool> approveUser(String userId) async {
     try {
       await _firestore.collection('users').doc(userId).update({
@@ -425,6 +483,57 @@ class AdminProvider extends ChangeNotifier {
 
       _updateLocalUser(userId, (u) => u.copyWith(isActive: true));
       ActivityLogService().logApproveUser(userId);
+      return true;
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Reject a pending student leader/organization officer registration.
+  /// Removes their Firestore user doc + location + notifications. The Auth
+  /// account becomes orphaned (no profile to load) and cannot log in.
+  Future<bool> rejectUser(String userId) async {
+    try {
+      final batch = _firestore.batch();
+
+      // Delete user doc
+      batch.delete(_firestore.collection('users').doc(userId));
+
+      // Delete location doc if exists
+      batch.delete(_firestore.collection('locations').doc(userId));
+
+      // Delete notifications where user is recipient or sender
+      final receivedSnap = await _firestore
+          .collection('notifications')
+          .where('recipientId', isEqualTo: userId)
+          .get();
+      final sentSnap = await _firestore
+          .collection('notifications')
+          .where('senderId', isEqualTo: userId)
+          .get();
+
+      final allDocs = [...receivedSnap.docs, ...sentSnap.docs];
+      for (int i = 0; i < allDocs.length; i += 500) {
+        final chunk = _firestore.batch();
+        final end = (i + 500 < allDocs.length) ? i + 500 : allDocs.length;
+        for (final doc in allDocs.sublist(i, end)) {
+          chunk.delete(doc.reference);
+        }
+        await chunk.commit();
+      }
+
+      // Delete user doc and location separately
+      await _firestore.collection('users').doc(userId).delete();
+      final locDoc = await _firestore.collection('locations').doc(userId).get();
+      if (locDoc.exists) await locDoc.reference.delete();
+
+      // Log the rejection and remove from local cache
+      ActivityLogService().logRejectUser(userId);
+      _allUsers.removeWhere((u) => u.id == userId);
+      _applyFilters();
+      notifyListeners();
       return true;
     } catch (e) {
       _error = e.toString();
@@ -449,19 +558,26 @@ class AdminProvider extends ChangeNotifier {
       final receivedSnap = await _firestore
           .collection('notifications')
           .where('recipientId', isEqualTo: userId)
-          .limit(499)
           .get();
       final sentSnap = await _firestore
           .collection('notifications')
           .where('senderId', isEqualTo: userId)
-          .limit(499)
           .get();
 
-      for (final doc in [...receivedSnap.docs, ...sentSnap.docs]) {
-        batch.delete(doc.reference);
+      final allDocs = [...receivedSnap.docs, ...sentSnap.docs];
+      for (int i = 0; i < allDocs.length; i += 500) {
+        final chunk = _firestore.batch();
+        final end = (i + 500 < allDocs.length) ? i + 500 : allDocs.length;
+        for (final doc in allDocs.sublist(i, end)) {
+          chunk.delete(doc.reference);
+        }
+        await chunk.commit();
       }
 
-      await batch.commit();
+      // Delete user doc and location separately
+      await _firestore.collection('users').doc(userId).delete();
+      final locDoc = await _firestore.collection('locations').doc(userId).get();
+      if (locDoc.exists) await locDoc.reference.delete();
 
       _allUsers.removeWhere((u) => u.id == userId);
       _applyFilters();

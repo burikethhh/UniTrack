@@ -16,17 +16,16 @@ class ActivityLogService {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
 
-    try {
-      _firestore.collection('activity_logs').add({
-        'actorId': uid,
-        'action': action,
-        'targetId': targetId,
-        'details': details,
-        'timestamp': FieldValue.serverTimestamp(),
-      });
-    } catch (e) {
+    final _ = _firestore.collection('activity_logs').add({
+      'actorId': uid,
+      'action': action,
+      'targetId': targetId ?? '',
+      'details': details ?? '',
+      'timestamp': FieldValue.serverTimestamp(),
+    }).catchError((e) {
       if (kDebugMode) debugPrint('ActivityLog error: $e');
-    }
+      return null as dynamic;
+    });
   }
 
   /// Log when a user views another user's profile
@@ -88,8 +87,13 @@ class ActivityLogService {
     log(action: 'BROADCAST_SENT', details: '$audience ($recipientCount)');
   }
 
-  /// Log when an admin approves a pending staff user
+  /// Log when an admin approves a pending student leader/organization officer
   void logApproveUser(String targetUserId) {
     log(action: 'APPROVE_USER', targetId: targetUserId);
+  }
+
+  /// Log when an admin rejects a pending student leader/organization officer
+  void logRejectUser(String targetUserId) {
+    log(action: 'REJECT_USER', targetId: targetUserId);
   }
 }

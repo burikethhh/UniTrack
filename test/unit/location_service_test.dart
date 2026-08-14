@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import '../../lib/services/location_service.dart';
-import '../../lib/models/location_model.dart';
+import 'package:unitrack/services/location_service.dart';
+import 'package:unitrack/models/location_model.dart';
 
 /// Simplified LocationService Tests
 /// These tests verify the service structure and configuration
@@ -18,9 +18,8 @@ void main() {
       expect(LocationConfig.distanceFilterMeters, equals(1.0));
       expect(LocationConfig.movementThreshold, equals(0.5));
       expect(LocationConfig.staleThresholdSeconds, equals(90));
-      expect(LocationConfig.movingUpdateIntervalSec, equals(2));
-      expect(LocationConfig.stationaryUpdateIntervalSec, equals(5));
-      expect(LocationConfig.heartbeatIntervalSec, equals(10));
+      expect(LocationConfig.unifiedTickSeconds, equals(5));
+      expect(LocationConfig.manualPinHeartbeatIntervalSec, equals(20));
       expect(LocationConfig.smoothingWindowSize, equals(5));
     });
 
@@ -36,7 +35,7 @@ void main() {
         status: 'available',
         isManualPin: false,
       );
-      
+
       // Assert
       expect(locationModel.userId, equals('faculty-1'));
       expect(locationModel.latitude, equals(6.633260));
@@ -44,6 +43,5 @@ void main() {
       expect(locationModel.isManualPin, isFalse);
       expect(locationModel.isWithinCampus, isTrue);
     });
-
   });
 }

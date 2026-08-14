@@ -16,12 +16,15 @@ class LoadingOverlay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Stack(
       children: [
         child,
         if (isLoading)
           Container(
-            color: Colors.black.withValues(alpha: 0.3),
+            color: Colors.black.withValues(alpha: isDark ? 0.6 : 0.3),
             child: Center(
               child: Card(
                 margin: const EdgeInsets.all(32),
@@ -30,18 +33,19 @@ class LoadingOverlay extends StatelessWidget {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const CircularProgressIndicator(
+                      CircularProgressIndicator(
                         valueColor: AlwaysStoppedAnimation<Color>(
-                          AppColors.primary,
+                          theme.colorScheme.primary,
                         ),
                       ),
                       if (message != null) ...[
                         const SizedBox(height: 16),
                         Text(
                           message!,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 14,
-                            color: AppColors.textSecondary,
+                            color: theme.textTheme.bodyMedium?.color ??
+                                AppColors.textSecondary,
                           ),
                           textAlign: TextAlign.center,
                         ),
@@ -92,10 +96,11 @@ class EmptyState extends StatelessWidget {
             const SizedBox(height: 24),
             Text(
               title,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
+                color: Theme.of(context).textTheme.titleMedium?.color ??
+                    AppColors.textPrimary,
               ),
               textAlign: TextAlign.center,
             ),
@@ -103,9 +108,10 @@ class EmptyState extends StatelessWidget {
               const SizedBox(height: 8),
               Text(
                 message!,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 14,
-                  color: AppColors.textSecondary,
+                  color: Theme.of(context).textTheme.bodyMedium?.color ??
+                      AppColors.textSecondary,
                 ),
                 textAlign: TextAlign.center,
               ),
@@ -147,21 +153,23 @@ class ErrorState extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 24),
-            const Text(
+            Text(
               'Oops! Something went wrong',
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
+                color: Theme.of(context).textTheme.titleMedium?.color ??
+                    AppColors.textPrimary,
               ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
             Text(
               message,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 14,
-                color: AppColors.textSecondary,
+                color: Theme.of(context).textTheme.bodyMedium?.color ??
+                    AppColors.textSecondary,
               ),
               textAlign: TextAlign.center,
             ),

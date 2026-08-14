@@ -1,8 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import '../../lib/providers/auth_provider.dart';
-import '../../lib/services/auth_service.dart';
-import '../../lib/models/user_model.dart';
-import '../test_helpers.dart';
+import 'package:unitrack/models/user_model.dart';
+import 'package:unitrack/services/auth_service.dart';
 
 /// Simplified AuthProvider Tests
 /// Tests structure and behavior without complex mocking
@@ -22,12 +20,12 @@ void main() {
         createdAt: DateTime.now(),
       );
       
-      final staff = UserModel(
-        id: 'staff-1',
-        email: 'staff@test.com',
+      final studentLeader = UserModel(
+        id: 'leader-1',
+        email: 'leader@test.com',
         firstName: 'Jane',
-        lastName: 'Staff',
-        role: UserRole.staff,
+        lastName: 'Leader',
+        role: UserRole.studentLeader,
         campusId: 'isulan',
         isActive: true,
         createdAt: DateTime.now(),
@@ -49,30 +47,32 @@ void main() {
       expect(student.isStaff, isFalse);
       expect(student.isAdmin, isFalse);
       
-      expect(staff.isStaff, isTrue);
-      expect(staff.isAdmin, isFalse);
-      expect(staff.isTrackingEnabled, isTrue);
+      expect(studentLeader.isStaff, isTrue);
+      expect(studentLeader.isAdmin, isFalse);
+      expect(studentLeader.isTrackingEnabled, isTrue);
       
-      expect(admin.isStaff, isTrue);
+      // Admins manage the system but are NOT 'trackable' staff — they
+      // should not appear as pinnable leaders on the student map.
+      expect(admin.isStaff, isFalse);
       expect(admin.isAdmin, isTrue);
     });
 
-    test('UserModel correctly identifies staff users', () {
+    test('UserModel correctly identifies student leader users', () {
       // Arrange
-      final staffUser = UserModel(
-        id: 'staff-1',
-        email: 'staff@example.com',
-        firstName: 'Staff',
+      final studentLeaderUser = UserModel(
+        id: 'leader-1',
+        email: 'leader@example.com',
+        firstName: 'Leader',
         lastName: 'Member',
-        role: UserRole.staff,
+        role: UserRole.studentLeader,
         campusId: 'isulan',
         isActive: true,
         createdAt: DateTime.now(),
       );
 
       // Assert
-      expect(staffUser.isStaff, isTrue);
-      expect(staffUser.role, equals(UserRole.staff));
+      expect(studentLeaderUser.isStaff, isTrue);
+      expect(studentLeaderUser.role, equals(UserRole.studentLeader));
     });
 
     test('UserModel correctly identifies admin users', () {
@@ -89,7 +89,7 @@ void main() {
       );
 
       // Assert
-      expect(adminUser.isStaff, isTrue);
+      expect(adminUser.isStaff, isFalse);
       expect(adminUser.isAdmin, isTrue);
       expect(adminUser.role, equals(UserRole.admin));
     });

@@ -16,14 +16,20 @@ class StatusBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = AppColors.getStatusColor(status);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final baseColor = AppColors.getStatusColor(status);
+    // Saturated status hues are too dim on dark surfaces — lighten the
+    // foreground so the label keeps an accessible contrast ratio.
+    final color = isDark
+        ? Color.lerp(baseColor, Colors.white, 0.35)!
+        : baseColor;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.15),
+        color: color.withValues(alpha: isDark ? 0.22 : 0.15),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
+        border: Border.all(color: color.withValues(alpha: isDark ? 0.45 : 0.3)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -67,7 +73,10 @@ class OnlineIndicator extends StatelessWidget {
             ? AppColors.statusAvailable
             : AppColors.statusUnavailable,
         shape: BoxShape.circle,
-        border: Border.all(color: Colors.white, width: 2),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.surface,
+          width: 2,
+        ),
         boxShadow: [
           BoxShadow(
             color:

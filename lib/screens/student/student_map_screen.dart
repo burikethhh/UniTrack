@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:maplibre_gl/maplibre_gl.dart' as maplibre;
@@ -69,7 +70,13 @@ class _StudentMapScreenState extends State<StudentMapScreen> {
       ) {
         if (!mounted) return;
         // Only notify if faculty belongs to selected campus (or all)
-        if (_selectedCampusId != null && f.user.campusId != _selectedCampusId) {
+        final locationCampus = f.location?.locationCampusId ?? f.user.campusId;
+        final isUniversityWide =
+            f.location?.visibilityScope ==
+            LocationVisibilityScope.universityWide;
+        if (_selectedCampusId != null &&
+            !isUniversityWide &&
+            locationCampus != _selectedCampusId) {
           return;
         }
         ScaffoldMessenger.of(context).showSnackBar(
@@ -155,7 +162,7 @@ class _StudentMapScreenState extends State<StudentMapScreen> {
         });
       }
     } catch (e) {
-      debugPrint('Error getting current location: $e');
+      if (kDebugMode) debugPrint('Error getting current location: $e');
     }
   }
 
@@ -486,7 +493,9 @@ class _StudentMapScreenState extends State<StudentMapScreen> {
             return Container(
               decoration: BoxDecoration(
                 color: Theme.of(context).colorScheme.surface,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(24),
+                ),
               ),
               child: Consumer<FacultyProvider>(
                 builder: (context, provider, _) {
@@ -522,8 +531,8 @@ class _StudentMapScreenState extends State<StudentMapScreen> {
                             Expanded(
                               child: Text(
                                 _selectedCampusId != null
-? 'Online · ${_campusShortName(_selectedCampusId!)} (${onlineFaculty.length})'
-                                     : 'Online (${onlineFaculty.length})',
+                                    ? 'Online · ${_campusShortName(_selectedCampusId!)} (${onlineFaculty.length})'
+                                    : 'Online (${onlineFaculty.length})',
                                 style: const TextStyle(
                                   fontSize: 18,
                                   fontWeight: FontWeight.bold,
@@ -541,9 +550,9 @@ class _StudentMapScreenState extends State<StudentMapScreen> {
                         child: onlineFaculty.isEmpty
                             ? const EmptyState(
                                 icon: Icons.location_off,
-                                title: 'No faculty online',
+                                title: 'No leaders online',
                                 message:
-                                    'Check back later for available faculty',
+                                    'Check back later for available leaders',
                               )
                             : ListView.builder(
                                 controller: scrollController,

@@ -24,7 +24,7 @@ const FCM_BATCH = 500;
 async function dispatch() {
   console.log('Starting push dispatch...');
 
-  // Fetch recent notifications.  Filter client-side for speed (only ~50 docs).
+  // Fetch recent notifications. Filter client-side for speed (only ~50 docs).
   const snap = await db
     .collection('notifications')
     .orderBy('createdAt', 'desc')
@@ -44,6 +44,8 @@ async function dispatch() {
 
     // Skip already-sent notifications
     if (data._pushSent === true) { skipped++; continue; }
+    // Skip if already in sending state (another dispatcher instance picked it up)
+    if (data.pushStatus === 'sending') { skipped++; continue; }
 
     const recipientId = data.recipientId;
     if (!recipientId) {
@@ -56,7 +58,11 @@ async function dispatch() {
     const userDoc = await db.collection('users').doc(recipientId).get();
     const fcmTokens = userDoc.data()?.fcmTokens;
     if (!fcmTokens || !Array.isArray(fcmTokens) || fcmTokens.length === 0) {
-      await doc.ref.update({ _pushSent: true });
+      await doc.ref.update({ 
+        _pushSent: true, 
+        pushStatus: 'failed', 
+        pushError: 'No FCM tokens' 
+      });
       skipped++;
       continue;
     }
@@ -85,6 +91,18 @@ async function dispatch() {
       },
     };
 
+    // Mark as sending
+    await doc.ref.update({ 
+      pushStatus: 'sending',
+      sentAt: admin.firestore.FieldValue.serverTimestamp(),
+      pushTokenCount: fcmTokens.length,
+    });
+
+    let successCount = 0;
+    let failureCount = 0;
+    let lastError = null;
+    const failedTokens = [];
+
     // Send to each token in batches
     try {
       for (let i = 0; i < fcmTokens.length; i += FCM_BATCH) {
@@ -98,32 +116,65 @@ async function dispatch() {
 
         response.responses.forEach((resp, idx) => {
           if (resp.success) {
-            console.log(`OK: ${chunk[idx].slice(0, 12)}...`);
+            successCount++;
           } else {
+            failureCount++;
             const code = resp.error?.code;
+            lastError = `${code}: ${resp.error?.message}`;
             console.warn(`FAIL: ${chunk[idx].slice(0, 12)}... ${code}`);
             if (
               code === 'messaging/invalid-registration-token' ||
               code === 'messaging/registration-token-not-registered'
             ) {
-              try {
-                db.collection('users').doc(recipientId).update({
-                  fcmTokens: admin.firestore.FieldValue.arrayRemove(chunk[idx]),
-                });
-              } catch (_) {}
+              failedTokens.push(chunk[idx]);
             }
           }
         });
       }
     } catch (err) {
+      lastError = err.message;
       console.error(`ERROR sending to ${recipientId}: ${err.message}`);
+      // Mark as failed
+      await doc.ref.update({ 
+        _pushSent: true,
+        pushStatus: 'failed', 
+        pushError: lastError 
+      });
       continue;
     }
 
-    // Mark as sent
-    await doc.ref.update({ _pushSent: true });
-    dispatched++;
-    console.log(`PUSHED to ${recipientId}`);
+    // Clean up invalid tokens
+    if (failedTokens.length > 0) {
+      try {
+        await db.collection('users').doc(recipientId).update({
+          fcmTokens: admin.firestore.FieldValue.arrayRemove(...failedTokens),
+        });
+      } catch (_) {}
+    }
+
+    // Mark as sent with delivery stats
+    const finalStatus = successCount > 0 ? 'sent' : 'failed';
+    const updateData = {
+      _pushSent: true,
+      pushStatus: finalStatus,
+      pushTokenCount: fcmTokens.length,
+      successCount: successCount,
+      failureCount: failureCount,
+    };
+
+    if (lastError) {
+      updateData.pushError = lastError;
+    }
+
+    await doc.ref.update(updateData);
+
+    if (finalStatus === 'sent') {
+      dispatched++;
+      console.log(`PUSHED to ${recipientId}: ${successCount} OK, ${failureCount} failed`);
+    } else {
+      skipped++;
+      console.log(`FAILED to ${recipientId}: ${failureCount} failed`);
+    }
   }
 
   console.log(`Done: ${dispatched} dispatched, ${skipped} skipped.`);

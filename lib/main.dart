@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -60,8 +61,8 @@ void main() async {
   try {
     await _initializeApp();
   } catch (e, stack) {
-    debugPrint('💥 FATAL initialization error: $e');
-    debugPrint('$stack');
+    if (kDebugMode) debugPrint('💥 FATAL initialization error: $e');
+    if (kDebugMode) debugPrint('$stack');
     // On web, show a visible error instead of white screen
     if (kIsWeb) {
       runApp(
@@ -110,12 +111,46 @@ Future<void> _initializeApp() async {
   // Initialize Firebase
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
-  // Configure Firestore settings for web to avoid SDK internal errors
+  // Initialize App Check — required for Firebase Auth/Firestore on web
+  // when App Check is registered in Firebase Console.
+  // Register at: https://www.google.com/recaptcha/admin
+  try {
+    final recaptchaKey = '6LdnrYAtAAAAACkljIXXnfY_2Ygz0WW-PRHFC4HS';
+    await FirebaseAppCheck.instance.activate(
+      providerWeb: ReCaptchaV3Provider(recaptchaKey),
+      providerAndroid: kDebugMode
+          ? const AndroidDebugProvider()
+          : const AndroidPlayIntegrityProvider(),
+    );
+    // Ensure tokens are auto-refreshed so Auth/Firestore requests succeed
+    await FirebaseAppCheck.instance.setTokenAutoRefreshEnabled(true);
+    // Force initial token acquisition to verify reCAPTCHA is working
+    final appCheckToken = await FirebaseAppCheck.instance.getToken();
+    if (kDebugMode) {
+      debugPrint('✅ App Check initialized — token: ${appCheckToken != null ? 'obtained' : 'null (will retry)'}');
+    }
+  } catch (e) {
+    if (kDebugMode) debugPrint('⚠️ App Check init failed: $e');
+    // Don't block app startup — App Check tokens are retried automatically
+  }
+
+  // Configure Firestore for web
   if (kIsWeb) {
+    // Try to clear any stale persistence that might be hanging
+    try {
+      await FirebaseFirestore.instance.clearPersistence().timeout(
+        const Duration(seconds: 5),
+      );
+      if (kDebugMode) debugPrint('Firestore persistence cleared');
+    } catch (e) {
+      if (kDebugMode) debugPrint('Firestore clearPersistence (expected): $e');
+    }
+
     FirebaseFirestore.instance.settings = const Settings(
       persistenceEnabled: true,
       cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
     );
+    if (kDebugMode) debugPrint('Firestore settings applied');
   }
 
   // Initialize connectivity monitoring (works on all platforms)
@@ -126,11 +161,13 @@ Future<void> _initializeApp() async {
     await OfflineCacheService().initialize().timeout(
       const Duration(seconds: 5),
       onTimeout: () {
-        debugPrint('⚠️ Offline cache init timed out (non-fatal)');
+        if (kDebugMode) {
+          debugPrint('⚠️ Offline cache init timed out (non-fatal)');
+        }
       },
     );
   } catch (e) {
-    debugPrint('⚠️ Offline cache init error (non-fatal): $e');
+    if (kDebugMode) debugPrint('⚠️ Offline cache init error (non-fatal): $e');
   }
 
   // Initialize push notifications — fire and forget to avoid blocking app start
@@ -140,11 +177,15 @@ Future<void> _initializeApp() async {
       .timeout(
         const Duration(seconds: 5),
         onTimeout: () {
-          debugPrint('⚠️ Push notification init timed out (non-fatal)');
+          if (kDebugMode) {
+            debugPrint('⚠️ Push notification init timed out (non-fatal)');
+          }
         },
       )
       .catchError((e) {
-        debugPrint('⚠️ Push notification init error (non-fatal): $e');
+        if (kDebugMode) {
+          debugPrint('⚠️ Push notification init error (non-fatal): $e');
+        }
         return null;
       });
 
@@ -152,7 +193,7 @@ Future<void> _initializeApp() async {
   try {
     await ThemeProvider().load();
   } catch (e) {
-    debugPrint('⚠️ Theme load error (non-fatal): $e');
+    if (kDebugMode) debugPrint('⚠️ Theme load error (non-fatal): $e');
   }
 }
 
@@ -185,14 +226,15 @@ class IsksularsTrackApp extends StatelessWidget {
         ),
 
         // Providers
-        ChangeNotifierProvider<AuthProvider>(
-          create: (context) => AuthProvider(
-            authService: context.read<AuthService>(),
-          ),
-        ),
         ChangeNotifierProvider<LocationProvider>(
           create: (context) => LocationProvider(
             locationService: context.read<LocationService>(),
+          ),
+        ),
+        ChangeNotifierProvider<AuthProvider>(
+          create: (context) => AuthProvider(
+            authService: context.read<AuthService>(),
+            locationProvider: context.read<LocationProvider>(),
           ),
         ),
         ChangeNotifierProvider<FacultyProvider>(
@@ -224,44 +266,44 @@ class IsksularsTrackApp extends StatelessWidget {
       ],
       child: Consumer<ThemeProvider>(
         builder: (context, themeProvider, _) => MaterialApp(
-        title: AppConstants.appName,
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.lightTheme,
-        darkTheme: AppTheme.darkTheme,
-        themeMode: themeProvider.themeMode,
-        scrollBehavior: AppScrollBehavior(),
-        navigatorKey: notificationNavigatorKey,
-        home: kDemoMode ? const DemoModeSelector() : const AppEntry(),
-        routes: {
-          '/login': (context) => const LoginScreen(),
-          '/onboarding': (context) => const OnboardingScreen(),
-        },
-        // Responsive wrapper: adaptive layout based on screen size
-        // Mobile: full width (max 600px)
-        // Tablet: centered content (max 840px)
-        // Desktop: full width (content handles its own constraints)
-        builder: (context, child) {
-          final screenWidth = MediaQuery.sizeOf(context).width;
+          title: AppConstants.appName,
+          debugShowCheckedModeBanner: false,
+          theme: AppTheme.lightTheme,
+          darkTheme: AppTheme.darkTheme,
+          themeMode: themeProvider.themeMode,
+          scrollBehavior: AppScrollBehavior(),
+          navigatorKey: notificationNavigatorKey,
+          home: kDemoMode ? const DemoModeSelector() : const AppEntry(),
+          routes: {
+            '/login': (context) => const LoginScreen(),
+            '/onboarding': (context) => const OnboardingScreen(),
+          },
+          // Responsive wrapper: adaptive layout based on screen size
+          // Mobile: full width (max 600px)
+          // Tablet: centered content (max 840px)
+          // Desktop: full width (content handles its own constraints)
+          builder: (context, child) {
+            final screenWidth = MediaQuery.sizeOf(context).width;
 
-          // On mobile, constrain to phone-like width
-          if (screenWidth < 600) {
-            return OfflineModeBanner(
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 480),
-                  child: child,
+            // On mobile, constrain to phone-like width
+            if (screenWidth < 600) {
+              return OfflineModeBanner(
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 480),
+                    child: child,
+                  ),
                 ),
-              ),
-            );
-          }
+              );
+            }
 
-          // On tablet/desktop, let screens handle their own layout
-          // Individual screens will use ResponsiveBuilder for adaptive layouts
-          return OfflineModeBanner(child: child ?? const SizedBox.shrink());
-        },
-      ),
+            // On tablet/desktop, let screens handle their own layout
+            // Individual screens will use ResponsiveBuilder for adaptive layouts
+            return OfflineModeBanner(child: child ?? const SizedBox.shrink());
+          },
         ),
-      );
+      ),
+    );
   }
 }
 
@@ -317,6 +359,47 @@ class _AppEntryState extends State<AppEntry> {
     }
 
     return const AuthWrapper();
+  }
+}
+
+/// Shown to staff after email verification but before admin approval.
+class PendingApprovalScreen extends StatelessWidget {
+  const PendingApprovalScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.hourglass_top, size: 64, color: Colors.orange),
+              const SizedBox(height: 24),
+              const Text(
+                'Account Pending Approval',
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Your email has been verified. An administrator will review your account before you can access the app.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+              ),
+              const SizedBox(height: 32),
+              ElevatedButton(
+                onPressed: () async {
+                  await context.read<AuthProvider>().signOut();
+                },
+                child: const Text('Sign Out'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -418,7 +501,7 @@ class DemoModeSelector extends StatelessWidget {
                 _buildRoleButton(
                   context,
                   'Student',
-                  'View faculty locations & navigate',
+                  'View leader locations & navigate',
                   Icons.school,
                   Colors.blue,
                   () => Navigator.push(
@@ -578,8 +661,27 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
         // Check email verification — block unverified users
         final firebaseUser = FirebaseAuth.instance.currentUser;
-        if (firebaseUser != null && !firebaseUser.emailVerified) {
+        if (firebaseUser != null &&
+            !firebaseUser.emailVerified &&
+            user.role != UserRole.admin) {
           return const EmailVerificationScreen();
+        }
+
+        // Check if user is active — handle pending approval and banned users
+        if (!user.isActive) {
+          if (user.role == UserRole.studentLeader ||
+              user.role == UserRole.organizationOfficer) {
+            // Staff pending admin approval after email verification
+            return const PendingApprovalScreen();
+          }
+          // Banned student — defer sign out to avoid setState during build
+          if (kDebugMode) {
+            debugPrint('🔄 AuthWrapper: user is banned, signing out');
+          }
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) authProvider.signOut();
+          });
+          return const LoginScreen();
         }
 
         // Check for updates on first authenticated build

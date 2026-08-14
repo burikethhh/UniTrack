@@ -48,6 +48,21 @@ class ErrorMessages {
       return 'Too many failed attempts. Please wait a few minutes before trying again.';
     }
 
+    if (message.contains('verify your email') ||
+        message.contains('verification')) {
+      return 'Please verify your email before logging in. Check your inbox for the verification link.';
+    }
+
+    if (message.contains('pending admin approval') ||
+        message.contains('pending approval')) {
+      return 'Your account is pending admin approval. You\'ll be able to log in once approved.';
+    }
+
+    if (message.contains('could not load your profile') ||
+        message.contains('profile could not be created')) {
+      return 'Could not load your profile. Please check your connection and try again.';
+    }
+
     if (message.contains('invalid-credential') ||
         message.contains('credential')) {
       return 'Invalid email or password. Please check your credentials and try again.';

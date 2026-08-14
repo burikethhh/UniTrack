@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import 'activity_log_service.dart';
 
 /// Service responsible for sending broadcast notifications to users.
@@ -32,32 +33,37 @@ class BroadcastService {
     final firestore = FirebaseFirestore.instance;
     int sentCount = 0;
 
-    for (int i = 0; i < audienceIds.length; i += _chunkSize) {
-      final batch = firestore.batch();
-      final chunk = audienceIds.skip(i).take(_chunkSize);
-      for (final recipientId in chunk) {
-        final notifRef = firestore.collection('notifications').doc();
-        batch.set(notifRef, {
-          'senderId': senderId,
-          'senderName': senderName,
-          'senderPhotoUrl': null,
-          'recipientId': recipientId,
-          'type': 'system',
-          'title': title,
-          'message': body,
-          'isRead': false,
-          'createdAt': FieldValue.serverTimestamp(),
-          'data': {
-            'source': type,
-            'audience': audienceLabel,
-          },
-        });
-        sentCount++;
+    try {
+      for (int i = 0; i < audienceIds.length; i += _chunkSize) {
+        final batch = firestore.batch();
+        final chunk = audienceIds.skip(i).take(_chunkSize);
+        for (final recipientId in chunk) {
+          final notifRef = firestore.collection('notifications').doc();
+          batch.set(notifRef, {
+            'senderId': senderId,
+            'senderName': senderName,
+            'senderPhotoUrl': null,
+            'recipientId': recipientId,
+            'type': 'system',
+            'title': title,
+            'message': body,
+            'isRead': false,
+            'createdAt': FieldValue.serverTimestamp(),
+            'data': {
+              'source': type,
+              'audience': audienceLabel,
+            },
+          });
+          sentCount++;
+        }
+        await batch.commit();
       }
-      await batch.commit();
-    }
 
-    return sentCount;
+      return sentCount;
+    } catch (e) {
+      if (kDebugMode) debugPrint('Broadcast error: $e');
+      rethrow;
+    }
   }
 
   /// Convenience: fetch the user IDs matching the given filter and send a
@@ -80,14 +86,14 @@ class BroadcastService {
         query = query.where('role', isEqualTo: 'student');
         break;
       case 'studentLeaders':
-        query = query.where('role', isEqualTo: 'studentleader');
+        query = query.where('role', isEqualTo: 'studentLeader');
         break;
       case 'orgOfficers':
-        query = query.where('role', isEqualTo: 'organizationofficer');
+        query = query.where('role', isEqualTo: 'organizationOfficer');
         break;
       case 'leaders':
         query = query.where('role',
-            whereIn: ['studentleader', 'organizationofficer']);
+            whereIn: ['studentLeader', 'organizationOfficer']);
         break;
       case 'admins':
         query = query.where('role', isEqualTo: 'admin');

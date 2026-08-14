@@ -1,19 +1,25 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
-    // APK releases - admins can upload, anyone authenticated can download
+    // APK releases - admins can upload, authenticated users can download
     match /apk_releases/{fileName} {
       allow read: if request.auth != null;
-      allow write: if request.auth != null && 
-                      firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'admin';
+      allow write: if request.auth != null
+                    && firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'admin'
+                    && request.resource.size < 50 * 1024 * 1024  // 50 MB max
+                    && request.resource.contentType.matches('application/vnd.android.package-archive');
     }
-    
+
     // User uploads (profile pictures, etc.)
     match /users/{userId}/{allPaths=**} {
       allow read: if request.auth != null;
-      allow write: if request.auth != null && request.auth.uid == userId;
+      allow write: if request.auth != null
+                    && request.auth.uid == userId
+                    && request.resource.size < 5 * 1024 * 1024  // 5 MB max
+                    && (request.resource.contentType.matches('image/.*')
+                        || request.resource.contentType.matches('application/octet-stream'));
     }
-    
+
     // Default - deny all other access
     match /{allPaths=**} {
       allow read, write: if false;

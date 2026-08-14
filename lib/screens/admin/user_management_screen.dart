@@ -129,17 +129,6 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                           ),
                           const SizedBox(width: 8),
                           _FilterChip(
-                            label: 'Staff',
-                            selected:
-                                adminProvider.roleFilter == UserRole.staff,
-                            onSelected: (_) =>
-                                adminProvider.setRoleFilter(UserRole.staff),
-                            count: adminProvider.staff.length,
-                            icon: Icons.work,
-                            color: Colors.orange,
-                          ),
-                          const SizedBox(width: 8),
-                          _FilterChip(
                             label: 'Admins',
                             selected:
                                 adminProvider.roleFilter == UserRole.admin,
@@ -358,7 +347,9 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
           ),
         ],
       ),
-    );
+    ).then((_) {
+      reasonController.dispose();
+    });
   }
 
   void _showUnbanDialog(UserModel user, AdminProvider adminProvider) {
@@ -550,8 +541,10 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
     switch (role) {
       case UserRole.student:
         return 'Regular student access';
-      case UserRole.staff:
-        return 'Faculty/Staff member';
+      case UserRole.studentLeader:
+        return 'Student Leader - trackable';
+      case UserRole.organizationOfficer:
+        return 'Organization Officer - trackable';
       case UserRole.admin:
         return 'Full administrative access';
     }
@@ -873,8 +866,10 @@ class _UserCard extends StatelessWidget {
     switch (role) {
       case UserRole.student:
         return Colors.green;
-      case UserRole.staff:
+      case UserRole.studentLeader:
         return Colors.orange;
+      case UserRole.organizationOfficer:
+        return Colors.teal;
       case UserRole.admin:
         return Colors.purple;
     }

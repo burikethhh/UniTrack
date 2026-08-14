@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
@@ -10,6 +11,7 @@ import '../../core/utils/connectivity_service.dart';
 import '../../providers/auth_provider.dart';
 import '../../models/user_model.dart';
 import '../../widgets/widgets.dart';
+import 'email_verification_screen.dart';
 
 /// Registration Screen for ISKSULARS TRACK
 class RegisterScreen extends StatefulWidget {
@@ -70,7 +72,7 @@ class _RegisterScreenState extends State<RegisterScreen> with SnackBarMixin {
   Future<void> _handleRegister() async {
     if (!_formKey.currentState!.validate()) return;
 
-    if (!ConnectivityService().isConnected) {
+    if (!kIsWeb && !ConnectivityService().isConnected) {
       showErrorSnackBar(
         context,
         'No internet connection. Please check your network.',
@@ -109,7 +111,15 @@ class _RegisterScreenState extends State<RegisterScreen> with SnackBarMixin {
       if (success) {
         final isStaff = _selectedRole == UserRole.studentLeader ||
             _selectedRole == UserRole.organizationOfficer;
-        Navigator.pop(context);
+
+        // Navigate to email verification screen (keep AuthWrapper alive below)
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const EmailVerificationScreen(),
+          ),
+        );
+
         showSuccessSnackBar(
           context,
           isStaff
@@ -120,6 +130,8 @@ class _RegisterScreenState extends State<RegisterScreen> with SnackBarMixin {
         final errorMsg = ErrorMessages.registerError(authProvider.error);
         showErrorSnackBar(context, errorMsg);
       }
+      // Notify after showing the snackbar so mounted stayed true
+      authProvider.resetLoading();
     }
   }
 
@@ -498,18 +510,26 @@ class _RegisterScreenState extends State<RegisterScreen> with SnackBarMixin {
                     const SizedBox(height: 16),
 
                     DropdownButtonFormField<String>(
-                      initialValue:
-                          _selectedDepartment, // ignore: deprecated_member_use
+                      initialValue: _selectedDepartment,
                       decoration: const InputDecoration(
                         labelText: 'Course/Program',
                         prefixIcon: Icon(Icons.school),
                       ),
-                      items: _availablePrograms.map((program) {
+                      items: [
+                        const DropdownMenuItem<String>(
+                          value: null,
+                          child: Text(
+                            'Select a program...',
+                            style: TextStyle(color: AppColors.textSecondary),
+                          ),
+                        ),
+                        ..._availablePrograms.map((program) {
                         return DropdownMenuItem(
                           value: program,
                           child: Text(program, overflow: TextOverflow.ellipsis),
                         );
-                      }).toList(),
+                      }),
+                      ],
                       onChanged: (value) {
                         setState(() {
                           _selectedDepartment = value;
@@ -630,18 +650,26 @@ class _RegisterScreenState extends State<RegisterScreen> with SnackBarMixin {
                               )
                             else
                               DropdownButtonFormField<String>(
-                                initialValue:
-                                    _selectedOrganization, // ignore: deprecated_member_use
+                                initialValue: _selectedOrganization,
                                 decoration: const InputDecoration(
                                   labelText: 'Select Organization',
                                   prefixIcon: Icon(Icons.groups),
                                 ),
-                                items: _filteredOrganizations.map((org) {
+                                items: [
+                                    const DropdownMenuItem<String>(
+                                      value: null,
+                                      child: Text(
+                                        'Select an organization...',
+                                        style: TextStyle(color: AppColors.textSecondary),
+                                      ),
+                                    ),
+                                    ..._filteredOrganizations.map((org) {
                                   return DropdownMenuItem(
                                     value: org,
                                     child: Text(org),
                                   );
-                                }).toList(),
+                                }),
+                                  ],
                                 onChanged: (value) {
                                   setState(() {
                                     _selectedOrganization = value;

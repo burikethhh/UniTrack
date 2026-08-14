@@ -51,7 +51,7 @@ class _VersionManagementScreenState extends State<VersionManagementScreen> {
           'This will create version records in Firestore to enable in-app updates.\n\n'
           'Versions to be created:\n'
           '• v1.0.0 (Initial Release)\n'
-          '• v2.0.0 (Major Update)\n'
+          '• v2.0.0 (Complete Overhaul)\n'
           '• v2.0.1 (New Features)\n'
           '• v2.0.2 (Hotfix)\n'
           '• v2.0.3 (Download Fix)\n\n'
@@ -82,11 +82,11 @@ class _VersionManagementScreenState extends State<VersionManagementScreen> {
       final versions = [
         {
           'versionName': '1.0.0',
-          'versionCode': 100,
+          'versionCode': 1,
           'downloadUrl': '',
           'releaseNotes':
-              'Initial release of UniTrack.\n- Real-time faculty location tracking\n- Student directory\n- Staff dashboard\n- Admin panel',
-          'isRequired': false,
+              'Initial release of ISKSULARS TRACK\n- Real-time faculty location tracking\n- Campus maps with 2D view\n- Student directory and search\n- Faculty availability status\n- Push notifications',
+          'isRequired': true,
           'isActive': false,
           'releaseDate': Timestamp.fromDate(DateTime(2025, 12, 1)),
           'downloadCount': 0,
@@ -95,11 +95,11 @@ class _VersionManagementScreenState extends State<VersionManagementScreen> {
         },
         {
           'versionName': '2.0.0',
-          'versionCode': 200,
+          'versionCode': 2,
           'downloadUrl':
               'https://github.com/burikethhh/UniTrack/releases/download/v2.0.0/unitrack-latest.apk',
           'releaseNotes':
-              'UniTrack 2.0 - Complete Overhaul!\n\n✨ New Features:\n- Animated splash screen\n- Enhanced location accuracy\n- Network connectivity monitoring\n- Password strength indicator\n\n🔧 Improvements:\n- Faster faculty refresh\n- Adaptive location tracking\n- Improved UI/UX',
+              'Complete overhaul\n- 3D campus maps\n- Multi-campus support (7 campuses)\n- Student leader tracking\n- Organization system\n- Offline mode\n- Improved UI/UX',
           'isRequired': false,
           'isActive': false,
           'releaseDate': Timestamp.fromDate(DateTime(2026, 1, 15)),
@@ -109,11 +109,11 @@ class _VersionManagementScreenState extends State<VersionManagementScreen> {
         },
         {
           'versionName': '2.0.1',
-          'versionCode': 201,
+          'versionCode': 3,
           'downloadUrl':
               'https://github.com/burikethhh/UniTrack/releases/download/v2.0.1/UniTrack-v2.0.1.apk',
           'releaseNotes':
-              'UniTrack 2.0.1 - New Features!\n\n✨ New Features:\n- Offline Mode with SQLite caching\n- Faculty Availability Status\n- Onboarding Tutorial\n- Skeleton Loading animations\n- Push Notifications (FCM)',
+              'New features\n- Walking directions\n- Faculty ping notifications\n- Quick messages\n- Auto-hide schedule\n- Background tracking improvements',
           'isRequired': false,
           'isActive': false,
           'releaseDate': Timestamp.fromDate(DateTime(2026, 2, 1)),
@@ -123,11 +123,11 @@ class _VersionManagementScreenState extends State<VersionManagementScreen> {
         },
         {
           'versionName': '2.0.2',
-          'versionCode': 202,
+          'versionCode': 4,
           'downloadUrl':
               'https://github.com/burikethhh/UniTrack/releases/download/v2.0.2/UniTrack-v2.0.2.apk',
           'releaseNotes':
-              '🔧 Hotfix Release\n\n- Fixed login crash caused by service initialization\n- Services now initialize gracefully with error handling',
+              'Bug fixes\n- Fixed login race condition on web\n- Fixed location accuracy issues\n- Improved offline cache reliability',
           'isRequired': false,
           'isActive': false,
           'releaseDate': Timestamp.fromDate(DateTime(2026, 2, 1)),
@@ -137,11 +137,11 @@ class _VersionManagementScreenState extends State<VersionManagementScreen> {
         },
         {
           'versionName': '2.0.3',
-          'versionCode': 203,
+          'versionCode': 5,
           'downloadUrl':
               'https://github.com/burikethhh/UniTrack/releases/download/v2.0.3/UniTrack-v2.0.3.apk',
           'releaseNotes':
-              '🔧 Download Fix Release\n\n- In-app update download now works with GitHub releases\n- Properly handles HTTP redirects\n- Added file validation after download\n- Better error handling and logging',
+              'Download improvements\n- Fixed APK download progress\n- Added file size display\n- Improved error handling',
           'isRequired': false,
           'isActive': true,
           'releaseDate': Timestamp.fromDate(DateTime(2026, 2, 1)),
@@ -547,7 +547,12 @@ class _VersionManagementScreenState extends State<VersionManagementScreen> {
           ],
         ),
       ),
-    );
+    ).then((_) {
+      versionNameController.dispose();
+      versionCodeController.dispose();
+      releaseNotesController.dispose();
+      downloadUrlController.dispose();
+    });
   }
 
   /// Show help dialog for GitHub URL format
@@ -594,7 +599,7 @@ class _VersionManagementScreenState extends State<VersionManagementScreen> {
             ),
             const SizedBox(height: 16),
             const Text(
-              'Example (UniTrack):',
+              'Example (ISKSULARS TRACK):',
               style: TextStyle(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
@@ -727,7 +732,7 @@ class _VersionManagementScreenState extends State<VersionManagementScreen> {
     final messageController = TextEditingController(
       text:
           version.releaseNotes ??
-          'A new version of UniTrack is available. Update now for the latest features and improvements!',
+          'A new version of ISKSULARS TRACK is available. Update now for the latest features and improvements!',
     );
 
     showDialog(
@@ -781,7 +786,10 @@ class _VersionManagementScreenState extends State<VersionManagementScreen> {
           ),
         ],
       ),
-    );
+    ).then((_) {
+      titleController.dispose();
+      messageController.dispose();
+    });
   }
 
   Future<void> _sendNotification({

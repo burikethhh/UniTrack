@@ -1,5 +1,5 @@
 import 'dart:typed_data';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
@@ -27,9 +27,11 @@ class UpdateService {
   /// This method is designed to work with all app versions (v1.0.0+)
   Future<UpdateCheckResult> checkForUpdate() async {
     try {
-      debugPrint(
+      if (kDebugMode) {
+        debugPrint(
         '🔍 Checking for updates (current: v$currentVersionName, code: $currentVersionCode)',
       );
+      }
 
       // Get latest active version
       final snapshot = await _firestore
@@ -40,7 +42,7 @@ class UpdateService {
           .get();
 
       if (snapshot.docs.isEmpty) {
-        debugPrint('📭 No versions found in database');
+        if (kDebugMode) debugPrint('📭 No versions found in database');
         return UpdateCheckResult(
           updateAvailable: false,
           message: 'No updates available',
@@ -48,12 +50,14 @@ class UpdateService {
       }
 
       final latestVersion = AppVersion.fromFirestore(snapshot.docs.first);
-      debugPrint(
+      if (kDebugMode) {
+        debugPrint(
         '📦 Latest version: v${latestVersion.versionName} (code: ${latestVersion.versionCode})',
       );
+      }
 
       if (latestVersion.isNewerThan(currentVersionCode)) {
-        debugPrint('✨ Update available!');
+        if (kDebugMode) debugPrint('✨ Update available!');
         return UpdateCheckResult(
           updateAvailable: true,
           isRequired: latestVersion.isRequired,
@@ -64,13 +68,13 @@ class UpdateService {
         );
       }
 
-      debugPrint('✅ App is up to date');
+      if (kDebugMode) debugPrint('✅ App is up to date');
       return UpdateCheckResult(
         updateAvailable: false,
         message: 'You have the latest version',
       );
     } catch (e) {
-      debugPrint('❌ Error checking for updates: $e');
+      if (kDebugMode) debugPrint('❌ Error checking for updates: $e');
       return UpdateCheckResult(
         updateAvailable: false,
         message: 'Error checking for updates: $e',
@@ -88,7 +92,7 @@ class UpdateService {
       final minSupported = configDoc.data()?['minSupportedApiVersion'] ?? 1;
       return currentApiVersion >= minSupported;
     } catch (e) {
-      debugPrint('Error checking version support: $e');
+      if (kDebugMode) debugPrint('Error checking version support: $e');
       return true; // Fail open - don't block users on error
     }
   }
@@ -105,7 +109,7 @@ class UpdateService {
       if (snapshot.docs.isEmpty) return null;
       return AppVersion.fromFirestore(snapshot.docs.first);
     } catch (e) {
-      debugPrint('Error getting version: $e');
+      if (kDebugMode) debugPrint('Error getting version: $e');
       return null;
     }
   }
@@ -120,7 +124,7 @@ class UpdateService {
 
       return snapshot.docs.map((doc) => AppVersion.fromFirestore(doc)).toList();
     } catch (e) {
-      debugPrint('Error getting versions: $e');
+      if (kDebugMode) debugPrint('Error getting versions: $e');
       return [];
     }
   }
@@ -134,7 +138,7 @@ class UpdateService {
   }) async {
     // On web, simply reload the page to get the latest version
     if (kIsWeb) {
-      debugPrint('🌐 Web update: triggering page reload');
+      if (kDebugMode) debugPrint('🌐 Web update: triggering page reload');
       return true; // Signal success; caller handles the reload
     }
 
@@ -154,7 +158,7 @@ class UpdateService {
 
       // The actual mobile download logic is handled via platform channels
       // and the packages we import conditionally
-      debugPrint('📥 Downloading APK from: ${version.downloadUrl}');
+      if (kDebugMode) debugPrint('📥 Downloading APK from: ${version.downloadUrl}');
 
       // Download via HTTP
       final client = http.Client();
@@ -172,7 +176,7 @@ class UpdateService {
           if (response.statusCode >= 300 && response.statusCode < 400) {
             final location = response.headers['location'];
             if (location != null) {
-              debugPrint('↪️ Redirect $i: $location');
+              if (kDebugMode) debugPrint('↪️ Redirect $i: $location');
               currentUrl = location;
               await response.stream.drain();
               continue;
@@ -189,22 +193,23 @@ class UpdateService {
 
         final contentLength = response.contentLength ?? 0;
         int downloadedBytes = 0;
-        final chunks = <int>[];
 
+        // Stream the response without accumulating in memory (avoids OOM)
         await for (final chunk in response.stream) {
-          chunks.addAll(chunk);
           downloadedBytes += chunk.length;
           if (contentLength > 0) {
             onProgress?.call(downloadedBytes / contentLength);
           }
         }
 
-        debugPrint(
+        if (kDebugMode) {
+          debugPrint(
           '✅ Downloaded ${(downloadedBytes / 1024 / 1024).toStringAsFixed(2)} MB',
         );
+        }
 
         if (downloadedBytes < 1024 * 1024) {
-          debugPrint('❌ Downloaded file too small');
+          if (kDebugMode) debugPrint('❌ Downloaded file too small');
           return false;
         }
 
@@ -216,7 +221,7 @@ class UpdateService {
         client.close();
       }
     } catch (e) {
-      debugPrint('❌ Error downloading update: $e');
+      if (kDebugMode) debugPrint('❌ Error downloading update: $e');
       return false;
     }
   }
@@ -234,7 +239,7 @@ class UpdateService {
         'downloadCount': FieldValue.increment(1),
       }, SetOptions(merge: true));
     } catch (e) {
-      debugPrint('Error incrementing download count: $e');
+      if (kDebugMode) debugPrint('Error incrementing download count: $e');
     }
   }
 
@@ -295,7 +300,7 @@ class UpdateService {
         fileSize: version.fileSize,
       );
     } catch (e) {
-      debugPrint('Error uploading version: $e');
+      if (kDebugMode) debugPrint('Error uploading version: $e');
       return null;
     }
   }
@@ -308,7 +313,7 @@ class UpdateService {
       }, SetOptions(merge: true));
       return true;
     } catch (e) {
-      debugPrint('Error toggling version: $e');
+      if (kDebugMode) debugPrint('Error toggling version: $e');
       return false;
     }
   }
@@ -321,7 +326,7 @@ class UpdateService {
       }, SetOptions(merge: true));
       return true;
     } catch (e) {
-      debugPrint('Error setting required: $e');
+      if (kDebugMode) debugPrint('Error setting required: $e');
       return false;
     }
   }
@@ -332,7 +337,7 @@ class UpdateService {
       await _firestore.collection('app_versions').doc(versionId).delete();
       return true;
     } catch (e) {
-      debugPrint('Error deleting version: $e');
+      if (kDebugMode) debugPrint('Error deleting version: $e');
       return false;
     }
   }
@@ -359,9 +364,11 @@ class UpdateService {
           final notifRef = _firestore.collection('notifications').doc();
           batch.set(notifRef, {
             'recipientId': userDoc.id,
+            'senderId': 'system',
+            'senderName': 'ISKSULARS TRACK',
             'title': title,
-            'body': message,
-            'type': 'app_update',
+            'message': message,
+            'type': 'appUpdate',
             'data': {'versionName': versionName},
             'isRead': false,
             'createdAt': FieldValue.serverTimestamp(),
@@ -370,10 +377,10 @@ class UpdateService {
         await batch.commit();
       }
 
-      debugPrint('Sent update notification to ${docs.length} users');
+      if (kDebugMode) debugPrint('Sent update notification to ${docs.length} users');
       return true;
     } catch (e) {
-      debugPrint('Error sending update notification: $e');
+      if (kDebugMode) debugPrint('Error sending update notification: $e');
       return false;
     }
   }

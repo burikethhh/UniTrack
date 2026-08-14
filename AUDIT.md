@@ -1,8 +1,10 @@
-# UniTrack — Complete Project Audit
+# ISKSULARS TRACK — Complete Project Audit
 
-> **Date:** April 8, 2026
-> **Version:** 2.3.2 (Build 251)
+> **Date:** April 8, 2026 (Updated July 27, 2026)
+> **Version:** 2.4.0 (Build 265)
 > **Platform:** Flutter 3.38+ / Dart 3.10.7+ — Android, iOS, Web
+
+> **2026-07-27 Migration Note:** The app has been migrated from a 3-role "faculty/staff locator" model to a 4-role "student leaders & organization officers locator" model. Roles are now: **student**, **studentLeader**, **organizationOfficer**, **admin**. The old `staff` role has been removed and mapped to `studentLeader`. Many references in this audit document still use the original "faculty/staff" terminology — the functional implementation in code has been updated. See the changelog at the end more recent updates.
 > **Backend:** Firebase (Auth, Firestore, Storage, FCM, Hosting) — `asia-southeast1`
 
 ---
@@ -26,13 +28,13 @@
 
 ## 1. Project Overview
 
-**UniTrack** is a real-time faculty & staff locator for **Sultan Kudarat State University (SKSU)**. It allows students to find faculty members on interactive campus maps and lets staff share their live location and availability status. The app serves three user roles: **Student**, **Staff/Faculty**, and **Admin**.
+**ISKSULARS TRACK** is a real-time student leader & organization officer locator for **Sultan Kudarat State University (SKSU)**. It allows students to find student leaders and org officers on interactive campus maps and lets leaders/officers share their live location and availability status. The app serves four user roles: **Student**, **Student Leader**, **Organization Officer**, and **Admin**.
 
 ### Goals
 
-- Help students locate faculty quickly across all 7 SKSU campuses
-- Give staff control over their location visibility and availability status
-- Provide admins a dashboard for user management and live monitoring
+- Help students locate student leaders & organization officers quickly across SKSU campuses
+- Give leaders/officers control over their location visibility and availability status
+- Provide admins a dashboard for user management, analytics, and live monitoring
 - Work offline with cached data when connectivity is poor
 - Support responsive layouts across mobile, tablet, and desktop
 

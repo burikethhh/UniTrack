@@ -21,9 +21,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   final List<OnboardingPage> _pages = [
     OnboardingPage(
       icon: Icons.location_on,
-      title: 'Find Faculty Easily',
+      title: 'Find Leaders Easily',
       description:
-          'Quickly locate professors and staff across all SKSU campuses. Know exactly where they are and if they\'re available.',
+          'Quickly locate student leaders and organization officers across all SKSU campuses. Know exactly where they are and if they\'re available.',
       color: AppColors.primary,
     ),
     OnboardingPage(
@@ -37,21 +37,21 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       icon: Icons.notifications_active,
       title: 'Real-Time Updates',
       description:
-          'Get instant notifications when your favorite faculty members become available or change their status.',
+          'Get instant notifications when your favorite student leaders become available or change their status.',
       color: const Color(0xFF2196F3),
     ),
     OnboardingPage(
       icon: Icons.schedule,
       title: 'Office Hours & Schedules',
       description:
-          'View faculty schedules and office hours at a glance. Plan your visits efficiently and never miss consultation time.',
+          'View leader schedules and office hours at a glance. Plan your visits efficiently and never miss consultation time.',
       color: const Color(0xFF9C27B0),
     ),
     OnboardingPage(
       icon: Icons.offline_bolt,
       title: 'Works Offline',
       description:
-          'Access faculty directory and last known locations even without internet connection. Your data is always available.',
+          'Access the leader directory and last known locations even without internet connection. Your data is always available.',
       color: const Color(0xFFFF9800),
     ),
   ];

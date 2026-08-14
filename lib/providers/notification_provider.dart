@@ -90,7 +90,7 @@ class NotificationProvider extends ChangeNotifier {
               notifyListeners();
             },
             onError: (e) {
-              debugPrint('Error getting unread count: $e');
+              if (kDebugMode) debugPrint('Error getting unread count: $e');
             },
           );
     } catch (e) {
@@ -100,18 +100,18 @@ class NotificationProvider extends ChangeNotifier {
     }
   }
 
-  /// Send a "looking for you" ping to a staff member
+  /// Send a "looking for you" ping to a recipient
   Future<bool> pingStaff({
     required UserModel student,
-    required String staffId,
-    required String staffName,
+    required String recipientId,
+    required String recipientName,
     String? studentLocation,
   }) async {
     try {
       // Check if recently pinged (spam prevention)
       final hasRecent = await _notificationService.hasRecentlyPinged(
         student.id,
-        staffId,
+        recipientId,
       );
 
       if (hasRecent) {
@@ -122,8 +122,8 @@ class NotificationProvider extends ChangeNotifier {
 
       final success = await _notificationService.sendLookingForYouNotification(
         student: student,
-        staffId: staffId,
-        staffName: staffName,
+        recipientId: recipientId,
+        recipientName: recipientName,
         studentLocation: studentLocation,
       );
 
@@ -143,6 +143,11 @@ class NotificationProvider extends ChangeNotifier {
   /// Mark a notification as read
   Future<void> markAsRead(String notificationId) async {
     await _notificationService.markAsRead(notificationId);
+  }
+
+  /// Mark a notification as opened (user tapped/seen it)
+  Future<void> markAsOpened(String notificationId) async {
+    await _notificationService.markAsOpened(notificationId);
   }
 
   /// Mark all notifications as read

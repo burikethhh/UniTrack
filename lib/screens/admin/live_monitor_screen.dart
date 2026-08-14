@@ -10,7 +10,7 @@ import '../../widgets/map/campus_map_3d.dart';
 import '../../widgets/map/map_view_controls.dart';
 
 /// Filter options for the Live Monitor
-enum MonitorFilter { all, students, staff, onlineOnly }
+enum MonitorFilter { all, students, studentLeaders, orgOfficers, onlineOnly }
 
 /// Admin-only Live Monitor screen
 /// Shows all users who have location sharing enabled on a real-time map
@@ -34,7 +34,7 @@ class _LiveMonitorScreenState extends State<LiveMonitorScreen> {
 
   /// Cached stream — created once, reused across rebuilds so StreamBuilder
   /// doesn't re-subscribe on every setState.
-  late final Stream<List<FacultyWithLocation>> _usersStream = _databaseService
+  late Stream<List<FacultyWithLocation>> _usersStream = _databaseService
       .getAllUsersWithLocationsStream();
 
   @override
@@ -66,19 +66,27 @@ class _LiveMonitorScreenState extends State<LiveMonitorScreen> {
     // First, only show users who are actively sharing location
     var visible = users.where(_isVisible).toList();
 
+    // Filter by selected campus if one is chosen
+    if (_selectedCampusId != null) {
+      visible = visible
+          .where((f) => f.user.campusId == _selectedCampusId)
+          .toList();
+    }
+
     switch (_filter) {
       case MonitorFilter.students:
         visible = visible
             .where((f) => f.user.role == UserRole.student)
             .toList();
         break;
-      case MonitorFilter.staff:
+      case MonitorFilter.studentLeaders:
         visible = visible
-            .where(
-              (f) =>
-                  f.user.role == UserRole.staff ||
-                  f.user.role == UserRole.admin,
-            )
+            .where((f) => f.user.role == UserRole.studentLeader)
+            .toList();
+        break;
+      case MonitorFilter.orgOfficers:
+        visible = visible
+            .where((f) => f.user.role == UserRole.organizationOfficer)
             .toList();
         break;
       case MonitorFilter.onlineOnly:
@@ -95,10 +103,12 @@ class _LiveMonitorScreenState extends State<LiveMonitorScreen> {
     switch (role) {
       case UserRole.student:
         return Colors.blue;
-      case UserRole.staff:
-        return AppColors.primary;
-      case UserRole.admin:
+      case UserRole.studentLeader:
         return Colors.orange;
+      case UserRole.organizationOfficer:
+        return Colors.teal;
+      case UserRole.admin:
+        return Colors.purple;
     }
   }
 
@@ -106,8 +116,10 @@ class _LiveMonitorScreenState extends State<LiveMonitorScreen> {
     switch (role) {
       case UserRole.student:
         return Icons.school;
-      case UserRole.staff:
-        return Icons.person;
+      case UserRole.studentLeader:
+        return Icons.account_balance;
+      case UserRole.organizationOfficer:
+        return Icons.groups;
       case UserRole.admin:
         return Icons.admin_panel_settings;
     }
@@ -153,7 +165,12 @@ class _LiveMonitorScreenState extends State<LiveMonitorScreen> {
                   Text('Error loading live data: ${snapshot.error}'),
                   const SizedBox(height: 12),
                   ElevatedButton(
-                    onPressed: () => setState(() {}),
+                    onPressed: () {
+                      setState(() {
+                        _usersStream = _databaseService
+                            .getAllUsersWithLocationsStream();
+                      });
+                    },
                     child: const Text('Retry'),
                   ),
                 ],
@@ -167,12 +184,11 @@ class _LiveMonitorScreenState extends State<LiveMonitorScreen> {
           final studentCount = visibleUsers
               .where((f) => f.user.role == UserRole.student)
               .length;
-          final staffCount = visibleUsers
-              .where(
-                (f) =>
-                    f.user.role == UserRole.staff ||
-                    f.user.role == UserRole.admin,
-              )
+          final leaderCount = visibleUsers
+              .where((f) => f.user.role == UserRole.studentLeader)
+              .length;
+          final officerCount = visibleUsers
+              .where((f) => f.user.role == UserRole.organizationOfficer)
               .length;
           final onCampusCount = visibleUsers
               .where((f) => f.isWithinCampus)
@@ -336,8 +352,13 @@ class _LiveMonitorScreenState extends State<LiveMonitorScreen> {
                           ),
                           const SizedBox(width: 8),
                           _buildFilterChip(
-                            'Staff ($staffCount)',
-                            MonitorFilter.staff,
+                            'Leaders ($leaderCount)',
+                            MonitorFilter.studentLeaders,
+                          ),
+                          const SizedBox(width: 8),
+                          _buildFilterChip(
+                            'Officers ($officerCount)',
+                            MonitorFilter.orgOfficers,
                           ),
                           const SizedBox(width: 8),
                           _buildFilterChip(
@@ -436,6 +457,30 @@ class _LiveMonitorScreenState extends State<LiveMonitorScreen> {
                   right: 0,
                   child: _buildUserPanel(_selectedUser!),
                 ),
+
+              // Center on campus FAB
+              Positioned(
+                bottom: _showPanel ? 260 : 24,
+                right: 16,
+                child: FloatingActionButton(
+                  heroTag: 'centerCampus',
+                  onPressed: () {
+                    if (_use3DMap) {
+                      _map3dKey.currentState?.centerOnCampus(
+                        campusId: _selectedCampusId ?? AppConstants.defaultCampusId,
+                      );
+                    } else {
+                      _map2dKey.currentState?.animateToCampus(
+                        _selectedCampusId ?? AppConstants.defaultCampusId,
+                      );
+                    }
+                  },
+                  backgroundColor: Colors.white,
+                  foregroundColor: AppColors.primary,
+                  tooltip: 'Center on campus',
+                  child: const Icon(Icons.my_location),
+                ),
+              ),
             ],
           );
         },

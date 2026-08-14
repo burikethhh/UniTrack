@@ -421,15 +421,15 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
                       _InfoRow(
                         icon: Icons.event_busy,
                         label: 'Banned At',
-                        value: _formatDateTime(
-                          (_additionalData!['bannedAt'] as Timestamp).toDate(),
-                        ),
+                        value: (_additionalData!['bannedAt'] is Timestamp)
+                            ? _formatDateTime((_additionalData!['bannedAt'] as Timestamp).toDate())
+                            : _additionalData!['bannedAt'].toString(),
                       ),
                       if (_additionalData?['banReason'] != null)
                         _InfoRow(
                           icon: Icons.info,
                           label: 'Ban Reason',
-                          value: _additionalData!['banReason'],
+                          value: _additionalData!['banReason']?.toString() ?? '',
                         ),
                     ],
                   ],
@@ -506,8 +506,10 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
     switch (role) {
       case UserRole.student:
         return Colors.green;
-      case UserRole.staff:
+      case UserRole.studentLeader:
         return Colors.orange;
+      case UserRole.organizationOfficer:
+        return Colors.teal;
       case UserRole.admin:
         return Colors.purple;
     }
@@ -669,7 +671,9 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
           ),
         ],
       ),
-    );
+    ).then((_) {
+      reasonController.dispose();
+    });
   }
 
   void _showUnbanDialog(AdminProvider adminProvider) {

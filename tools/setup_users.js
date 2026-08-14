@@ -25,10 +25,10 @@ const users = [
   },
   {
     id: 'g9IT1ZyLf0YS7BcomfSrQz5lrmC3',
-    email: 'christiankethaguacitostaff@sksu.edu.ph',
+    email: 'christiankethaguacitostudentleader@sksu.edu.ph',
     firstName: 'Christian Ketha',
     lastName: 'Guacito',
-    role: 'staff',
+    role: 'studentLeader',
     department: 'College of Information and Computing Sciences',
     position: 'Instructor',
     campusId: 'isulan',

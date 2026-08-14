@@ -1,4 +1,4 @@
-rules_version='2';
+rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -12,8 +12,12 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
+    function getUserDoc() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
     function getUserRole() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+      return getUserDoc().data.role;
     }
 
     function isAdmin() {
@@ -22,97 +26,256 @@ service cloud.firestore {
              && getUserRole() == 'admin';
     }
 
-    // Roles that a user may assign to THEMSELVES at registration.
-    // Student role gets immediate approval (isActive: true).
-    // Staff roles (studentLeader, organizationOfficer) get isActive: false
-    // and require admin approval before they appear on the map.
+    function isStaffRole(role) {
+      return role is string
+             && (role == 'studentLeader'
+                 || role == 'organizationOfficer');
+    }
+
+    function isActiveStaff(userId) {
+      return exists(/databases/$(database)/documents/users/$(userId))
+             && get(/databases/$(database)/documents/users/$(userId)).data.role in ['studentLeader', 'organizationOfficer']
+             && get(/databases/$(database)/documents/users/$(userId)).data.isActive == true;
+    }
+
+    function isValidAvailability(value) {
+      return value is string
+             && value in ['available', 'busy', 'inMeeting', 'teaching', 'onBreak', 'outOfOffice', 'doNotDisturb'];
+    }
+
+    function isValidVisibilityScope(value) {
+      return value is string && value in ['campusOnly', 'universityWide'];
+    }
+
     function isSelfRegistrationRole(role) {
       return role is string
              && (role == 'student'
-                 || role == 'studentleader'
+                 || role == 'studentLeader'
                  || role == 'organizationOfficer');
     }
 
     function isValidUserRole(role) {
       return role is string
              && (role == 'student'
-                 || role == 'studentleader'
+                 || role == 'studentLeader'
                  || role == 'organizationOfficer'
                  || role == 'admin');
     }
 
-function isStaffRole(role) {
-      return role is string
-             && (role == 'studentleader'
-                 || role == 'organizationOfficer');
+    function recipientIsStaff(recipientId) {
+      return exists(/databases/$(database)/documents/users/$(recipientId))
+             && get(/databases/$(database)/documents/users/$(recipientId)).data.role in ['studentLeader', 'organizationOfficer'];
+    }
+
+    // ── Field validators ───────────────────────────────────────────────
+    function isValidName(value) {
+      return value is string && value.size() >= 2 && value.size() <= 64;
+    }
+
+    function isValidEmail(value) {
+      return value is string && value.size() <= 254;
     }
 
     // ── Users collection ──────────────────────────────────────────────
-    // Authenticated users can read any profile (needed for faculty lookup).
-    // Users can update their OWN doc (but not role/isActive fields).
-    // Admins can update ANY user doc including role/isActive.
-    // Students auto-approve (isActive = true). Staff roles require admin
-    // approval and must register with isActive = false.
     match /users/{userId} {
-      allow read: if isSignedIn();
+      // READ: own doc, OR staff-active docs, OR admin
+      allow read: if isOwner(userId)
+                  || isAdmin()
+                  || (isSignedIn()
+                      && resource.data.role in ['studentLeader', 'organizationOfficer']
+                      && resource.data.isActive == true);
+
+      // CREATE: self-registration with validation
       allow create: if isOwner(userId)
                     && isValidUserRole(request.resource.data.role)
                     && isSelfRegistrationRole(request.resource.data.role)
                     && (request.resource.data.role == 'student'
                         || (isStaffRole(request.resource.data.role)
-                            && request.resource.data.isActive == false));
+                            && request.resource.data.isActive == false))
+                    && isValidName(request.resource.data.firstName)
+                    && isValidName(request.resource.data.lastName)
+                    && isValidEmail(request.resource.data.email)
+                    && request.resource.data.email == request.auth.token.email
+                     && (!('availabilityStatus' in request.resource.data.keys()) || isValidAvailability(request.resource.data.availabilityStatus))
+                     && (!('customStatusMessage' in request.resource.data.keys()) || (request.resource.data.customStatusMessage is string && request.resource.data.customStatusMessage.size() <= 200))
+                     && (!('statusUpdatedAt' in request.resource.data.keys()) || request.resource.data.statusUpdatedAt is timestamp)
+                     && (!('statusExpiresAt' in request.resource.data.keys()) || request.resource.data.statusExpiresAt is timestamp)
+                     && (!('currentStatus' in request.resource.data.keys()) || (request.resource.data.currentStatus is string && request.resource.data.currentStatus.size() <= 64))
+                     && (!('quickMessage' in request.resource.data.keys()) || (request.resource.data.quickMessage is string && request.resource.data.quickMessage.size() <= 200))
+                     && request.resource.data.keys().hasOnly([
+                          'id', 'email', 'firstName', 'lastName', 'role',
+                          'department', 'position', 'organization', 'campusId',
+                          'createdAt', 'lastLoginAt', 'isTrackingEnabled',
+                          'isActive', 'currentStatus', 'notificationPreferences',
+                          'photoUrl', 'phoneNumber', 'officeHours', 'searchName',
+                          'quickMessage', 'availabilityStatus', 'customStatusMessage',
+                          'statusUpdatedAt', 'statusExpiresAt'
+                        ]);
+
+      // UPDATE: owner (limited fields) OR admin
       allow update: if (isOwner(userId)
-                        && !request.resource.data.diff(resource.data).affectedKeys()
-                            .hasAny(['role', 'isActive']))
+                        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                          'firstName', 'lastName', 'department', 'position',
+                          'organization', 'photoUrl', 'phoneNumber', 'campusId',
+                          'officeHours', 'notificationPreferences', 'searchName',
+                          'quickMessage', 'currentStatus', 'availabilityStatus',
+                          'customStatusMessage', 'statusUpdatedAt', 'statusExpiresAt',
+                          'isTrackingEnabled', 'lastLoginAt'
+                        ])
+                        && isValidName(request.resource.data.firstName)
+                        && isValidName(request.resource.data.lastName)
+                        && (!('availabilityStatus' in request.resource.data.keys()) || isValidAvailability(request.resource.data.availabilityStatus))
+                        && (!('statusExpiresAt' in request.resource.data.keys()) || request.resource.data.statusExpiresAt is timestamp)
+                        && (!('currentStatus' in request.resource.data.keys()) || (request.resource.data.currentStatus is string && request.resource.data.currentStatus.size() <= 64))
+                        && (!('quickMessage' in request.resource.data.keys()) || (request.resource.data.quickMessage is string && request.resource.data.quickMessage.size() <= 200)))
                      || isAdmin();
-      allow delete: if isAdmin();
+
+      // DELETE: account owner or admin
+      allow delete: if isOwner(userId) || isAdmin();
     }
 
     // ── Locations collection ──────────────────────────────────────────
-    // Authenticated users can read all locations (map lookups).
-    // Only the owner can write their own location doc.
-    // Validates flat latitude/longitude fields (numeric, valid range).
     match /locations/{userId} {
-      allow read: if isSignedIn();
+      // READ: owner, admin, or any signed-in user for ON-CAMPUS staff locations only
+      allow read: if isOwner(userId)
+                  || isAdmin()
+                  || (isSignedIn()
+                       && resource.data.isWithinCampus == true
+                       && resource.data.visibilityScope is string
+                       && (resource.data.visibilityScope == 'universityWide'
+                           || (resource.data.visibilityScope == 'campusOnly'
+                               && getUserDoc().data.campusId == resource.data.locationCampusId))
+                       && exists(/databases/$(database)/documents/users/$(userId))
+                      && get(/databases/$(database)/documents/users/$(userId)).data.role in ['studentLeader', 'organizationOfficer']
+                      && get(/databases/$(database)/documents/users/$(userId)).data.isActive == true);
+
+      // CREATE/UPDATE: owner only, with coordinate validation
       allow create: if isOwner(userId)
+                    && isActiveStaff(userId)
+                    && request.resource.data.userId == userId
                     && request.resource.data.latitude is number
                     && request.resource.data.latitude <= 90
                     && request.resource.data.latitude >= -90
                     && request.resource.data.longitude is number
                     && request.resource.data.longitude <= 180
-                    && request.resource.data.longitude >= -180;
-      allow update, delete: if isOwner(userId);
+                    && request.resource.data.longitude >= -180
+                    && request.resource.data.timestamp is timestamp
+                    && request.resource.data.isWithinCampus is bool
+                    && request.resource.data.isMoving is bool
+                    && request.resource.data.isManualPin is bool
+                    && (!('status' in request.resource.data.keys()) || (request.resource.data.status is string && request.resource.data.status.size() <= 64))
+                    && (!('quickMessage' in request.resource.data.keys()) || (request.resource.data.quickMessage is string && request.resource.data.quickMessage.size() <= 200))
+                    && (!('locationCampusId' in request.resource.data.keys()) || request.resource.data.locationCampusId is string)
+                    && (!('visibilityScope' in request.resource.data.keys()) || isValidVisibilityScope(request.resource.data.visibilityScope))
+                    && (!('statusExpiresAt' in request.resource.data.keys()) || request.resource.data.statusExpiresAt is timestamp)
+                    && request.resource.data.keys().hasOnly([
+                         'userId', 'latitude', 'longitude', 'timestamp',
+                          'isWithinCampus', 'status', 'quickMessage',
+                          'isMoving', 'isManualPin', 'accuracy', 'locationCampusId',
+                          'visibilityScope', 'statusExpiresAt'
+                        ]);
+
+      allow update: if isOwner(userId)
+                    && isActiveStaff(userId)
+                    && request.resource.data.userId == userId
+                    && request.resource.data.keys().hasOnly([
+                         'userId', 'latitude', 'longitude', 'timestamp',
+                         'isWithinCampus', 'status', 'quickMessage',
+                         'isMoving', 'isManualPin', 'accuracy', 'locationCampusId',
+                         'visibilityScope', 'statusExpiresAt'
+                       ])
+                    && (!('latitude' in request.resource.data.keys())
+                        || (request.resource.data.latitude is number
+                            && request.resource.data.latitude <= 90
+                            && request.resource.data.latitude >= -90))
+                    && (!('longitude' in request.resource.data.keys())
+                        || (request.resource.data.longitude is number
+                            && request.resource.data.longitude <= 180
+                            && request.resource.data.longitude >= -180))
+                    && request.resource.data.timestamp is timestamp
+                    && request.resource.data.isWithinCampus is bool
+                    && request.resource.data.isMoving is bool
+                    && request.resource.data.isManualPin is bool
+                    && (!('status' in request.resource.data.keys()) || (request.resource.data.status is string && request.resource.data.status.size() <= 64))
+                    && (!('quickMessage' in request.resource.data.keys()) || (request.resource.data.quickMessage is string && request.resource.data.quickMessage.size() <= 200))
+                    && (!('visibilityScope' in request.resource.data.keys()) || isValidVisibilityScope(request.resource.data.visibilityScope))
+                    && (!('statusExpiresAt' in request.resource.data.keys()) || request.resource.data.statusExpiresAt is timestamp);
+
+      allow delete: if isOwner(userId) || isAdmin();
     }
 
     // ── Notifications collection ──────────────────────────────────────
-    // Users can read/update/delete their own received notifications.
-    // A user may only create a notification where senderId == their UID.
-    // Admins can read/update/delete any notification.
     match /notifications/{notifId} {
+      // READ: recipient or sender or admin
       allow read: if (isSignedIn()
-                       && (resource.data.recipientId == request.auth.uid
-                           || resource.data.senderId == request.auth.uid))
-                  || isAdmin();
-      allow create: if isSignedIn()
-                    && request.resource.data.senderId == request.auth.uid
-                    && request.resource.data.recipientId is string
-                    && request.resource.data.recipientId != request.auth.uid
-                    && request.resource.data.title is string
-                    && request.resource.data.message is string;
-      allow update, delete: if (isSignedIn()
-                                && resource.data.recipientId == request.auth.uid)
-                            || isAdmin();
+                      && (resource.data.recipientId == request.auth.uid
+                          || resource.data.senderId == request.auth.uid))
+                   || isAdmin();
+
+      // CREATE: staff can send to staff, admin can broadcast
+      allow create: if (isSignedIn()
+                      && request.resource.data.senderId == request.auth.uid
+                      && request.resource.data.recipientId is string
+                      && request.resource.data.recipientId != request.auth.uid
+                      && recipientIsStaff(request.resource.data.recipientId)
+                      && request.resource.data.title is string
+                      && request.resource.data.title.size() <= 100
+                      && request.resource.data.message is string
+                      && request.resource.data.message.size() <= 500
+                      && request.resource.data.senderName is string
+                      && request.resource.data.senderName.size() <= 128
+                      && request.resource.data.type is string
+                       && request.resource.data.keys().hasOnly([
+                            'senderId', 'senderName', 'senderPhotoUrl',
+                            'recipientId', 'title', 'message',
+                            'type', 'createdAt', 'isRead', 'openedAt',
+                            'pushStatus', 'pushSentAt', 'pushDeliveredAt',
+                            'data', 'sentAt', 'deliveredAt', 'pushTokenCount',
+                            'pushError', 'deliveredTokens'
+                          ]))
+                    || (isAdmin()
+                      && request.resource.data.senderId is string
+                      && request.resource.data.recipientId is string
+                      && request.resource.data.title is string
+                       && request.resource.data.title.size() <= 100
+                       && request.resource.data.message is string
+                       && request.resource.data.message.size() <= 500
+                       && request.resource.data.keys().hasOnly([
+                            'senderId', 'senderName', 'senderPhotoUrl',
+                            'recipientId', 'title', 'message',
+                            'type', 'createdAt', 'isRead', 'openedAt',
+                            'pushStatus', 'pushSentAt', 'pushDeliveredAt',
+                            'data', 'sentAt', 'deliveredAt', 'pushTokenCount',
+                            'pushError', 'deliveredTokens'
+                          ]));
+
+      // UPDATE: recipient can only mark as read/open
+      allow update: if (isSignedIn()
+                        && resource.data.recipientId == request.auth.uid
+                        && request.resource.data.diff(resource.data).affectedKeys()
+                            .hasOnly(['isRead', 'openedAt', 'pushStatus', 'pushDeliveredAt']))
+                     || isAdmin();
+
+      allow delete: if (isSignedIn()
+                        && (resource.data.recipientId == request.auth.uid
+                            || resource.data.senderId == request.auth.uid))
+                     || isAdmin();
     }
 
     // ── Activity logs collection ──────────────────────────────────────
-    // Only admins can read. Authenticated users can create entries but
-    // only with their own actorId (prevents audit-log forgery).
     match /activity_logs/{logId} {
       allow read: if isAdmin();
       allow create: if isSignedIn()
                     && request.resource.data.actorId == request.auth.uid
-                    && request.resource.data.action is string;
-      allow update, delete: if false; // immutable audit trail
+                    && request.resource.data.action is string
+                    && request.resource.data.action.size() <= 50
+                    && request.resource.data.targetId is string
+                    && request.resource.data.details is string
+                    && request.resource.data.details.size() <= 200
+                    && request.resource.data.keys().hasOnly([
+                         'actorId', 'action', 'targetId', 'details', 'timestamp'
+                       ]);
+      allow update, delete: if false;
     }
 
     // ── Departments collection ────────────────────────────────────────
@@ -121,16 +284,21 @@ function isStaffRole(role) {
       allow write: if isAdmin();
     }
 
-    // ── App versions collection ───────────────────────────────────────
+    // ── App versions collection ──────────────────────────────────────
     match /app_versions/{versionId} {
       allow read: if isSignedIn();
       allow write: if isAdmin();
     }
 
-    // ── Config collection ─────────────────────────────────────────────
+    // ── Config collection ────────────────────────────────────────────
     match /config/{configId} {
       allow read: if isSignedIn();
       allow write: if isAdmin();
+    }
+
+    // ── Default deny ─────────────────────────────────────────────────
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }

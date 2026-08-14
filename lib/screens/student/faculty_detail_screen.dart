@@ -8,25 +8,35 @@ import '../../services/activity_log_service.dart';
 import '../../widgets/widgets.dart';
 
 /// Detailed view for a specific faculty member
-class FacultyDetailScreen extends StatelessWidget {
+class FacultyDetailScreen extends StatefulWidget {
   final String facultyId;
 
   const FacultyDetailScreen({super.key, required this.facultyId});
 
   @override
+  State<FacultyDetailScreen> createState() => _FacultyDetailScreenState();
+}
+
+class _FacultyDetailScreenState extends State<FacultyDetailScreen> {
+  bool _hasLoggedView = false;
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Faculty Details')),
+      appBar: AppBar(title: const Text('Leader Details')),
       body: Consumer<FacultyProvider>(
         builder: (context, provider, _) {
-          final faculty = provider.getFacultyById(facultyId);
+          final faculty = provider.getFacultyById(widget.facultyId);
 
           if (faculty == null) {
-            return const Center(child: Text('Faculty not found'));
+            return const Center(child: Text('Leader not found'));
           }
 
-          // Log profile view (fire-and-forget)
-          ActivityLogService().logProfileView(faculty.user.id);
+          // Log profile view once (not on every rebuild)
+          if (!_hasLoggedView) {
+            _hasLoggedView = true;
+            ActivityLogService().logProfileView(faculty.user.id);
+          }
 
           return SingleChildScrollView(
             child: Column(
@@ -202,7 +212,7 @@ class FacultyDetailScreen extends StatelessWidget {
       // Persistent bottom quick-action bar
       bottomNavigationBar: Consumer<FacultyProvider>(
         builder: (context, provider, _) {
-          final faculty = provider.getFacultyById(facultyId);
+          final faculty = provider.getFacultyById(widget.facultyId);
 
           if (faculty == null || !faculty.isOnline) {
             return const SizedBox.shrink();
@@ -322,7 +332,7 @@ class FacultyDetailScreen extends StatelessWidget {
   void _navigateToMap(BuildContext context, FacultyWithLocation faculty) {
     if (faculty.location == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Faculty location not available')),
+        const SnackBar(content: Text('Leader location not available')),
       );
       return;
     }

@@ -1,7 +1,7 @@
 name: unitrack
 description: "ISKSULARS TRACK - Real-Time Student Leader & Officer Locator for SKSU"
 publish_to: 'none'
-version: 2.5.0+277
+version: 2.5.0+278
 
 environment:
   sdk: ^3.8.0
@@ -13,10 +13,12 @@ dependencies:
   cupertino_icons: ^1.0.8
    
   # Firebase Core & Services
-  firebase_core: ^3.8.1
-  firebase_auth: ^5.3.4
-  cloud_firestore: ^5.6.0
-  firebase_storage: ^12.4.0
+  firebase_core: ^4.13.0
+  firebase_auth: ^6.5.7
+  cloud_firestore: ^6.8.0
+  firebase_storage: ^13.4.6
+  firebase_messaging: ^16.5.0
+  firebase_app_check: ^0.4.6
   
   # Maps & Location
   # NOTE: Both flutter_map (2D fallback) and maplibre_gl (3D satellite view)
@@ -45,7 +47,6 @@ dependencies:
    
   # Background Service & Notifications
   flutter_local_notifications: ^18.0.1
-  firebase_messaging: ^15.1.6
    
   # Reactive Extensions
   rxdart: ^0.28.0
@@ -92,6 +93,8 @@ dev_dependencies:
 # following page: https://dart.dev/tools/pub/pubspec
 
 # The following section is specific to Flutter packages.
+  firebase_core_platform_interface: any
+  cloud_firestore_platform_interface: any
 flutter:
 
   # The following line ensures that the Material Icons font is
@@ -153,4 +156,4 @@ flutter_launcher_icons:
     generate: true
     image_path: "assets/icon.png"
     background_color: "#0a2540"
-    theme_color: "#00f5b8"
+    theme_color: "#41B3A3"

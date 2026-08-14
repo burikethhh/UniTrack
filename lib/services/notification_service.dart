@@ -5,12 +5,13 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import '../models/notification_model.dart';
 import '../models/user_model.dart';
+import '../screens/staff_leader/notifications_screen.dart';
 
 /// Global navigator key for showing in-app notifications on web
 final GlobalKey<NavigatorState> notificationNavigatorKey =
     GlobalKey<NavigatorState>();
 
-/// Service for handling notifications between students and staff
+/// Service for handling notifications between students and faculty
 class NotificationService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   // Lazy init — FlutterLocalNotificationsPlugin has no web implementation
@@ -23,7 +24,7 @@ class NotificationService {
   Future<void> initialize() async {
     // On web, we use in-app overlay notifications instead
     if (kIsWeb) {
-      debugPrint('📱 Using in-app notifications for web');
+      if (kDebugMode) debugPrint('📱 Using in-app notifications for web');
       return;
     }
 
@@ -49,7 +50,7 @@ class NotificationService {
 
   /// Handle notification tap
   void _onNotificationTapped(NotificationResponse response) {
-    debugPrint('Notification tapped: ${response.payload}');
+    if (kDebugMode) debugPrint('Notification tapped: ${response.payload}');
     // Can navigate to specific screen based on payload
   }
 
@@ -63,6 +64,8 @@ class NotificationService {
     _notificationSubscription = _firestore
         .collection('notifications')
         .where('recipientId', isEqualTo: userId)
+        .orderBy('createdAt', descending: true)
+        .limit(100)
         .snapshots()
         .listen(
           (snapshot) {
@@ -78,13 +81,16 @@ class NotificationService {
                 final notification = AppNotification.fromFirestore(change.doc);
                 // Only show local notification for unread notifications
                 if (!notification.isRead) {
+                  if (notification.type == NotificationType.appUpdate) {
+                    if (kDebugMode) debugPrint('📢 App update notification received: ${notification.title}');
+                  }
                   _showLocalNotification(notification);
                 }
               }
             }
           },
           onError: (e) {
-            debugPrint('Error listening to notifications: $e');
+            if (kDebugMode) debugPrint('Error listening to notifications: $e');
           },
         );
   }
@@ -105,8 +111,8 @@ class NotificationService {
 
     const androidDetails = AndroidNotificationDetails(
       'unitrack_notifications',
-      'UniTrack Notifications',
-      channelDescription: 'Notifications for UniTrack app',
+      'ISKSULARS TRACK Notifications',
+      channelDescription: 'Notifications for ISKSULARS TRACK app',
       importance: Importance.high,
       priority: Priority.high,
       showWhen: true,
@@ -133,20 +139,35 @@ class NotificationService {
     );
   }
 
-  /// Send a "looking for you" notification from student to staff
+  /// Send a "looking for you" notification from student to faculty
   Future<bool> sendLookingForYouNotification({
     required UserModel student,
-    required String staffId,
-    required String staffName,
+    required String recipientId,
+    required String recipientName,
     String? studentLocation,
   }) async {
     try {
+      // Fetch recipient's notification preferences
+      final recipientDoc = await _firestore.collection('users').doc(recipientId).get();
+      if (!recipientDoc.exists) return false;
+      
+      final recipientData = recipientDoc.data()!;
+      final prefs = NotificationPreferences.fromMap(
+        recipientData['notificationPreferences'] as Map<String, dynamic>?,
+      );
+
+      // Check if recipient wants to receive "looking for you" notifications
+      if (!prefs.shouldReceivePush(NotificationType.lookingForYou)) {
+        if (kDebugMode) debugPrint('📢 Notification blocked by user preferences: $recipientId');
+        return false;
+      }
+
       final notification = AppNotification(
         id: '', // Will be set by Firestore
         senderId: student.id,
         senderName: student.fullName,
         senderPhotoUrl: student.photoUrl,
-        recipientId: staffId,
+        recipientId: recipientId,
         type: NotificationType.lookingForYou,
         title: 'Student Looking for You',
         message: '${student.fullName} is looking for you',
@@ -162,10 +183,10 @@ class NotificationService {
           .collection('notifications')
           .add(notification.toFirestore());
 
-      debugPrint('📢 Notification sent: ${student.fullName} -> $staffName');
+      if (kDebugMode) debugPrint('📢 Notification sent: ${student.fullName} -> $recipientName');
       return true;
     } catch (e) {
-      debugPrint('Error sending notification: $e');
+      if (kDebugMode) debugPrint('Error sending notification: $e');
       return false;
     }
   }
@@ -204,7 +225,21 @@ class NotificationService {
         'isRead': true,
       }, SetOptions(merge: true));
     } catch (e) {
-      debugPrint('Error marking notification as read: $e');
+      if (kDebugMode) debugPrint('Error marking notification as read: $e');
+    }
+  }
+
+  /// Mark notification as opened (user tapped/seen it)
+  /// Also marks as read and updates push delivery status
+  Future<void> markAsOpened(String notificationId) async {
+    try {
+      await _firestore.collection('notifications').doc(notificationId).set({
+        'isRead': true,
+        'openedAt': FieldValue.serverTimestamp(),
+        'pushStatus': 'opened',
+      }, SetOptions(merge: true));
+    } catch (e) {
+      if (kDebugMode) debugPrint('Error marking notification as opened: $e');
     }
   }
 
@@ -228,7 +263,7 @@ class NotificationService {
         await batch.commit();
       }
     } catch (e) {
-      debugPrint('Error marking all notifications as read: $e');
+      if (kDebugMode) debugPrint('Error marking all notifications as read: $e');
     }
   }
 
@@ -237,7 +272,7 @@ class NotificationService {
     try {
       await _firestore.collection('notifications').doc(notificationId).delete();
     } catch (e) {
-      debugPrint('Error deleting notification: $e');
+      if (kDebugMode) debugPrint('Error deleting notification: $e');
     }
   }
 
@@ -261,13 +296,13 @@ class NotificationService {
         await batch.commit();
       } while (page.docs.length == 499);
     } catch (e) {
-      debugPrint('Error deleting all notifications: $e');
+      if (kDebugMode) debugPrint('Error deleting all notifications: $e');
     }
   }
 
-  /// Check if student has recently pinged this staff (to prevent spam)
+  /// Check if student has recently pinged this recipient (to prevent spam)
   /// Uses composite index: senderId ASC, recipientId ASC, type ASC, createdAt ASC
-  Future<bool> hasRecentlyPinged(String studentId, String staffId) async {
+  Future<bool> hasRecentlyPinged(String studentId, String recipientId) async {
     try {
       final fiveMinutesAgo = DateTime.now().subtract(
         const Duration(minutes: 5),
@@ -276,7 +311,7 @@ class NotificationService {
       final pings = await _firestore
           .collection('notifications')
           .where('senderId', isEqualTo: studentId)
-          .where('recipientId', isEqualTo: staffId)
+          .where('recipientId', isEqualTo: recipientId)
           .where('type', isEqualTo: NotificationType.lookingForYou.name)
           .where('createdAt', isGreaterThan: Timestamp.fromDate(fiveMinutesAgo))
           .limit(1)
@@ -284,7 +319,7 @@ class NotificationService {
 
       return pings.docs.isNotEmpty;
     } catch (e) {
-      debugPrint('Error checking recent pings: $e');
+      if (kDebugMode) debugPrint('Error checking recent pings: $e');
       return false;
     }
   }
@@ -306,6 +341,12 @@ class NotificationService {
         title: notification.title,
         message: notification.message,
         onDismiss: () => entry.remove(),
+        onTap: () {
+          entry.remove();
+          notificationNavigatorKey.currentState?.push(
+            MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+          );
+        },
       ),
     );
     overlayState.insert(entry);
@@ -327,11 +368,13 @@ class _WebNotificationOverlay extends StatefulWidget {
   final String title;
   final String message;
   final VoidCallback onDismiss;
+  final VoidCallback? onTap;
 
   const _WebNotificationOverlay({
     required this.title,
     required this.message,
     required this.onDismiss,
+    this.onTap,
   });
 
   @override
@@ -381,7 +424,7 @@ class _WebNotificationOverlayState extends State<_WebNotificationOverlay>
             borderRadius: BorderRadius.circular(12),
             color: const Color(0xFF2E7D32),
             child: InkWell(
-              onTap: widget.onDismiss,
+              onTap: widget.onTap ?? widget.onDismiss,
               borderRadius: BorderRadius.circular(12),
               child: Padding(
                 padding: const EdgeInsets.symmetric(

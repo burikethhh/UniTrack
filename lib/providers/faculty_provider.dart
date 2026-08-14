@@ -32,6 +32,7 @@ class FacultyProvider extends ChangeNotifier {
 
   // Viewer role — controls privacy filtering of off-campus locations
   UserRole? _viewerRole;
+  String? _viewerCampusId;
 
   StreamSubscription? _facultySubscription;
   Timer? _refreshTimer;
@@ -70,7 +71,7 @@ class FacultyProvider extends ChangeNotifier {
   /// Count faculty by availability status
   int countByStatus(AvailabilityStatus status) {
     return _allFaculty
-        .where((f) => f.isOnline && f.user.availabilityStatus == status)
+        .where((f) => f.isOnline && f.effectiveStatus == status)
         .length;
   }
 
@@ -79,8 +80,7 @@ class FacultyProvider extends ChangeNotifier {
     return _allFaculty
         .where(
           (f) =>
-              f.isOnline &&
-              f.user.availabilityStatus == AvailabilityStatus.available,
+              f.isOnline && f.effectiveStatus == AvailabilityStatus.available,
         )
         .length;
   }
@@ -105,8 +105,9 @@ class FacultyProvider extends ChangeNotifier {
   /// Initialize and start listening.
   /// [viewerRole] controls privacy filtering — students won't receive
   /// off-campus location coordinates.
-  void initialize({UserRole? viewerRole}) {
+  void initialize({UserRole? viewerRole, String? viewerCampusId}) {
     _viewerRole = viewerRole;
+    _viewerCampusId = viewerCampusId;
     _isLoading = true;
     notifyListeners();
 
@@ -116,7 +117,10 @@ class FacultyProvider extends ChangeNotifier {
 
     // Listen to faculty updates with real-time changes
     _facultySubscription = _databaseService
-        .getFacultyWithLocationsStream(viewerRole: _viewerRole)
+        .getFacultyWithLocationsStream(
+          viewerRole: _viewerRole,
+          viewerCampusId: _viewerCampusId,
+        )
         .listen(
           (faculty) {
             if (kDebugMode) {
@@ -150,9 +154,11 @@ class FacultyProvider extends ChangeNotifier {
               for (final id in newArrivals) {
                 final arrived = faculty.firstWhere((f) => f.user.id == id);
                 _arrivalController.add(arrived);
-                debugPrint(
-                  '[FacultyProvider] 🟢 Faculty arrived: ${arrived.user.fullName}',
-                );
+                if (kDebugMode) {
+                  debugPrint(
+                    '[FacultyProvider] 🟢 Faculty arrived: ${arrived.user.fullName}',
+                  );
+                }
               }
             }
             _previouslyOnlineIds
@@ -168,7 +174,7 @@ class FacultyProvider extends ChangeNotifier {
             notifyListeners();
           },
           onError: (e) {
-            debugPrint('[FacultyProvider] Stream ERROR: $e');
+            if (kDebugMode) debugPrint('[FacultyProvider] Stream ERROR: $e');
             _error = e.toString();
             _isLoading = false;
             notifyListeners();
@@ -207,7 +213,7 @@ class FacultyProvider extends ChangeNotifier {
   /// Schedule a retry after stream error with exponential backoff
   void _scheduleRetry() {
     if (_retryCount >= _maxRetries) {
-      debugPrint('Faculty stream: max retries reached');
+      if (kDebugMode) debugPrint('Faculty stream: max retries reached');
       return;
     }
     final delay = Duration(
@@ -216,10 +222,12 @@ class FacultyProvider extends ChangeNotifier {
     _retryTimer?.cancel();
     _retryTimer = Timer(delay, () {
       _retryCount++;
-      debugPrint(
-        'Faculty stream: retry #$_retryCount after ${delay.inSeconds}s',
-      );
-      initialize();
+      if (kDebugMode) {
+        debugPrint(
+          'Faculty stream: retry #$_retryCount after ${delay.inSeconds}s',
+        );
+      }
+      initialize(viewerRole: _viewerRole, viewerCampusId: _viewerCampusId);
     });
   }
 
@@ -348,7 +356,7 @@ class FacultyProvider extends ChangeNotifier {
 
       // Availability status filter
       if (_selectedAvailabilityStatus != null) {
-        if (faculty.user.availabilityStatus != _selectedAvailabilityStatus) {
+        if (faculty.effectiveStatus != _selectedAvailabilityStatus) {
           return false;
         }
       }
@@ -398,9 +406,11 @@ class FacultyProvider extends ChangeNotifier {
               for (final id in newArrivals) {
                 final arrived = faculty.firstWhere((f) => f.user.id == id);
                 _arrivalController.add(arrived);
-                debugPrint(
-                  '[FacultyProvider] \u{1F7E2} Faculty arrived: ${arrived.user.fullName}',
-                );
+                if (kDebugMode) {
+                  debugPrint(
+                    '[FacultyProvider] \u{1F7E2} Faculty arrived: ${arrived.user.fullName}',
+                  );
+                }
               }
             }
             _previouslyOnlineIds

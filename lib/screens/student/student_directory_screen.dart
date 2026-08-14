@@ -9,7 +9,7 @@ import '../../providers/providers.dart';
 import '../../widgets/widgets.dart';
 import 'faculty_detail_screen.dart';
 import 'student_map_screen.dart';
-import '../staff/notifications_screen.dart';
+import '../staff_leader/notifications_screen.dart';
 import '../../services/activity_log_service.dart';
 
 /// Directory screen for browsing faculty
@@ -35,7 +35,7 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Faculty Directory'),
+        title: const Text('Leader Directory'),
         bottom: const PreferredSize(
           preferredSize: Size.fromHeight(24),
           child: Padding(
@@ -43,7 +43,7 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
             child: Align(
               alignment: Alignment.centerLeft,
               child: Text(
-                'Locate faculty and leaders on campus',
+                'Locate leaders and officers on campus',
                 style: TextStyle(
                   fontSize: 13,
                   color: Colors.white70,
@@ -398,7 +398,7 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      '${provider.filteredFaculty.length} faculty',
+                      '${provider.filteredFaculty.length} leaders',
                       style: TextStyle(
                         color: AppColors.textSecondary,
                         fontSize: 13,
@@ -445,11 +445,11 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
 
                 if (provider.filteredFaculty.isEmpty) {
                   return EmptyState(
-                    icon: Icons.search_off,
-                    title: 'No faculty found',
+                  icon: Icons.search_off,
+                  title: 'No leaders found',
                     message: provider.searchQuery.isNotEmpty
                         ? 'Try a different search term'
-                        : 'No faculty members available',
+                        : 'No leaders available',
                     action:
                         provider.searchQuery.isNotEmpty ||
                             provider.selectedDepartment != null ||

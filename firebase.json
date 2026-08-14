@@ -48,8 +48,9 @@
           { "key": "X-Content-Type-Options", "value": "nosniff" },
           { "key": "X-Frame-Options", "value": "DENY" },
           { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
-          { "key": "Permissions-Policy", "value": "geolocation=(*), camera=(), microphone=(), payment=()" },
-          { "key": "Strict-Transport-Security", "value": "max-age=31536000; includeSubDomains; preload" }
+          { "key": "Permissions-Policy", "value": "geolocation=(self), camera=(), microphone=(), payment=()" },
+          { "key": "Strict-Transport-Security", "value": "max-age=31536000; includeSubDomains; preload" },
+          { "key": "Content-Security-Policy", "value": "default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://apis.google.com https://www.google.com https://www.gstatic.com https://*.firebaseapp.com https://*.firebaseio.com https://unpkg.com blob:; worker-src blob: 'self' https://unpkg.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://unpkg.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https://firebasestorage.googleapis.com https://www.gstatic.com https://*.tile.openstreetmap.org https://*.arcgisonline.com https://api.maptiler.com; connect-src 'self' https://identitytoolkit.googleapis.com https://firestore.googleapis.com https://securetoken.googleapis.com https://www.gstatic.com https://fonts.gstatic.com https://*.firebaseio.com https://*.firebaseapp.com https://api.maptiler.com https://unpkg.com https://*.tile.openstreetmap.org https://*.arcgisonline.com https://firebaseinstallations.googleapis.com https://fcmregistrations.googleapis.com https://apis.google.com https://accounts.google.com https://www.googleapis.com https://firebaseappcheck.googleapis.com https://recaptchaenterprise.googleapis.com wss://*.firebaseio.com; frame-src 'self' https://*.firebaseapp.com https://apis.google.com https://*.google.com https://www.google.com/recaptcha; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none';" }
         ]
       },
       {

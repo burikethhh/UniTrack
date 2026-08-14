@@ -1,19 +1,24 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user_model.dart';
 import '../services/auth_service.dart';
 import '../services/push_notification_service.dart';
+import 'location_provider.dart';
 
 /// Authentication Provider for state management
 class AuthProvider extends ChangeNotifier {
   final AuthService _authService;
+  final LocationProvider? _locationProvider;
   StreamSubscription? _authStateSubscription;
   bool _isSigningIn =
       false; // Guard to prevent auth listener interference during sign-in
 
   AuthProvider({
     required AuthService authService,
-  }) : _authService = authService {
+    LocationProvider? locationProvider,
+  }) : _authService = authService,
+       _locationProvider = locationProvider {
     _init();
   }
 
@@ -34,6 +39,7 @@ class AuthProvider extends ChangeNotifier {
   /// Reset loading state (useful for timeout recovery)
   void resetLoading() {
     _isLoading = false;
+    _isSigningIn = false;
     notifyListeners();
   }
 
@@ -52,32 +58,44 @@ class AuthProvider extends ChangeNotifier {
     ) async {
       // Skip if we're in the middle of signIn() — it handles its own state
       if (_isSigningIn) {
-        debugPrint('Auth state listener: skipping (signIn in progress)');
+        if (kDebugMode) {
+          debugPrint('Auth state listener: skipping (signIn in progress)');
+        }
         return;
       }
       if (firebaseUser != null && !_isLoading) {
         // Always refresh profile from Firestore — this corrects stale/fallback data
-        debugPrint(
-          'Auth state listener: Firebase user detected, refreshing profile...',
-        );
+        if (kDebugMode) {
+          debugPrint(
+            'Auth state listener: Firebase user detected, refreshing profile...',
+          );
+        }
         try {
           final freshUser = await _authService.getCurrentUserModel().timeout(
             const Duration(seconds: 10),
             onTimeout: () {
-              debugPrint('Auth listener: getCurrentUserModel timed out');
+              if (kDebugMode) {
+                debugPrint('Auth listener: getCurrentUserModel timed out');
+              }
               return null;
             },
           );
           if (freshUser != null &&
-              (freshUser.role != _user?.role || _user == null)) {
+              (freshUser.role != _user?.role ||
+                  freshUser.isActive != _user?.isActive ||
+                  freshUser.campusId != _user?.campusId ||
+                  freshUser.currentStatus != _user?.currentStatus ||
+                  _user == null)) {
             _user = freshUser;
-            debugPrint(
-              'Auth listener: Profile refreshed for ${_user!.fullName} (role: ${_user!.role})',
-            );
+            if (kDebugMode) {
+              debugPrint(
+                'Auth listener: Profile refreshed for ${_user!.fullName} (role: ${_user!.role})',
+              );
+            }
             notifyListeners();
           }
         } catch (e) {
-          debugPrint('Auth listener error: $e');
+          if (kDebugMode) debugPrint('Auth listener error: $e');
         }
       } else if (firebaseUser == null && _user != null) {
         // User signed out externally
@@ -98,7 +116,7 @@ class AuthProvider extends ChangeNotifier {
         _user = await _authService.getCurrentUserModel().timeout(
           const Duration(seconds: 10),
           onTimeout: () {
-            debugPrint('getCurrentUserModel timed out');
+            if (kDebugMode) debugPrint('getCurrentUserModel timed out');
             return null;
           },
         );
@@ -109,14 +127,23 @@ class AuthProvider extends ChangeNotifier {
             .timeout(
               const Duration(seconds: 10),
               onTimeout: () {
-                debugPrint('createUserDocumentForLegacyUser timed out');
+                if (kDebugMode) {
+                  debugPrint('createUserDocumentForLegacyUser timed out');
+                }
                 return null;
               },
             );
+
+        // Check if user is banned — defer sign out to AuthWrapper (don't sign out during state init)
+        if (_user != null && !_user!.isActive) {
+          if (kDebugMode) {
+            debugPrint('User is inactive — AuthWrapper will handle routing');
+          }
+        }
       }
     } catch (e) {
       _error = e.toString();
-      debugPrint('Error checking auth state: $e');
+      if (kDebugMode) debugPrint('Error checking auth state: $e');
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -138,6 +165,15 @@ class AuthProvider extends ChangeNotifier {
       _isLoading = false;
       _isSigningIn = false;
       notifyListeners();
+
+      // Persist user ID for push token refresh
+      if (_user != null) {
+        SharedPreferences.getInstance()
+            .then((prefs) {
+              prefs.setString('current_user_id', _user!.id);
+            })
+            .catchError((_) {});
+      }
 
       // Save FCM token for push notifications
       if (_user != null) {
@@ -163,7 +199,10 @@ class AuthProvider extends ChangeNotifier {
       _error = e.toString();
       _isLoading = false;
       _isSigningIn = false;
-      notifyListeners();
+      // Don't call notifyListeners() here yet — the caller needs to
+      // show the error snackbar first. If we notify now, AuthWrapper
+      // rebuilds and replaces LoginScreen, making mounted=false
+      // before the snackbar can be shown.
       return false;
     }
   }
@@ -201,6 +240,15 @@ class AuthProvider extends ChangeNotifier {
       _isSigningIn = false;
       notifyListeners();
 
+      // Persist user ID for push token refresh
+      if (_user != null) {
+        SharedPreferences.getInstance()
+            .then((prefs) {
+              prefs.setString('current_user_id', _user!.id);
+            })
+            .catchError((_) {});
+      }
+
       // Save FCM token for push notifications
       if (_user != null) {
         try {
@@ -222,7 +270,7 @@ class AuthProvider extends ChangeNotifier {
       _error = e.toString();
       _isLoading = false;
       _isSigningIn = false;
-      notifyListeners();
+      // Defer notify — caller shows error snackbar first
       return false;
     }
   }
@@ -260,6 +308,7 @@ class AuthProvider extends ChangeNotifier {
 
   /// Sign out
   Future<void> signOut() async {
+    await _locationProvider?.stopTracking();
     // Remove FCM token before signing out
     if (_user != null) {
       try {
@@ -282,12 +331,7 @@ class AuthProvider extends ChangeNotifier {
   Future<void> refreshUser() async {
     if (_authService.currentUser != null) {
       _user = await _authService.getCurrentUserModel();
-      // Force sign out if user was banned while logged in
-      if (_user != null && !_user!.isActive) {
-        debugPrint('User is banned — forcing sign out');
-        await signOut();
-        return;
-      }
+      // Note: sign out for banned users is handled by AuthWrapper, not here
       notifyListeners();
     }
   }

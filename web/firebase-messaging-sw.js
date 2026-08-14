@@ -1,13 +1,13 @@
 // Firebase Cloud Messaging Service Worker
 // Required for FCM web push notifications
 
-importScripts('https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js');
-importScripts('https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/11.0.0/firebase-app-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/11.0.0/firebase-messaging-compat.js');
 
 firebase.initializeApp({
-  apiKey: 'AIzaSyBhSl-KJ5bF3CtsYfm1etcwHNCgyGsSAo8',
-  appId: '1:505882301770:web:d5d1c0e7b3d6b17f9c9db3',
-  messagingSenderId: '505882301770',
+  apiKey: 'AIzaSyBBpAsroGKwFelz0Xf4rvFzwvUl9Ht9wv8',
+  appId: '1:568922390866:web:f2d09e42176dcb1b7a3a8b',
+  messagingSenderId: '568922390866',
   projectId: 'isksulars-track',
   authDomain: 'isksulars-track.firebaseapp.com',
   storageBucket: 'isksulars-track.firebasestorage.app',

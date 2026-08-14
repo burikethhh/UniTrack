@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:math';
 
 
-/// Map configuration constants for UniTrack
+/// Map configuration constants for ISKSULARS TRACK
 ///
 /// To enable premium map features (vector streets, satellite labels,
 /// full 3D building data from OpenStreetMap), sign up for a free
@@ -16,7 +16,11 @@ class MapConstants {
   // MapTiler API Key
   // ============================================================
   /// Replace with your own key from https://cloud.maptiler.com/account/keys/
-  static const String mapTilerApiKey = 'YOUR_MAPTILER_API_KEY';
+  /// Pass via: flutter build web --dart-define=MAPTILER_API_KEY=your_key
+  static const String mapTilerApiKey = String.fromEnvironment(
+    'MAPTILER_API_KEY',
+    defaultValue: 'YOUR_MAPTILER_API_KEY',
+  );
 
   /// Whether a valid MapTiler API key is configured
   static bool get hasMapTilerKey =>
@@ -381,7 +385,7 @@ class MapConstants {
   static String buildSatelliteStyle() {
     final style = {
       'version': 8,
-      'name': 'UniTrack Satellite',
+      'name': 'ISKSULARS TRACK Satellite',
       'glyphs': 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
       'sources': {
         'satellite': {
@@ -418,7 +422,7 @@ class MapConstants {
     // to avoid MapLibre worker parse errors with large inline GeoJSON.
     final style = {
       'version': 8,
-      'name': 'UniTrack 3D Campus',
+      'name': 'ISKSULARS TRACK 3D Campus',
       'glyphs': 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
       'sources': {
         'satellite': {
@@ -455,7 +459,7 @@ class MapConstants {
   static String buildGroundLevelStyle() {
     final style = {
       'version': 8,
-      'name': 'UniTrack Ground Level',
+      'name': 'ISKSULARS TRACK Ground Level',
       'glyphs': 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
       'sources': {
         'satellite': {

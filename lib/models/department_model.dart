@@ -8,7 +8,7 @@ class DepartmentModel {
   final String? description;
   final String? headId;
   final String? buildingLocation;
-  final int staffCount;
+  final int memberCount;
   final bool isActive;
 
   DepartmentModel({
@@ -18,7 +18,7 @@ class DepartmentModel {
     this.description,
     this.headId,
     this.buildingLocation,
-    this.staffCount = 0,
+    this.memberCount = 0,
     this.isActive = true,
   });
 
@@ -32,7 +32,7 @@ class DepartmentModel {
       description: data['description'],
       headId: data['headId'],
       buildingLocation: data['buildingLocation'],
-      staffCount: data['staffCount'] ?? 0,
+      memberCount: data['memberCount'] ?? data['leaderCount'] ?? data['staffCount'] ?? 0,
       isActive: data['isActive'] ?? true,
     );
   }
@@ -45,7 +45,7 @@ class DepartmentModel {
       'description': description,
       'headId': headId,
       'buildingLocation': buildingLocation,
-      'staffCount': staffCount,
+      'memberCount': memberCount,
       'isActive': isActive,
     };
   }

@@ -64,7 +64,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
               'How We Use Your Data',
               Icons.settings_outlined,
               [
-                'Display faculty availability to students',
+                'Display leader availability to students',
                 'Show real-time locations on the campus map',
                 'Send relevant notifications (optional)',
                 'Improve app performance and features',

@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 
-/// Integration tests placeholder for UniTrack
+/// Integration tests placeholder for ISKSULARS TRACK
 /// These tests require Firebase initialization and are skipped in unit test runs
 /// Run actual integration tests with: flutter test integration_test/
 void main() {

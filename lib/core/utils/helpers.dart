@@ -28,7 +28,7 @@ String formatRelativeTime(DateTime time) {
   return '${time.day}/${time.month}/${time.year}';
 }
 
-/// Send a "looking for you" ping notification to a faculty member.
+/// Send a "looking for you" ping notification to a student leader / org officer.
 /// Shows a confirmation dialog, sends the notification, and displays result feedback.
 Future<void> pingFaculty({
   required BuildContext context,
@@ -61,7 +61,7 @@ Future<void> pingFaculty({
           ),
           const SizedBox(width: 12),
           const Expanded(
-            child: Text('Notify Teacher', overflow: TextOverflow.ellipsis),
+            child: Text('Notify Student Leader', overflow: TextOverflow.ellipsis),
           ),
         ],
       ),

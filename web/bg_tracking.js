@@ -1,4 +1,4 @@
-// UniTrack Background Tracking Helper
+// ISKSULARS TRACK Background Tracking Helper
 // Keeps geolocation running when the PWA tab is backgrounded/minimized.
 // Uses Wake Lock API to prevent the tab from being suspended.
 // On tab close (beforeunload), sends a final "offline" beacon to Firestore REST.

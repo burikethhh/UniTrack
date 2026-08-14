@@ -7,6 +7,7 @@ import '../../providers/providers.dart';
 import 'student_directory_screen.dart';
 import 'student_map_screen.dart';
 import 'student_profile_screen.dart';
+import '../staff_leader/tracking_dashboard_screen.dart';
 
 /// Main screen for student module with adaptive navigation
 class StudentHomeScreen extends StatefulWidget {
@@ -19,20 +20,55 @@ class StudentHomeScreen extends StatefulWidget {
 class _StudentHomeScreenState extends State<StudentHomeScreen> {
   int _currentIndex = 0;
 
-  final List<Widget> _screens = [
-    const StudentDirectoryScreen(),
-    const StudentMapScreen(),
-    const StudentProfileScreen(),
-  ];
+  late final List<Widget> _screens;
+  late final List<NavigationDestination> _destinations;
 
   @override
   void initState() {
     super.initState();
+    final authProvider = context.read<AuthProvider>();
+    final isStaff = authProvider.user?.isStaff ?? false;
+
+    _screens = [
+      const StudentDirectoryScreen(),
+      const StudentMapScreen(),
+      if (isStaff) const TrackingDashboardScreen(),
+      const StudentProfileScreen(),
+    ];
+
+    _destinations = [
+      const NavigationDestination(
+        icon: Icon(Icons.people_outline),
+        selectedIcon: Icon(Icons.people),
+        label: 'Directory',
+      ),
+      const NavigationDestination(
+        icon: Icon(Icons.map_outlined),
+        selectedIcon: Icon(Icons.map),
+        label: 'Map',
+      ),
+      if (isStaff)
+        const NavigationDestination(
+          icon: Icon(Icons.location_on_outlined),
+          selectedIcon: Icon(Icons.location_on),
+          label: 'Tracking',
+        ),
+      const NavigationDestination(
+        icon: Icon(Icons.person_outline),
+        selectedIcon: Icon(Icons.person),
+        label: 'Profile',
+      ),
+    ];
+
     // Initialize faculty provider
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<FacultyProvider>().initialize(viewerRole: UserRole.student);
-      // Initialize location provider for student location sharing
       final authProvider = context.read<AuthProvider>();
+      final viewerRole = authProvider.user?.role ?? UserRole.student;
+      context.read<FacultyProvider>().initialize(
+        viewerRole: viewerRole,
+        viewerCampusId: authProvider.user?.campusId,
+      );
+      // Initialize location provider for student location sharing
       if (authProvider.user != null) {
         context.read<LocationProvider>().initialize(
           authProvider.user!.id,
@@ -56,6 +92,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
   }
 
   void _onFacultyProviderChanged() {
+    if (!mounted) return;
     final focusedId = context.read<FacultyProvider>().focusedFacultyId;
     if (focusedId != null && _currentIndex != 1) {
       setState(() {
@@ -100,29 +137,16 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
               _currentIndex = index;
             });
           },
-          destinations: const [
-            NavigationDestination(
-              icon: Icon(Icons.people_outline),
-              selectedIcon: Icon(Icons.people),
-              label: 'Directory',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.map_outlined),
-              selectedIcon: Icon(Icons.map),
-              label: 'Map',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.person_outline),
-              selectedIcon: Icon(Icons.person),
-              label: 'Profile',
-            ),
-          ],
+          destinations: _destinations,
         ),
       ),
     );
   }
 
   Widget _buildAdaptiveLayout(BuildContext context, DeviceType deviceType) {
+    final authProvider = context.read<AuthProvider>();
+    final isStaff = authProvider.user?.isStaff ?? false;
+
     final destinations = [
       NavigationRailDestination(
         icon: const Icon(Icons.people_outline),
@@ -134,6 +158,12 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
         selectedIcon: const Icon(Icons.map),
         label: const Text('Map'),
       ),
+      if (isStaff)
+        NavigationRailDestination(
+          icon: const Icon(Icons.location_on_outlined),
+          selectedIcon: const Icon(Icons.location_on),
+          label: const Text('Tracking'),
+        ),
       NavigationRailDestination(
         icon: const Icon(Icons.person_outline),
         selectedIcon: const Icon(Icons.person),
@@ -172,9 +202,13 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
   }
 
   Widget _buildNavigationDrawer() {
+    final authProvider = context.read<AuthProvider>();
+    final isStaff = authProvider.user?.isStaff ?? false;
+
     final items = [
       (Icons.people_outline, Icons.people, 'Directory'),
       (Icons.map_outlined, Icons.map, 'Map'),
+      if (isStaff) (Icons.location_on_outlined, Icons.location_on, 'Tracking'),
       (Icons.person_outline, Icons.person, 'Profile'),
     ];
 
@@ -209,7 +243,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
                     ),
                     const SizedBox(width: 16),
                     const Text(
-                      'UniTrack',
+                      'ISKSULARS TRACK',
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: 24,

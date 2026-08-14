@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import '../../services/offline_cache_service.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/utils/connectivity_service.dart';
 
 /// A banner that shows when the app is offline with pulsing animation
 class OfflineModeBanner extends StatefulWidget {
@@ -38,8 +39,8 @@ class _OfflineModeBannerState extends State<OfflineModeBanner>
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<bool>(
-      stream: OfflineCacheService().connectivityStream,
-      initialData: OfflineCacheService().isOnline,
+      stream: ConnectivityService().connectivityStream,
+      initialData: ConnectivityService().isConnected,
       builder: (context, snapshot) {
         final isOnline = snapshot.data ?? true;
 
@@ -54,7 +55,7 @@ class _OfflineModeBannerState extends State<OfflineModeBanner>
                 opacity: isOnline ? 0 : 1,
                 duration: const Duration(milliseconds: 200),
                 child: Material(
-                  color: Colors.orange[700],
+                  color: AppColors.warning,
                   child: SafeArea(
                     bottom: false,
                     child: Container(
@@ -65,7 +66,7 @@ class _OfflineModeBannerState extends State<OfflineModeBanner>
                       ),
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
-                          colors: [Colors.orange[800]!, Colors.orange[600]!],
+                          colors: [AppColors.warning, AppColors.warning.withValues(alpha: 0.8)],
                         ),
                       ),
                       child: Row(
@@ -79,7 +80,7 @@ class _OfflineModeBannerState extends State<OfflineModeBanner>
                                 scale: isOnline ? 1.0 : _pulseAnimation.value,
                                 child: Icon(
                                   Icons.cloud_off,
-                                  color: Colors.white.withValues(
+                                  color: AppColors.textOnPrimary.withValues(
                                     alpha: isOnline
                                         ? 1.0
                                         : 0.7 + (_pulseAnimation.value * 0.3),
@@ -91,28 +92,11 @@ class _OfflineModeBannerState extends State<OfflineModeBanner>
                           ),
                           const SizedBox(width: 10),
                           const Text(
-                            'You\'re offline',
+                            'Offline • cached data',
                             style: TextStyle(
-                              color: Colors.white,
+                              color: AppColors.textOnPrimary,
                               fontSize: 13,
                               fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          Container(
-                            width: 4,
-                            height: 4,
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.5),
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          const Text(
-                            'Showing cached data',
-                            style: TextStyle(
-                              color: Colors.white70,
-                              fontSize: 12,
                             ),
                           ),
                         ],
@@ -176,8 +160,8 @@ class _ConnectivityAwareWidgetState extends State<ConnectivityAwareWidget>
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<bool>(
-      stream: OfflineCacheService().connectivityStream,
-      initialData: OfflineCacheService().isOnline,
+      stream: ConnectivityService().connectivityStream,
+      initialData: ConnectivityService().isConnected,
       builder: (context, snapshot) {
         final isOnline = snapshot.data ?? true;
 
@@ -199,7 +183,7 @@ class _ConnectivityAwareWidgetState extends State<ConnectivityAwareWidget>
                 child: FadeTransition(
                   opacity: _animation,
                   child: Container(
-                    color: Colors.orange[700],
+                    color: AppColors.warning,
                     padding: EdgeInsets.only(
                       top: MediaQuery.of(context).padding.top + 8,
                       bottom: 8,
@@ -211,15 +195,15 @@ class _ConnectivityAwareWidgetState extends State<ConnectivityAwareWidget>
                       children: [
                         const Icon(
                           Icons.wifi_off,
-                          color: Colors.white,
+                          color: AppColors.textOnPrimary,
                           size: 18,
                         ),
                         const SizedBox(width: 8),
                         const Flexible(
                           child: Text(
-                            'No internet connection - Using cached data',
+                            'Offline • cached data',
                             style: TextStyle(
-                              color: Colors.white,
+                              color: AppColors.textOnPrimary,
                               fontSize: 13,
                               fontWeight: FontWeight.w500,
                             ),
@@ -247,8 +231,8 @@ class ConnectivityIndicator extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<bool>(
-      stream: OfflineCacheService().connectivityStream,
-      initialData: OfflineCacheService().isOnline,
+      stream: ConnectivityService().connectivityStream,
+      initialData: ConnectivityService().isConnected,
       builder: (context, snapshot) {
         final isOnline = snapshot.data ?? true;
 
@@ -257,11 +241,11 @@ class ConnectivityIndicator extends StatelessWidget {
           width: size,
           height: size,
           decoration: BoxDecoration(
-            color: isOnline ? Colors.green : Colors.orange,
+            color: isOnline ? AppColors.success : AppColors.warning,
             shape: BoxShape.circle,
             boxShadow: [
               BoxShadow(
-                color: (isOnline ? Colors.green : Colors.orange).withValues(
+                color: (isOnline ? AppColors.success : AppColors.warning).withValues(
                   alpha: 0.4,
                 ),
                 blurRadius: 4,
@@ -271,7 +255,11 @@ class ConnectivityIndicator extends StatelessWidget {
           ),
           child: isOnline
               ? null
-              : Icon(Icons.cloud_off, size: size * 0.7, color: Colors.white),
+              : Icon(
+                  Icons.cloud_off,
+                  size: size * 0.7,
+                  color: AppColors.textOnPrimary,
+                ),
         );
       },
     );
@@ -287,8 +275,8 @@ class SyncStatusIndicator extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<bool>(
-      stream: OfflineCacheService().connectivityStream,
-      initialData: OfflineCacheService().isOnline,
+      stream: ConnectivityService().connectivityStream,
+      initialData: ConnectivityService().isConnected,
       builder: (context, snapshot) {
         final isOnline = snapshot.data ?? true;
         final syncText = _getSyncText();
@@ -296,10 +284,10 @@ class SyncStatusIndicator extends StatelessWidget {
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           decoration: BoxDecoration(
-            color: isOnline ? Colors.green[50] : Colors.orange[50],
+            color: isOnline ? AppColors.success.withValues(alpha: 0.1) : AppColors.warning.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: isOnline ? Colors.green[200]! : Colors.orange[200]!,
+              color: isOnline ? AppColors.success.withValues(alpha: 0.3) : AppColors.warning.withValues(alpha: 0.3),
             ),
           ),
           child: Row(
@@ -308,7 +296,7 @@ class SyncStatusIndicator extends StatelessWidget {
               Icon(
                 isOnline ? Icons.cloud_done : Icons.cloud_off,
                 size: 16,
-                color: isOnline ? Colors.green[700] : Colors.orange[700],
+                color: isOnline ? AppColors.success : AppColors.warning,
               ),
               const SizedBox(width: 6),
               Text(
@@ -316,7 +304,7 @@ class SyncStatusIndicator extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w500,
-                  color: isOnline ? Colors.green[700] : Colors.orange[700],
+                  color: isOnline ? AppColors.success : AppColors.warning,
                 ),
               ),
             ],

@@ -39,10 +39,22 @@ class FacultyWithLocation {
   /// Get display status
   String get displayStatus {
     if (!isOnline) return 'Offline';
-    return location?.status ?? user.currentStatus ?? 'Available';
+    return effectiveStatus.displayName;
   }
 
-  /// Check if staff is within campus
+  AvailabilityStatus get effectiveStatus {
+    final expiresAt = location?.statusExpiresAt ?? user.statusExpiresAt;
+    if (expiresAt != null && DateTime.now().isAfter(expiresAt)) {
+      return AvailabilityStatus.available;
+    }
+    return AvailabilityStatusExtension.fromString(
+          location?.status ?? user.currentStatus,
+        ) ??
+        user.availabilityStatus ??
+        AvailabilityStatus.available;
+  }
+
+  /// Check if user is within campus
   bool get isWithinCampus => location?.isWithinCampus ?? false;
 
   /// Check if location is fresh (very recent update)

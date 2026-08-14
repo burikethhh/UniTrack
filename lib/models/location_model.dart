@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:latlong2/latlong.dart';
+import 'user_model.dart';
 
 /// Sentinel value for clearing nullable fields in copyWith
 const Object _sentinel = Object();
@@ -16,6 +17,9 @@ class LocationModel {
   final double? accuracy;
   final bool isMoving; // True if teacher is moving (GPS mode only)
   final bool isManualPin; // True if location was set manually
+  final String? locationCampusId;
+  final LocationVisibilityScope visibilityScope;
+  final DateTime? statusExpiresAt;
 
   LocationModel({
     required this.userId,
@@ -28,6 +32,9 @@ class LocationModel {
     this.accuracy,
     this.isMoving = false,
     this.isManualPin = false,
+    this.locationCampusId,
+    this.visibilityScope = LocationVisibilityScope.campusOnly,
+    this.statusExpiresAt,
   });
 
   /// Get as LatLng for map
@@ -70,22 +77,36 @@ class LocationModel {
       accuracy: (data['accuracy'] as num?)?.toDouble(),
       isMoving: data['isMoving'] ?? false,
       isManualPin: data['isManualPin'] ?? false,
+      locationCampusId: data['locationCampusId'] is String
+          ? data['locationCampusId'] as String
+          : null,
+      visibilityScope: data['visibilityScope'] == 'universityWide'
+          ? LocationVisibilityScope.universityWide
+          : LocationVisibilityScope.campusOnly,
+      statusExpiresAt: (data['statusExpiresAt'] as Timestamp?)?.toDate(),
     );
   }
 
   /// Convert to Firestore document
   Map<String, dynamic> toFirestore() {
-    return {
+    final data = <String, dynamic>{
+      'userId': userId,
       'latitude': latitude,
       'longitude': longitude,
-      'status': status,
-      'quickMessage': quickMessage,
       'timestamp': Timestamp.fromDate(timestamp),
       'isWithinCampus': isWithinCampus,
-      'accuracy': accuracy,
       'isMoving': isMoving,
       'isManualPin': isManualPin,
+      'visibilityScope': visibilityScope.name,
     };
+    if (status != null) data['status'] = status;
+    if (quickMessage != null) data['quickMessage'] = quickMessage;
+    if (accuracy != null) data['accuracy'] = accuracy;
+    if (locationCampusId != null) data['locationCampusId'] = locationCampusId;
+    if (statusExpiresAt != null) {
+      data['statusExpiresAt'] = Timestamp.fromDate(statusExpiresAt!);
+    }
+    return data;
   }
 
   /// Create a copy with updated fields
@@ -101,6 +122,9 @@ class LocationModel {
     Object? accuracy = _sentinel,
     bool? isMoving,
     bool? isManualPin,
+    String? locationCampusId,
+    LocationVisibilityScope? visibilityScope,
+    Object? statusExpiresAt = _sentinel,
   }) {
     return LocationModel(
       userId: userId ?? this.userId,
@@ -115,6 +139,11 @@ class LocationModel {
       accuracy: accuracy == _sentinel ? this.accuracy : accuracy as double?,
       isMoving: isMoving ?? this.isMoving,
       isManualPin: isManualPin ?? this.isManualPin,
+      locationCampusId: locationCampusId ?? this.locationCampusId,
+      visibilityScope: visibilityScope ?? this.visibilityScope,
+      statusExpiresAt: statusExpiresAt == _sentinel
+          ? this.statusExpiresAt
+          : statusExpiresAt as DateTime?,
     );
   }
 

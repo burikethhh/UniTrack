@@ -7,11 +7,14 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'notification_service.dart' show notificationNavigatorKey;
+import '../screens/student/faculty_detail_screen.dart';
+import '../screens/student/student_map_screen.dart';
+import '../screens/staff_leader/notifications_screen.dart';
 
 /// Background message handler - must be top-level function
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  debugPrint('🔔 Background message received: ${message.messageId}');
+  if (kDebugMode) debugPrint('🔔 Background message received: ${message.messageId}');
   // Handle background message
 }
 
@@ -39,7 +42,7 @@ class PushNotificationService {
   static AndroidNotificationChannel get _channel =>
       const AndroidNotificationChannel(
         'unitrack_notifications',
-        'UniTrack Notifications',
+        'ISKSULARS TRACK Notifications',
         description: 'Notifications for faculty updates and alerts',
         importance: Importance.high,
         enableVibration: true,
@@ -60,7 +63,7 @@ class PushNotificationService {
         criticalAlert: false,
       );
 
-      debugPrint('📱 FCM Permission status: ${settings.authorizationStatus}');
+      if (kDebugMode) debugPrint('📱 FCM Permission status: ${settings.authorizationStatus}');
 
       if (settings.authorizationStatus == AuthorizationStatus.authorized ||
           settings.authorizationStatus == AuthorizationStatus.provisional) {
@@ -72,7 +75,7 @@ class PushNotificationService {
         _setupMessageHandlers();
       }
     } catch (e) {
-      debugPrint('❌ Error initializing push notifications: $e');
+      if (kDebugMode) debugPrint('❌ Error initializing push notifications: $e');
     }
   }
 
@@ -87,15 +90,15 @@ class PushNotificationService {
       } else {
         _fcmToken = await _fcm.getToken();
       }
-      debugPrint('🔑 FCM Token: $_fcmToken');
+      if (kDebugMode) debugPrint('🔑 FCM Token: $_fcmToken');
     } catch (e) {
-      debugPrint('⚠️ FCM getToken error (non-fatal): $e');
+      if (kDebugMode) debugPrint('⚠️ FCM getToken error (non-fatal): $e');
     }
 
     // Listen for token refresh
     _tokenRefreshSubscription?.cancel();
     _tokenRefreshSubscription = _fcm.onTokenRefresh.listen((newToken) {
-      debugPrint('🔄 FCM Token refreshed: $newToken');
+      if (kDebugMode) debugPrint('🔄 FCM Token refreshed: $newToken');
       _fcmToken = newToken;
       _saveTokenToFirestore(newToken);
     });
@@ -160,13 +163,13 @@ class PushNotificationService {
   Future<void> _checkInitialMessage() async {
     final initialMessage = await _fcm.getInitialMessage();
     if (initialMessage != null) {
-      debugPrint('📬 App opened from terminated state via notification');
+      if (kDebugMode) debugPrint('📬 App opened from terminated state via notification');
       _handleNotificationData(initialMessage.data);
     }
   }
 
   void _handleForegroundMessage(RemoteMessage message) {
-    debugPrint('📬 Foreground message: ${message.notification?.title}');
+    if (kDebugMode) debugPrint('📬 Foreground message: ${message.notification?.title}');
 
     final notification = message.notification;
 
@@ -175,7 +178,7 @@ class PushNotificationService {
     // On web, show in-app overlay notification
     if (kIsWeb) {
       _showWebOverlayNotification(
-        title: notification.title ?? 'UniTrack',
+        title: notification.title ?? 'ISKSULARS TRACK',
         body: notification.body ?? '',
       );
       return;
@@ -209,9 +212,11 @@ class PushNotificationService {
   }
 
   void _handleMessageOpenedApp(RemoteMessage message) {
-    debugPrint(
+    if (kDebugMode) {
+      debugPrint(
       '📬 App opened via notification: ${message.notification?.title}',
     );
+    }
     _handleNotificationData(message.data);
   }
 
@@ -221,7 +226,7 @@ class PushNotificationService {
         final data = jsonDecode(response.payload!) as Map<String, dynamic>;
         _handleNotificationData(data);
       } catch (e) {
-        debugPrint('Error parsing notification payload: $e');
+        if (kDebugMode) debugPrint('Error parsing notification payload: $e');
       }
     }
   }
@@ -230,14 +235,76 @@ class PushNotificationService {
     // Handle notification navigation based on type
     final type = data['type'] as String?;
     final targetId = data['targetId'] as String?;
+    final senderId = data['senderId'] as String?;
+    final notificationId = data['notificationId'] as String?;
 
-    debugPrint('📌 Handling notification: type=$type, targetId=$targetId');
+    if (kDebugMode) debugPrint('📌 Handling notification: type=$type, targetId=$targetId, notificationId=$notificationId');
 
-    // TODO: Implement navigation based on notification type
-    // Examples:
-    // - 'faculty_available': Navigate to faculty detail
-    // - 'location_update': Navigate to map
-    // - 'announcement': Navigate to announcements
+    // If we have a notificationId, mark it as opened in Firestore
+    if (notificationId != null && notificationId.isNotEmpty) {
+      _firestore.collection('notifications').doc(notificationId).set({
+        'isRead': true,
+        'openedAt': FieldValue.serverTimestamp(),
+        'pushStatus': 'opened',
+      }, SetOptions(merge: true)).catchError((e) {
+        if (kDebugMode) debugPrint('Error marking notification as opened: $e');
+      });
+    }
+
+    final navigator = notificationNavigatorKey.currentState;
+    if (navigator == null) {
+      if (kDebugMode) debugPrint('⚠️ Navigator not ready — cannot route notification tap');
+      return;
+    }
+
+    // Map notification type → screen route.
+    // Strings here mirror the FCM `data.type` and Firestore `type` field on
+    // AppNotification (which stores NotificationType.name — all lowercase by
+    // enum convention: 'lookingForYou', 'system', etc.).
+    switch (type) {
+      case 'lookingForYou':
+        // Student is looking for this leader — open the student directory
+        // entry for the *sender* (the student) so the leader can see who.
+        // For admin_broadcast pings, senderId is 'system' so this route only
+        // fires for genuine student→leader pings.
+        if (senderId != null && senderId.isNotEmpty && senderId != 'system') {
+          navigator.push(MaterialPageRoute(
+            builder: (_) =>
+                FacultyDetailScreen(facultyId: senderId),
+          ));
+        }
+        break;
+
+      case 'locationUpdate':
+        // A tracked user's location changed — open the student map so the
+        // viewer sees the new marker. The Map tab is index 1 in
+        // StudentHomeScreen's IndexedStack; we can't switch tabs from here
+        // but we can push the map screen directly.
+        navigator.push(MaterialPageRoute(
+          builder: (_) => const StudentMapScreen(),
+        ));
+        break;
+
+      case 'statusChange':
+        // A leader's availability changed — open their faculty detail.
+        if (targetId != null && targetId.isNotEmpty) {
+          navigator.push(MaterialPageRoute(
+            builder: (_) =>
+                FacultyDetailScreen(facultyId: targetId),
+          ));
+        }
+        break;
+
+      case 'system':
+      case 'appUpdate':
+      default:
+        // Admin broadcast or system notification — open the notifications
+        // inbox so the user can read the full message.
+        navigator.push(MaterialPageRoute(
+          builder: (_) => const NotificationsScreen(),
+        ));
+        break;
+    }
   }
 
   /// Save FCM token to Firestore for the current user
@@ -254,9 +321,9 @@ class PushNotificationService {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('fcm_token', _fcmToken!);
 
-      debugPrint('✅ FCM token saved for user: $userId');
+      if (kDebugMode) debugPrint('✅ FCM token saved for user: $userId');
     } catch (e) {
-      debugPrint('❌ Error saving FCM token: $e');
+      if (kDebugMode) debugPrint('❌ Error saving FCM token: $e');
     }
   }
 
@@ -277,9 +344,9 @@ class PushNotificationService {
       await _firestore.collection('users').doc(userId).set({
         'fcmTokens': FieldValue.arrayRemove([_fcmToken]),
       }, SetOptions(merge: true));
-      debugPrint('✅ FCM token removed for user: $userId');
+      if (kDebugMode) debugPrint('✅ FCM token removed for user: $userId');
     } catch (e) {
-      debugPrint('❌ Error removing FCM token: $e');
+      if (kDebugMode) debugPrint('❌ Error removing FCM token: $e');
     }
   }
 
@@ -288,9 +355,9 @@ class PushNotificationService {
     if (kIsWeb) return; // Topics not supported on web
     try {
       await _fcm.subscribeToTopic(topic);
-      debugPrint('✅ Subscribed to topic: $topic');
+      if (kDebugMode) debugPrint('✅ Subscribed to topic: $topic');
     } catch (e) {
-      debugPrint('❌ Error subscribing to topic $topic: $e');
+      if (kDebugMode) debugPrint('❌ Error subscribing to topic $topic: $e');
     }
   }
 
@@ -299,9 +366,9 @@ class PushNotificationService {
     if (kIsWeb) return; // Topics not supported on web
     try {
       await _fcm.unsubscribeFromTopic(topic);
-      debugPrint('✅ Unsubscribed from topic: $topic');
+      if (kDebugMode) debugPrint('✅ Unsubscribed from topic: $topic');
     } catch (e) {
-      debugPrint('❌ Error unsubscribing from topic $topic: $e');
+      if (kDebugMode) debugPrint('❌ Error unsubscribing from topic $topic: $e');
     }
   }
 
@@ -387,7 +454,7 @@ class PushNotificationService {
     // Import the navigator key from notification_service.dart
     final overlayState = notificationNavigatorKey.currentState?.overlay;
     if (overlayState == null) {
-      debugPrint('📱 Web notification (no overlay): $title - $body');
+      if (kDebugMode) debugPrint('📱 Web notification (no overlay): $title - $body');
       return;
     }
 
@@ -404,6 +471,8 @@ class PushNotificationService {
           child: InkWell(
             onTap: () {
               if (entry.mounted) entry.remove();
+              // Navigate to notifications screen on tap
+              _handleNotificationData({'type': 'system'});
             },
             borderRadius: BorderRadius.circular(12),
             child: Padding(

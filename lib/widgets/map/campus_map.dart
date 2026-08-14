@@ -543,8 +543,12 @@ class CampusMapState extends State<CampusMap> with TickerProviderStateMixin {
   }
 
   static Color _parseHexColor(String hex) {
-    final hexCode = hex.replaceAll('#', '');
-    return Color(int.parse('FF$hexCode', radix: 16));
+    try {
+      final hexCode = hex.replaceAll('#', '');
+      return Color(int.parse('FF$hexCode', radix: 16));
+    } catch (_) {
+      return Colors.grey;
+    }
   }
 
   // ──────────────────────────────────────────────────────────

@@ -7,13 +7,24 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:permission_handler/permission_handler.dart' as ph
     if (dart.library.html) 'package:permission_handler/permission_handler.dart';
 import '../models/location_model.dart';
+import '../models/user_model.dart';
 import '../core/constants/app_constants.dart';
+
+/// Permission outcome for location access — separates the permission decision
+/// from the side effect of opening settings, so the UI layer can show a
+/// rationale dialog first.
+enum LocationPermissionResult {
+  granted,
+  denied,
+  permanentlyDenied,
+  serviceDisabled,
+}
 
 /// Location tracking configuration for better accuracy
 class LocationConfig {
   /// Minimum accuracy in meters to accept a GPS reading
   static const double minAccuracyMeters = 30.0;
-  
+
   /// Distance filter for GPS stream (meters)
   static const double distanceFilterMeters = 1.0;
   
@@ -25,30 +36,25 @@ class LocationConfig {
   /// refreshing so the location naturally goes stale.
   static const int staleThresholdSeconds = 90;
   
-  /// Location update interval when moving (seconds)
-  static const int movingUpdateIntervalSec = 2;
-  
-  /// Location update interval when stationary (seconds)
-  static const int stationaryUpdateIntervalSec = 5;
-  
-  /// Heartbeat interval to keep GPS location fresh (seconds)
-  static const int heartbeatIntervalSec = 10;
+  /// Unified heartbeat interval (seconds).
+  /// A single timer polls at this cadence and decides what to do based on
+  /// current state (manual-pin refresh / fallback GPS read / nothing).
+  /// Replaces the old 3-timer setup which caused redundant GPS wakeups.
+  static const int unifiedTickSeconds = 5;
   
   /// Heartbeat interval for manual pin mode (seconds)
   static const int manualPinHeartbeatIntervalSec = 20;
   
   /// Number of readings to average for smoothing
   static const int smoothingWindowSize = 5;
+
 }
 
-/// Location Service for UniTrack
+/// Location Service for ISKSULARS TRACK
 class LocationService {
   final FirebaseFirestore _firestore;
-  final GeolocatorPlatform? _geolocator;
   StreamSubscription<Position>? _positionSubscription;
-  Timer? _heartbeatTimer;
-  Timer? _manualPinHeartbeat; // Dedicated heartbeat for manual pin mode
-  Timer? _movementTimer; // Timer for movement updates
+  Timer? _unifiedTimer; // Single timer replacing heartbeat + movement + pin
   LocationModel? _lastLocation;
   Position? _previousPosition; // For movement detection
   String? _currentUserId;
@@ -57,26 +63,27 @@ class LocationService {
   Function(LocationModel)? _onLocationUpdate;
   String? _currentStatus;
   String? _currentQuickMessage;
+  DateTime? _statusExpiresAt;
+  LocationVisibilityScope _visibilityScope = LocationVisibilityScope.campusOnly;
+  Future<void> _locationWriteQueue = Future<void>.value();
+  DateTime? _lastManualPinRefresh; // Tracks when the manual pin was last refreshed
   
   // Position history for smoothing (Kalman-like filtering)
   final List<Position> _positionHistory = [];
   DateTime? _lastFirestoreUpdate;
   DateTime? _lastGpsTimestamp; // When the last real GPS reading arrived
   int _consecutiveBadReadings = 0;
-  static const int _maxBadReadings = 5;
 
   /// Default constructor - uses Firebase and Geolocator instances
   LocationService()
-      : _firestore = FirebaseFirestore.instance,
-        _geolocator = null;
+      : _firestore = FirebaseFirestore.instance;
 
   /// Testable constructor - allows dependency injection
   @visibleForTesting
   LocationService.testable({
     FirebaseFirestore? firestore,
     GeolocatorPlatform? geolocator,
-  })  : _firestore = firestore ?? FirebaseFirestore.instance,
-        _geolocator = geolocator;
+  })  : _firestore = firestore ?? FirebaseFirestore.instance;
 
   /// Check if currently tracking location
   bool get isTracking => _positionSubscription != null;
@@ -84,58 +91,88 @@ class LocationService {
   /// Check if in manual pin mode
   bool get isManualPinMode => _isManualPinMode;
   
-  /// Force request location permission - will open settings if denied
-  Future<bool> checkAndRequestPermission() async {
-    // On web, use geolocator's built-in permission (permission_handler has no web support)
+  /// Check location permission WITHOUT opening settings as a side effect.
+  /// Returns a result enum so the UI layer can decide whether to call
+  /// [openSettingsForPermission] (e.g., after showing a rationale dialog).
+  Future<LocationPermissionResult> checkPermission() async {
     if (kIsWeb) {
       var permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
       }
       return permission == LocationPermission.whileInUse ||
-             permission == LocationPermission.always;
+             permission == LocationPermission.always
+          ? LocationPermissionResult.granted
+          : LocationPermissionResult.denied;
     }
     
-    // First check if location services are enabled
-    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) return LocationPermissionResult.serviceDisabled;
+    
+    final status = await ph.Permission.locationWhenInUse.status;
+    if (status.isGranted) return LocationPermissionResult.granted;
+    if (status.isPermanentlyDenied) return LocationPermissionResult.permanentlyDenied;
+    return LocationPermissionResult.denied;
+  }
+
+  /// Attempt to request permission (does not open system settings).
+  Future<LocationPermissionResult> requestPermission() async {
+    if (kIsWeb) {
+      var permission = await Geolocator.requestPermission();
+      return permission == LocationPermission.whileInUse ||
+             permission == LocationPermission.always
+          ? LocationPermissionResult.granted
+          : LocationPermissionResult.denied;
+    }
+    final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) return LocationPermissionResult.serviceDisabled;
+    
+    final status = await ph.Permission.locationWhenInUse.request();
+    if (status.isGranted) return LocationPermissionResult.granted;
+    if (status.isPermanentlyDenied) return LocationPermissionResult.permanentlyDenied;
+    return LocationPermissionResult.denied;
+  }
+
+  /// Open system settings (caller should show a rationale dialog first).
+  Future<void> openSettingsForPermission() async {
+    if (kIsWeb) {
+      // Browsers do not expose an application settings page. The user must
+      // change the permission from the browser's address-bar controls.
+      return;
+    }
+    final serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
-      // Try to open location settings
       await Geolocator.openLocationSettings();
-      // Check again after user returns
-      serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) return false;
+      return;
     }
-    
-    // Request location permission using permission_handler for better control
-    var status = await ph.Permission.locationWhenInUse.status;
-    
-    if (status.isDenied) {
-      status = await ph.Permission.locationWhenInUse.request();
+    await ph.openAppSettings();
+  }
+
+  /// Backwards-compatible permission check that mirrors the old behavior
+  /// (requests permission, then opens settings if still denied).
+  /// Prefer [checkPermission] / [requestPermission] / [openSettingsForPermission]
+  /// for new call sites.
+  Future<bool> checkAndRequestPermission() async {
+    var result = await checkPermission();
+    if (result == LocationPermissionResult.granted) return true;
+    if (result == LocationPermissionResult.denied) {
+      result = await requestPermission();
+      if (result == LocationPermissionResult.granted) return true;
     }
-    
-    // If still denied or permanently denied, open app settings
-    if (status.isDenied || status.isPermanentlyDenied) {
-      await ph.openAppSettings();
-      // Check again after user returns
-      status = await ph.Permission.locationWhenInUse.status;
+    if (result == LocationPermissionResult.denied ||
+        result == LocationPermissionResult.permanentlyDenied ||
+        result == LocationPermissionResult.serviceDisabled) {
+      await openSettingsForPermission();
     }
-    
-    if (!status.isGranted) return false;
-    
-    // Also try to get background location for continuous tracking
-    var bgStatus = await ph.Permission.locationAlways.status;
-    if (bgStatus.isDenied) {
-      await ph.Permission.locationAlways.request();
-    }
-    
-    return true;
+    // Re-check after settings
+    return (await checkPermission()) == LocationPermissionResult.granted;
   }
   
   /// Get current position
   Future<Position?> getCurrentPosition() async {
     try {
-      final hasPermission = await checkAndRequestPermission();
-      if (!hasPermission) return null;
+      final hasPermission = await checkPermission();
+      if (hasPermission != LocationPermissionResult.granted) return null;
       
       return await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
@@ -144,7 +181,7 @@ class LocationService {
         ),
       );
     } catch (e) {
-      debugPrint('Error getting position: $e');
+      if (kDebugMode) debugPrint('Error getting position: $e');
       return null;
     }
   }
@@ -208,36 +245,19 @@ class LocationService {
   /// Set manual pin mode - when true, GPS updates won't overwrite the manual location
   void setManualPinMode(bool enabled) {
     _isManualPinMode = enabled;
-    debugPrint('📍 Manual Pin Mode: ${enabled ? "ENABLED" : "DISABLED"}');
+    if (kDebugMode) debugPrint('📍 Manual Pin Mode: ${enabled ? "ENABLED" : "DISABLED"}');
   }
-  
+   
   /// Set manual location (bypasses GPS tracking)
-  /// Starts a dedicated heartbeat so the pin stays fresh in Firestore.
+  /// The unified timer will keep refreshing the pin's timestamp.
   Future<void> setManualLocation(String userId, LocationModel location) async {
     _isManualPinMode = true;
     _lastLocation = location;
     _currentUserId = userId;
+    _lastManualPinRefresh = DateTime.now();
     await updateLocation(userId, location);
     _onLocationUpdate?.call(location);
-
-    // Start a dedicated heartbeat for manual pin – keeps refreshing the
-    // timestamp so other users continue to see this faculty as online.
-    _manualPinHeartbeat?.cancel();
-    _manualPinHeartbeat = Timer.periodic(
-      Duration(seconds: LocationConfig.manualPinHeartbeatIntervalSec),
-      (timer) async {
-        if (_lastLocation != null && _currentUserId != null && _isManualPinMode) {
-          final refreshed = _lastLocation!.copyWith(timestamp: DateTime.now());
-          _lastLocation = refreshed;
-          await updateLocation(_currentUserId!, refreshed);
-          debugPrint('📍 Manual-pin heartbeat: timestamp refreshed');
-        } else {
-          timer.cancel();
-        }
-      },
-    );
-
-    debugPrint('📍 Manual pin set at (${location.latitude}, ${location.longitude}) — heartbeat started');
+    if (kDebugMode) debugPrint('📍 Manual pin set at (${location.latitude}, ${location.longitude})');
   }
   
   /// Calculate distance between two positions in meters
@@ -256,22 +276,24 @@ class LocationService {
     return earthRadius * c;
   }
   
-  /// Start location tracking for staff (GPS mode with movement detection)
+  /// Start location tracking for faculty (GPS mode with movement detection)
   void startTracking({
     required String userId,
     required String? status,
     required String? quickMessage,
     String? campusId, // User's assigned campus for geofence checking
+    DateTime? statusExpiresAt,
+    LocationVisibilityScope visibilityScope = LocationVisibilityScope.campusOnly,
     required Function(LocationModel) onLocationUpdate,
   }) {
     _positionSubscription?.cancel();
-    _heartbeatTimer?.cancel();
-    _movementTimer?.cancel();
-    _manualPinHeartbeat?.cancel();
+    _unifiedTimer?.cancel();
     _isManualPinMode = false;
     _currentUserId = userId;
     _currentStatus = status;
     _currentQuickMessage = quickMessage;
+    _statusExpiresAt = statusExpiresAt;
+    _visibilityScope = visibilityScope;
     _onLocationUpdate = onLocationUpdate;
     _previousPosition = null;
     _isMoving = false;
@@ -289,10 +311,10 @@ class LocationService {
       locationSettings = AndroidSettings(
         accuracy: LocationAccuracy.bestForNavigation,
         distanceFilter: LocationConfig.distanceFilterMeters.toInt(),
-        intervalDuration: Duration(seconds: LocationConfig.movingUpdateIntervalSec),
+        intervalDuration: Duration(seconds: LocationConfig.unifiedTickSeconds),
         forceLocationManager: false,
         foregroundNotificationConfig: const ForegroundNotificationConfig(
-          notificationTitle: 'UniTrack Location Sharing',
+          notificationTitle: 'ISKSULARS TRACK Location Sharing',
           notificationText: 'Sharing your location with students',
           enableWakeLock: true,
         ),
@@ -304,89 +326,80 @@ class LocationService {
     ).listen((Position position) async {
       await _processGpsPosition(position);
     }, onError: (e) {
-      debugPrint('📍 GPS Stream Error: $e');
+      if (kDebugMode) debugPrint('📍 GPS Stream Error: $e');
     });
     
-    // Start adaptive movement detection timer
-    _startAdaptiveTimer();
-    
-    // Heartbeat timer to keep location fresh in Firestore.
-    // For GPS mode: only fires when a real GPS reading arrived recently
-    //   (prevents masking genuinely stale data, e.g. browser crash).
-    // For manual-pin mode: the separate _manualPinHeartbeat handles it,
-    //   so this is effectively a no-op when _isManualPinMode is true.
-    _heartbeatTimer = Timer.periodic(
-      Duration(seconds: LocationConfig.heartbeatIntervalSec), 
-      (timer) async {
-        if (_lastLocation == null || _currentUserId == null) return;
-        // Manual-pin has its own heartbeat — skip here.
-        if (_isManualPinMode) return;
-        // Guard: if no recent GPS reading, attempt a fresh one before giving up
-        if (_lastGpsTimestamp == null ||
-            DateTime.now().difference(_lastGpsTimestamp!).inSeconds >
-                LocationConfig.staleThresholdSeconds) {
-          if (kDebugMode) debugPrint('📍 Heartbeat: no recent GPS — attempting fresh read');
-          try {
-            final position = await Geolocator.getCurrentPosition(
-              locationSettings: const LocationSettings(
-                accuracy: LocationAccuracy.high,
-                timeLimit: Duration(seconds: 5),
-              ),
-            );
-            await _processGpsPosition(position);
-            return; // _processGpsPosition already updated Firestore
-          } catch (e) {
-            if (kDebugMode) debugPrint('📍 Heartbeat: fresh GPS attempt failed: $e');
-            return; // genuinely stale
-          }
-        }
-        final refreshedLocation = _lastLocation!.copyWith(
-          timestamp: DateTime.now(),
-        );
-        _lastLocation = refreshedLocation;
-        await updateLocation(_currentUserId!, refreshedLocation);
-        if (kDebugMode) debugPrint('📍 Heartbeat: Location refreshed (withinCampus=${_lastLocation!.isWithinCampus})');
-      },
+    // Single unified timer replaces heartbeat + movement + manual-pin timers.
+    // Every tick decides what to do based on current state, so there's
+    // never more than one timer firing and never redundant GPS wakeups.
+    _unifiedTimer = Timer.periodic(
+      Duration(seconds: LocationConfig.unifiedTickSeconds),
+      _onUnifiedTick,
     );
   }
-  
-  /// Start adaptive timer that adjusts based on movement state
-  void _startAdaptiveTimer() {
-    _movementTimer?.cancel();
-    
-    final interval = _isMoving 
-        ? LocationConfig.movingUpdateIntervalSec 
-        : LocationConfig.stationaryUpdateIntervalSec;
-    
-    _movementTimer = Timer.periodic(Duration(seconds: interval), (timer) async {
-      if (_currentUserId == null) return;
-      
-      // Skip if GPS stream already provided a recent update (fallback only)
-      if (_lastGpsTimestamp != null &&
-          DateTime.now().difference(_lastGpsTimestamp!).inSeconds < interval) {
-        return;
+
+  /// Single handler for the unified timer tick.
+  /// Decides based on state whether to: refresh manual pin / fallback
+  /// GPS read / heartbeat refresh / nothing.
+  Future<void> _onUnifiedTick(Timer timer) async {
+    if (_currentUserId == null || _lastLocation == null) return;
+
+    // ── Manual-pin mode: refresh every manualPinHeartbeatIntervalSec
+    if (_isManualPinMode) {
+      final sinceRefresh = _lastManualPinRefresh != null
+          ? DateTime.now().difference(_lastManualPinRefresh!).inSeconds
+          : LocationConfig.manualPinHeartbeatIntervalSec;
+      if (sinceRefresh >= LocationConfig.manualPinHeartbeatIntervalSec) {
+        final refreshed = _lastLocation!.copyWith(timestamp: DateTime.now());
+        _lastLocation = refreshed;
+        _lastManualPinRefresh = DateTime.now();
+        await updateLocation(_currentUserId!, refreshed);
+        if (kDebugMode) debugPrint('📍 Manual-pin refresh: timestamp updated');
       }
-      
+      return;
+    }
+
+    // ── GPS mode: stale guard — only heartbeat-refresh when within window
+    final gpsStale = _lastGpsTimestamp == null ||
+        DateTime.now().difference(_lastGpsTimestamp!).inSeconds >
+            LocationConfig.staleThresholdSeconds;
+
+    if (gpsStale) {
+      // GPS hasn't provided a real reading recently — do a fresh read.
+      // This is the "movement timer fallback" + "heartbeat fresh read"
+      // combined into a single attempt, gated by the staleness check so
+      // we don't fire redundant getCurrentPosition calls when the stream
+      // is active.
+      if (kDebugMode) debugPrint('📍 Unified tick: stale GPS — attempting fresh read');
       try {
         final position = await Geolocator.getCurrentPosition(
           locationSettings: const LocationSettings(
-            accuracy: LocationAccuracy.bestForNavigation,
-            timeLimit: Duration(seconds: 10),
+            accuracy: LocationAccuracy.high,
+            timeLimit: Duration(seconds: 5),
           ),
         );
         await _processGpsPosition(position);
       } catch (e) {
         _consecutiveBadReadings++;
-        debugPrint('📍 Position request failed: $e (bad readings: $_consecutiveBadReadings)');
-        
-        // If too many failures, try to refresh with last known position
-        if (_consecutiveBadReadings >= _maxBadReadings && _lastLocation != null) {
-          final refreshed = _lastLocation!.copyWith(timestamp: DateTime.now());
-          await updateLocation(_currentUserId!, refreshed);
-          _consecutiveBadReadings = 0;
-        }
+        if (kDebugMode) debugPrint('📍 Unified tick: fresh read failed: $e (bad: $_consecutiveBadReadings)');
+        // Do not refresh the timestamp with an old position. The location must
+        // become stale when the device cannot provide a valid GPS reading.
       }
-    });
+      return;
+    }
+
+    // ── GPS is fresh — heartbeat refresh the timestamp (no GPS wakeup)
+    final sinceFirestore = _lastFirestoreUpdate != null
+        ? DateTime.now().difference(_lastFirestoreUpdate!).inSeconds
+        : LocationConfig.staleThresholdSeconds;
+    final interval = _isMoving ? 2 : 5; // movingUpdateIntervalSec / stationaryUpdateIntervalSec
+    if (sinceFirestore >= interval) {
+      final refreshed = _lastLocation!.copyWith(timestamp: DateTime.now());
+      _lastLocation = refreshed;
+      final written = await updateLocation(_currentUserId!, refreshed);
+      if (written) _lastFirestoreUpdate = DateTime.now();
+      if (kDebugMode) debugPrint('📍 Heartbeat refresh (withinCampus=${_lastLocation!.isWithinCampus})');
+    }
   }
   
   /// Apply smoothing to position using weighted average of recent readings
@@ -441,7 +454,6 @@ class LocationService {
     
     // Reset bad reading counter on successful position
     _consecutiveBadReadings = 0;
-    _lastGpsTimestamp = DateTime.now();
     
     // IMPORTANT: Skip GPS updates if user has manually pinned their location
     if (_isManualPinMode) {
@@ -463,6 +475,9 @@ class LocationService {
         }
       }
     }
+
+    // Only accepted readings are allowed to keep the location fresh.
+    _lastGpsTimestamp = DateTime.now();
     
     // Apply smoothing for more stable position
     final smoothedPosition = _smoothPosition(position);
@@ -482,15 +497,18 @@ class LocationService {
         _isMoving = distance > LocationConfig.movementThreshold; // Higher threshold to start moving
       }
       
-      // Restart adaptive timer if movement state changed
+      // Movement state change is picked up by _onUnifiedTick on the next tick —
+      // the unified timer auto-adapts by reading _isMoving, so no restart needed.
       if (wasMoving != _isMoving) {
-        debugPrint('📍 Movement state changed: ${_isMoving ? "MOVING" : "STATIONARY"}');
-        _startAdaptiveTimer();
+        if (kDebugMode) debugPrint('📍 Movement state changed: ${_isMoving ? "MOVING" : "STATIONARY"}');
       }
     }
-    _previousPosition = smoothedPosition;
-    
-    final location = LocationModel(
+_previousPosition = smoothedPosition;
+
+    // Guard against stopTracking being called mid-processing
+    if (_currentUserId == null) return;
+
+        final location = LocationModel(
       userId: _currentUserId!,
       latitude: smoothedPosition.latitude,
       longitude: smoothedPosition.longitude,
@@ -498,6 +516,9 @@ class LocationService {
       quickMessage: _currentQuickMessage,
       timestamp: DateTime.now(),
       isWithinCampus: withinCampus,
+      locationCampusId: currentCampusLocation,
+      visibilityScope: _visibilityScope,
+      statusExpiresAt: _statusExpiresAt,
       accuracy: smoothedPosition.accuracy,
       isMoving: _isMoving,
       isManualPin: false,
@@ -509,11 +530,11 @@ class LocationService {
     final now = DateTime.now();
     final shouldUpdate = _isMoving || 
         _lastFirestoreUpdate == null ||
-        now.difference(_lastFirestoreUpdate!).inSeconds >= LocationConfig.stationaryUpdateIntervalSec;
+        now.difference(_lastFirestoreUpdate!).inSeconds >= LocationConfig.unifiedTickSeconds;
     
     if (shouldUpdate) {
-      await updateLocation(_currentUserId!, location);
-      _lastFirestoreUpdate = now;
+      final written = await updateLocation(_currentUserId!, location);
+      if (written) _lastFirestoreUpdate = now;
       if (kDebugMode) debugPrint('📍 Location UPDATED: accuracy=${smoothedPosition.accuracy.toStringAsFixed(1)}m, campus=$currentCampusLocation, moving=$_isMoving');
     }
     
@@ -521,21 +542,26 @@ class LocationService {
   }
   
   /// Update status and message without restarting tracking
-  void updateStatusAndMessage(String? status, String? quickMessage) {
+  void updateStatusAndMessage(
+    String? status,
+    String? quickMessage, {
+    DateTime? statusExpiresAt,
+  }) {
     _currentStatus = status;
     _currentQuickMessage = quickMessage;
+    _statusExpiresAt = statusExpiresAt ?? _statusExpiresAt;
+  }
+
+  void updateVisibilityScope(LocationVisibilityScope scope) {
+    _visibilityScope = scope;
   }
   
   /// Stop location tracking
   void stopTracking() {
     _positionSubscription?.cancel();
     _positionSubscription = null;
-    _heartbeatTimer?.cancel();
-    _heartbeatTimer = null;
-    _manualPinHeartbeat?.cancel();
-    _manualPinHeartbeat = null;
-    _movementTimer?.cancel();
-    _movementTimer = null;
+    _unifiedTimer?.cancel();
+    _unifiedTimer = null;
     _lastLocation = null;
     _currentUserId = null;
     _previousPosition = null;
@@ -545,42 +571,57 @@ class LocationService {
     _positionHistory.clear();
     _lastFirestoreUpdate = null;
     _lastGpsTimestamp = null;
+    _lastManualPinRefresh = null;
     _consecutiveBadReadings = 0;
   }
-  
+   
   /// Switch from manual pin to automatic GPS tracking
   void switchToAutoTracking() {
     _isManualPinMode = false;
-    _manualPinHeartbeat?.cancel();
-    _manualPinHeartbeat = null;
-    debugPrint('📍 Switched to automatic GPS tracking — manual heartbeat stopped');
+    _lastManualPinRefresh = null;
+    if (kDebugMode) debugPrint('📍 Switched to automatic GPS tracking');
   }
   
-  /// Legacy method - no longer needed but kept for compatibility
-  void updateHideOutsideCampusSetting(bool value) {
-    // No-op: Auto-hide is now always enabled
+  /// Update location in Firestore. Returns true on success, false on failure
+  /// (callers may surface "offline" state or retry).
+  Future<bool> updateLocation(String userId, LocationModel location) async {
+    final result = Completer<bool>();
+    _locationWriteQueue = _locationWriteQueue.then((_) async {
+      try {
+        result.complete(await _writeLocation(userId, location));
+      } catch (e) {
+        result.complete(false);
+      }
+    });
+    return result.future;
   }
-  
-  /// Update location in Firestore
-  Future<void> updateLocation(String userId, LocationModel location) async {
+
+  Future<bool> _writeLocation(String userId, LocationModel location) async {
     try {
       await _firestore
           .collection('locations')
           .doc(userId)
           .set(location.toFirestore());
+      return true;
     } catch (e) {
-      debugPrint('Error updating location: $e');
+      if (kDebugMode) debugPrint('Error updating location: $e');
+      return false;
     }
   }
-  
-  /// Remove location from Firestore (when tracking is disabled or outside campus)
-  Future<void> removeLocation(String userId) async {
+   
+  /// Remove location from Firestore (when tracking is disabled or outside campus).
+  /// Returns true on success, false on failure (a failed delete leaves a stale
+  /// location doc that students may still read — callers can retry).
+  Future<bool> removeLocation(String userId) async {
     try {
-      debugPrint('🗑️ Removing location for user: $userId');
+      await _locationWriteQueue;
+      if (kDebugMode) debugPrint('🗑️ Removing location for user: $userId');
       await _firestore.collection('locations').doc(userId).delete();
-      debugPrint('🗑️ Location successfully removed from Firestore');
+      if (kDebugMode) debugPrint('🗑️ Location successfully removed from Firestore');
+      return true;
     } catch (e) {
-      debugPrint('Error removing location: $e');
+      if (kDebugMode) debugPrint('Error removing location: $e');
+      return false;
     }
   }
   
@@ -593,7 +634,7 @@ class LocationService {
       }
       return null;
     } catch (e) {
-      debugPrint('Error getting location: $e');
+      if (kDebugMode) debugPrint('Error getting location: $e');
       return null;
     }
   }

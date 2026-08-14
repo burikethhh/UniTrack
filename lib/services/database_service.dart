@@ -9,44 +9,44 @@ class DatabaseService {
 
   // ==================== USERS ====================
 
-  /// Get all staff members
-  Future<List<UserModel>> getAllStaff() async {
+  /// Get all faculty members
+  Future<List<UserModel>> getAllFaculty() async {
     try {
       final snapshot = await _firestore
           .collection('users')
-          .where('role', whereIn: ['staff', 'admin'])
+          .where('role', whereIn: ['studentLeader', 'organizationOfficer'])
           .where('isActive', isEqualTo: true)
           .get();
 
       return snapshot.docs.map((doc) => UserModel.fromFirestore(doc)).toList();
     } catch (e) {
-      debugPrint('Error getting staff: $e');
+      if (kDebugMode) debugPrint('Error getting faculty: $e');
       return [];
     }
   }
 
-  /// Get staff by department
-  Future<List<UserModel>> getStaffByDepartment(String department) async {
+  /// Get faculty by department
+  Future<List<UserModel>> getFacultyByDepartment(String department) async {
     try {
       final snapshot = await _firestore
           .collection('users')
-          .where('role', whereIn: ['staff', 'admin'])
+          .where('role', whereIn: ['studentLeader', 'organizationOfficer'])
           .where('department', isEqualTo: department)
           .where('isActive', isEqualTo: true)
           .get();
 
       return snapshot.docs.map((doc) => UserModel.fromFirestore(doc)).toList();
     } catch (e) {
-      debugPrint('Error getting staff by department: $e');
+      if (kDebugMode) debugPrint('Error getting faculty by department: $e');
       return [];
     }
   }
 
-  /// Stream of all active staff
-  Stream<List<UserModel>> getActiveStaffStream() {
+  /// Stream of all active faculty
+  Stream<List<UserModel>> getActiveFacultyStream() {
     return _firestore
         .collection('users')
-        .where('role', whereIn: ['staff', 'admin'])
+        .where('role', whereIn: ['studentLeader', 'organizationOfficer'])
         .where('isActive', isEqualTo: true)
         .snapshots()
         .map(
@@ -55,13 +55,52 @@ class DatabaseService {
         );
   }
 
-  /// Search staff by name
-  Future<List<UserModel>> searchStaff(String query) async {
+  /// Search faculty by name (server-side prefix match on `searchName`)
+  /// Falls back to client-side filter if the index/field is missing.
+  Future<List<UserModel>> searchFaculty(String query) async {
+    if (query.trim().isEmpty) return [];
     try {
       final queryLower = query.toLowerCase();
+
+      // Optimized path: server-side range query on lowercased `searchName`.
+      // Requires a `searchName` field written at registration/update time.
+      try {
+        final snapshot = await _firestore
+            .collection('users')
+            .where('role', whereIn: ['studentLeader', 'organizationOfficer'])
+            .where('isActive', isEqualTo: true)
+            .where('searchName', isGreaterThanOrEqualTo: queryLower)
+            .where('searchName', isLessThan: '$queryLower\uf8ff')
+            .limit(30)
+            .get();
+
+        final exact = <UserModel>[];
+        final prefix = <UserModel>[];
+        for (final doc in snapshot.docs) {
+          final user = UserModel.fromFirestore(doc);
+          final first = user.firstName.toLowerCase();
+          final last = user.lastName.toLowerCase();
+          final full = user.fullName.toLowerCase();
+          if (first == queryLower || last == queryLower || full == queryLower) {
+            exact.add(user);
+          } else if (first.startsWith(queryLower) ||
+              last.startsWith(queryLower) ||
+              full.startsWith(queryLower) ||
+              (user.department?.toLowerCase().contains(queryLower) ?? false)) {
+            prefix.add(user);
+          }
+        }
+        return [...exact, ...prefix];
+      } catch (e) {
+        if (kDebugMode) {
+          debugPrint('searchFaculty indexed path failed, falling back: $e');
+        }
+      }
+
+      // Fallback path: client-side filter (original implementation)
       final snapshot = await _firestore
           .collection('users')
-          .where('role', whereIn: ['staff', 'admin'])
+          .where('role', whereIn: ['studentLeader', 'organizationOfficer'])
           .where('isActive', isEqualTo: true)
           .get();
 
@@ -76,7 +115,7 @@ class DatabaseService {
           )
           .toList();
     } catch (e) {
-      debugPrint('Error searching staff: $e');
+      if (kDebugMode) debugPrint('Error searching faculty: $e');
       return [];
     }
   }
@@ -88,19 +127,35 @@ class DatabaseService {
         'isTrackingEnabled': isEnabled,
       }, SetOptions(merge: true));
     } catch (e) {
-      debugPrint('Error updating tracking status: $e');
+      if (kDebugMode) debugPrint('Error updating tracking status: $e');
       rethrow;
     }
   }
 
   /// Update user status
-  Future<void> updateUserStatus(String userId, String status) async {
+  Future<void> updateUserStatus(
+    String userId,
+    String status, {
+    AvailabilityStatus? availabilityStatus,
+    DateTime? statusUpdatedAt,
+    DateTime? statusExpiresAt,
+  }) async {
     try {
-      await _firestore.collection('users').doc(userId).set({
+      final data = <String, dynamic>{
         'currentStatus': status,
-      }, SetOptions(merge: true));
+        if (availabilityStatus != null)
+          'availabilityStatus': availabilityStatus.name,
+        if (statusUpdatedAt != null)
+          'statusUpdatedAt': Timestamp.fromDate(statusUpdatedAt),
+        if (statusExpiresAt != null)
+          'statusExpiresAt': Timestamp.fromDate(statusExpiresAt),
+      };
+      await _firestore
+          .collection('users')
+          .doc(userId)
+          .set(data, SetOptions(merge: true));
     } catch (e) {
-      debugPrint('Error updating status: $e');
+      if (kDebugMode) debugPrint('Error updating status: $e');
       rethrow;
     }
   }
@@ -109,10 +164,10 @@ class DatabaseService {
   Future<void> updateQuickMessage(String userId, String? message) async {
     try {
       await _firestore.collection('users').doc(userId).set({
-        'quickMessage': message,
+        'quickMessage': message ?? FieldValue.delete(),
       }, SetOptions(merge: true));
     } catch (e) {
-      debugPrint('Error updating quick message: $e');
+      if (kDebugMode) debugPrint('Error updating quick message: $e');
       rethrow;
     }
   }
@@ -132,7 +187,7 @@ class DatabaseService {
           .map((doc) => DepartmentModel.fromFirestore(doc))
           .toList();
     } catch (e) {
-      debugPrint('Error getting departments: $e');
+      if (kDebugMode) debugPrint('Error getting departments: $e');
       return [];
     }
   }
@@ -159,7 +214,7 @@ class DatabaseService {
           .doc(department.id)
           .set(department.toFirestore());
     } catch (e) {
-      debugPrint('Error adding department: $e');
+      if (kDebugMode) debugPrint('Error adding department: $e');
     }
   }
 
@@ -170,58 +225,155 @@ class DatabaseService {
   /// When [viewerRole] is [UserRole.student], off-campus locations are
   /// stripped (set to null) so students never receive raw coordinates
   /// for faculty outside campus boundaries.
+  ///
+  /// NOTE: Firebase `whereIn` caps at 30 literals. For larger datasets,
+  /// chunk the stream or add server-side filtering via Cloud Functions.
   Stream<List<FacultyWithLocation>> getFacultyWithLocationsStream({
     UserRole? viewerRole,
+    String? viewerCampusId,
   }) {
-    // Stream of staff/admin users
     final usersStream = _firestore
         .collection('users')
-        .where('role', whereIn: ['staff', 'admin'])
+        .where('role', whereIn: ['studentLeader', 'organizationOfficer'])
         .where('isActive', isEqualTo: true)
         .snapshots();
 
-    // Stream of all locations
-    final locationsStream = _firestore.collection('locations').snapshots();
+    // Cache location data and previous user IDs to avoid re-subscribing
+    // to location streams when only user attributes change.
+    List<String>? prevUserIds;
+    Map<String, LocationModel> cachedLocations = {};
 
-    // Combine both streams - updates when EITHER changes
-    return Rx.combineLatest2(usersStream, locationsStream, (
-      QuerySnapshot<Map<String, dynamic>> usersSnapshot,
-      QuerySnapshot<Map<String, dynamic>> locationsSnapshot,
-    ) {
-      // Build a map of userId -> location for quick lookup
-      // Wrap each doc in try-catch so one bad document doesn't crash the stream
-      final locationMap = <String, LocationModel>{};
-      for (final locDoc in locationsSnapshot.docs) {
-        final loc = LocationModel.tryFromFirestore(locDoc);
-        if (loc != null) {
-          locationMap[locDoc.id] = loc;
-        }
+    return usersStream.switchMap((usersSnapshot) {
+      final userIds = usersSnapshot.docs.map((d) => d.id).toList()..sort();
+
+      final idsChanged =
+          prevUserIds == null || !_listEquals(prevUserIds!, userIds);
+      prevUserIds = userIds;
+
+      if (userIds.isEmpty) {
+        cachedLocations = {};
+        return Stream.value(
+          usersSnapshot.docs
+              .map(
+                (d) => FacultyWithLocation(
+                  user: UserModel.fromFirestore(d),
+                  location: null,
+                ),
+              )
+              .toList(),
+        );
       }
 
-      // Build result list
-      final List<FacultyWithLocation> result = [];
-      for (final userDoc in usersSnapshot.docs) {
-        try {
-          final user = UserModel.fromFirestore(userDoc);
-          LocationModel? location =
-              locationMap[user.id]; // Get location if exists
-
-          // Privacy: strip off-campus locations for student viewers
-          // so they never receive raw coordinates outside campus boundaries
-          if (viewerRole == UserRole.student &&
-              location != null &&
-              !(location.isWithinCampus)) {
-            location = null;
+      if (!idsChanged) {
+        // User IDs unchanged — build result from cached locations (no new subscriptions)
+        final List<FacultyWithLocation> result = [];
+        for (final userDoc in usersSnapshot.docs) {
+          try {
+            final user = UserModel.fromFirestore(userDoc);
+            LocationModel? location = cachedLocations[user.id];
+            if (viewerRole == UserRole.student &&
+                location != null &&
+                !(location.isWithinCampus)) {
+              location = null;
+            }
+            result.add(FacultyWithLocation(user: user, location: location));
+          } catch (e) {
+            if (kDebugMode) {
+              debugPrint('Skipping bad user doc ${userDoc.id}: $e');
+            }
           }
-
-          result.add(FacultyWithLocation(user: user, location: location));
-        } catch (e) {
-          debugPrint('Skipping bad user doc ${userDoc.id}: $e');
         }
+        return Stream.value(result);
       }
 
-      return result;
+      // User IDs changed — re-subscribe to location streams
+      final locationStreams = <Stream<QuerySnapshot>>[];
+      for (var i = 0; i < userIds.length; i += 30) {
+        final chunk = userIds.sublist(i, (i + 30).clamp(0, userIds.length));
+        if (viewerRole == UserRole.student) {
+          // Firestore rules are not filters. Use separate constrained streams
+          // for university-wide and campus-only visibility.
+          final baseQuery = _firestore
+              .collection('locations')
+              .where(FieldPath.documentId, whereIn: chunk)
+              .where('isWithinCampus', isEqualTo: true);
+          locationStreams.add(
+            baseQuery
+                .where('visibilityScope', isEqualTo: 'universityWide')
+                .snapshots(),
+          );
+          if (viewerCampusId != null) {
+            locationStreams.add(
+              baseQuery
+                  .where('visibilityScope', isEqualTo: 'campusOnly')
+                  .where('locationCampusId', isEqualTo: viewerCampusId)
+                  .snapshots(),
+            );
+          }
+          continue;
+        }
+        locationStreams.add(
+          _firestore
+              .collection('locations')
+              .where(FieldPath.documentId, whereIn: chunk)
+              .snapshots(),
+        );
+      }
+
+      if (locationStreams.isEmpty) {
+        cachedLocations = {};
+        return Stream.value(
+          usersSnapshot.docs
+              .map(
+                (d) => FacultyWithLocation(
+                  user: UserModel.fromFirestore(d),
+                  location: null,
+                ),
+              )
+              .toList(),
+        );
+      }
+
+      return Rx.combineLatest(locationStreams, (List<QuerySnapshot> snaps) {
+        cachedLocations = {};
+        for (final snap in snaps) {
+          for (final locDoc in snap.docs) {
+            final loc = LocationModel.tryFromFirestore(locDoc);
+            if (loc != null) {
+              cachedLocations[locDoc.id] = loc;
+            }
+          }
+        }
+
+        final List<FacultyWithLocation> result = [];
+        for (final userDoc in usersSnapshot.docs) {
+          try {
+            final user = UserModel.fromFirestore(userDoc);
+            LocationModel? location = cachedLocations[user.id];
+            if (viewerRole == UserRole.student &&
+                location != null &&
+                !(location.isWithinCampus)) {
+              location = null;
+            }
+            result.add(FacultyWithLocation(user: user, location: location));
+          } catch (e) {
+            if (kDebugMode) {
+              debugPrint('Skipping bad user doc ${userDoc.id}: $e');
+            }
+          }
+        }
+        return result;
+      });
     });
+  }
+
+  /// Simple list equality check for caching
+  bool _listEquals(List<String> a, List<String> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
   }
 
   /// Get online faculty only
@@ -231,43 +383,79 @@ class DatabaseService {
     );
   }
 
-  /// Get ALL users (students + staff + admin) with their locations - Admin Live Monitor
-  /// Unlike getFacultyWithLocationsStream, this includes ALL roles
+  /// Get ALL users (students + leaders + officers + admins) with their locations - Admin Live Monitor
+  /// Unlike getFacultyWithLocationsStream, this includes ALL roles.
+  /// Same chunked `whereIn` approach as above to avoid full `locations` collection reads.
   Stream<List<FacultyWithLocation>> getAllUsersWithLocationsStream() {
-    // Stream of ALL active users (no role filter)
     final usersStream = _firestore
         .collection('users')
         .where('isActive', isEqualTo: true)
         .snapshots();
 
-    // Stream of all locations
-    final locationsStream = _firestore.collection('locations').snapshots();
-
-    return Rx.combineLatest2(usersStream, locationsStream, (
-      QuerySnapshot<Map<String, dynamic>> usersSnapshot,
-      QuerySnapshot<Map<String, dynamic>> locationsSnapshot,
-    ) {
-      // Wrap each doc in try-catch so one bad document doesn't crash the stream
-      final locationMap = <String, LocationModel>{};
-      for (final locDoc in locationsSnapshot.docs) {
-        final loc = LocationModel.tryFromFirestore(locDoc);
-        if (loc != null) {
-          locationMap[locDoc.id] = loc;
-        }
+    return usersStream.asyncExpand((usersSnapshot) {
+      final userIds = usersSnapshot.docs.map((d) => d.id).toList();
+      if (userIds.isEmpty) {
+        return Stream.value(
+          usersSnapshot.docs
+              .map(
+                (d) => FacultyWithLocation(
+                  user: UserModel.fromFirestore(d),
+                  location: null,
+                ),
+              )
+              .toList(),
+        );
       }
 
-      final List<FacultyWithLocation> result = [];
-      for (final userDoc in usersSnapshot.docs) {
-        try {
-          final user = UserModel.fromFirestore(userDoc);
-          final location = locationMap[user.id];
-          result.add(FacultyWithLocation(user: user, location: location));
-        } catch (e) {
-          debugPrint('Skipping bad user doc ${userDoc.id}: $e');
-        }
+      final locationStreams = <Stream<QuerySnapshot>>[];
+      for (var i = 0; i < userIds.length; i += 30) {
+        final chunk = userIds.sublist(i, (i + 30).clamp(0, userIds.length));
+        locationStreams.add(
+          _firestore
+              .collection('locations')
+              .where(FieldPath.documentId, whereIn: chunk)
+              .snapshots(),
+        );
       }
 
-      return result;
+      if (locationStreams.isEmpty) {
+        return Stream.value(
+          usersSnapshot.docs
+              .map(
+                (d) => FacultyWithLocation(
+                  user: UserModel.fromFirestore(d),
+                  location: null,
+                ),
+              )
+              .toList(),
+        );
+      }
+
+      return Rx.combineLatest(locationStreams, (List<QuerySnapshot> snaps) {
+        final mergedMap = <String, LocationModel>{};
+        for (final snap in snaps) {
+          for (final locDoc in snap.docs) {
+            final loc = LocationModel.tryFromFirestore(locDoc);
+            if (loc != null) {
+              mergedMap[locDoc.id] = loc;
+            }
+          }
+        }
+
+        final List<FacultyWithLocation> result = [];
+        for (final userDoc in usersSnapshot.docs) {
+          try {
+            final user = UserModel.fromFirestore(userDoc);
+            final location = mergedMap[user.id];
+            result.add(FacultyWithLocation(user: user, location: location));
+          } catch (e) {
+            if (kDebugMode) {
+              debugPrint('Skipping bad user doc ${userDoc.id}: $e');
+            }
+          }
+        }
+        return result;
+      });
     });
   }
 
@@ -281,30 +469,37 @@ class DatabaseService {
           .where('role', isEqualTo: 'student')
           .count()
           .get();
-      final staffCount = await _firestore
-          .collection('users')
-          .where('role', isEqualTo: 'staff')
-          .count()
-          .get();
       final adminsCount = await _firestore
           .collection('users')
           .where('role', isEqualTo: 'admin')
           .count()
           .get();
+      final studentLeadersCount = await _firestore
+          .collection('users')
+          .where('role', isEqualTo: 'studentLeader')
+          .count()
+          .get();
+      final orgOfficersCount = await _firestore
+          .collection('users')
+          .where('role', isEqualTo: 'organizationOfficer')
+          .count()
+          .get();
 
       final students = studentsCount.count ?? 0;
-      final staff = staffCount.count ?? 0;
       final admins = adminsCount.count ?? 0;
+      final studentLeaders = studentLeadersCount.count ?? 0;
+      final orgOfficers = orgOfficersCount.count ?? 0;
+      final faculty = studentLeaders + orgOfficers;
 
       return {
         'students': students,
-        'staff': staff,
+        'faculty': faculty,
         'admins': admins,
-        'total': students + staff + admins,
+        'total': students + faculty + admins,
       };
     } catch (e) {
-      debugPrint('Error getting user counts: $e');
-      return {'students': 0, 'staff': 0, 'admins': 0, 'total': 0};
+      if (kDebugMode) debugPrint('Error getting user counts: $e');
+      return {'students': 0, 'faculty': 0, 'admins': 0, 'total': 0};
     }
   }
 }

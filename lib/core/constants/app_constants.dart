@@ -8,7 +8,7 @@ class AppConstants {
   static const String appVersion =
       '2.5.0'; // Firestore-direct admin ops + activity audit trail
   static const int versionCode =
-      277; // Version code for update checks
+      281; // Role query fix + office hours on map + status on cards
   static const String appTagline = 'Real-Time Campus Locator & Directory';
 
   // Version Compatibility - for older app versions to update
@@ -237,13 +237,13 @@ class AppConstants {
 
   // Status Options
   static const List<String> statusPresets = [
-    'Available for Consultation',
-    'In a Class',
-    'In a Meeting',
-    'Break Time',
-    'Office Hours',
+    'Available',
+    'Busy',
+    'In Meeting',
+    'Teaching',
+    'On Break',
+    'Out of Office',
     'Do Not Disturb',
-    'Away',
   ];
 
   // Quick Messages

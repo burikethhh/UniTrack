@@ -8,7 +8,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
 
   <!-- Security Headers (meta-tag equivalents for static hosting) -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://apis.google.com https://identitytoolkit.googleapis.com https://firestore.googleapis.com https://www.gstatic.com https://*.firebaseio.com https://*.firebaseapp.com https://unpkg.com blob:; worker-src blob: 'self' https://unpkg.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://unpkg.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https://firestore.googleapis.com https://www.gstatic.com https://*.tile.openstreetmap.org https://*.arcgisonline.com https://api.maptiler.com; connect-src 'self' https://identitytoolkit.googleapis.com https://firestore.googleapis.com https://securetoken.googleapis.com https://www.gstatic.com https://fonts.gstatic.com https://*.firebaseio.com https://*.firebaseapp.com https://api.maptiler.com https://unpkg.com https://*.tile.openstreetmap.org https://*.arcgisonline.com wss://*.firebaseio.com; frame-src 'self' https://*.firebaseapp.com https://apis.google.com; object-src 'none'; base-uri 'self'; form-action 'self';">
+  <!-- CSP is set via firebase.json headers to avoid intersection issues -->
   <meta http-equiv="X-Content-Type-Options" content="nosniff">
   <meta name="referrer" content="strict-origin-when-cross-origin">
 
@@ -17,12 +17,12 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="ISKSULARS TRACK">
-  <link rel="apple-touch-icon" href="icons/Icon-circle-192.png?v=276">
-  <link rel="apple-touch-icon" sizes="152x152" href="icons/Icon-circle-192.png?v=276">
-  <link rel="apple-touch-icon" sizes="167x167" href="icons/Icon-circle-192.png?v=276">
-  <link rel="apple-touch-icon" sizes="180x180" href="icons/Icon-circle-512.png?v=276">
-  <link rel="apple-touch-icon" sizes="192x192" href="icons/Icon-circle-192.png?v=276">
-  <link rel="apple-touch-icon" sizes="512x512" href="icons/Icon-circle-512.png?v=276">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png?v=282">
+    <link rel="apple-touch-icon" sizes="152x152" href="icons/apple-touch-icon.png?v=282">
+    <link rel="apple-touch-icon" sizes="167x167" href="icons/apple-touch-icon.png?v=282">
+    <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=282">
+    <link rel="apple-touch-icon" sizes="192x192" href="icons/apple-touch-icon.png?v=282">
+    <link rel="apple-touch-icon" sizes="512x512" href="icons/apple-touch-icon.png?v=282">
 
   <!-- iOS PWA Splash/Launch Images -->
   <link rel="apple-touch-startup-image" href="icons/launch-640x1136.png"
@@ -47,7 +47,7 @@
         media="(device-width: 1024px) and (device-height: 1366px) and (-webkit-device-pixel-ratio: 2)">
 
   <!-- Theme color for Android & desktop -->
-  <meta name="theme-color" content="#0a2540">
+  <meta name="theme-color" content="#41B3A3">
   <!-- Safari pinned tab color -->
   <meta name="msapplication-TileColor" content="#0a2540">
 
@@ -56,6 +56,8 @@
   <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png"/>
   <link rel="icon" type="image/png" sizes="16x16" href="icons/favicon-16.png"/>
   <link rel="shortcut icon" href="favicon.ico"/>
+
+  <link rel="preload" as="image" href="icons/isksularstracklogo.png" type="image/png">
 
   <title>ISKSULARS TRACK - SKSU Student Leader Tracker</title>
   <link rel="manifest" href="manifest.json">
@@ -161,7 +163,7 @@
     ::-webkit-scrollbar { display: none; }
     * { scrollbar-width: none; }
 
-    /* ===== Loading Splash Screen ===== */
+    /* ===== Loading Splash Screen (Radar Sweep) ===== */
     #loading {
       position: fixed;
       inset: 0;
@@ -170,48 +172,298 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      background: linear-gradient(145deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      background: linear-gradient(145deg, #0a2540 0%, #16213e 50%, #0f3460 100%);
       transition: opacity 0.5s ease-out;
+      perspective: 800px;
     }
     #loading.fade-out {
       opacity: 0;
       pointer-events: none;
     }
-    #loading .logo {
-      width: 88px;
-      height: 88px;
-      border-radius: 22px;
-      object-fit: cover;
-      animation: pulse 2s ease-in-out infinite;
-      box-shadow: 0 8px 32px rgba(0, 200, 150, 0.3);
+
+    /* 3D gyro wrapper — tilts the whole radar */
+    #loading .gyro {
+      transform-style: preserve-3d;
+      animation: gyro-tilt 6s ease-in-out infinite;
     }
-    #loading .app-name {
-      margin-top: 20px;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      font-size: 28px;
-      font-weight: 700;
-      color: #fff;
-      letter-spacing: -0.5px;
+    @keyframes gyro-tilt {
+      0%, 100% { transform: rotateX(0deg) rotateZ(0deg); }
+      25%      { transform: rotateX(6deg)  rotateZ(2deg); }
+      50%      { transform: rotateX(0deg)  rotateZ(0deg); }
+      75%      { transform: rotateX(-6deg) rotateZ(-2deg); }
     }
-    #loading .app-tagline {
-      margin-top: 6px;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      font-size: 13px;
-      color: rgba(255,255,255,0.6);
+
+    /* Radar container */
+    #loading .radar-wrap {
+      position: relative;
+      width: 260px; height: 260px;
+      display: flex; align-items: center; justify-content: center;
+      transform-style: preserve-3d;
     }
-    #loading .spinner {
-      margin-top: 36px;
-      width: 36px;
-      height: 36px;
-      border: 3px solid rgba(255,255,255,0.15);
-      border-top-color: #00C896;
+
+    /* Concentric expanding rings (sonar pings) */
+    #loading .ring {
+      position: absolute;
+      width: 260px; height: 260px;
+      border: 2px solid rgba(65, 179, 163, 0.25);
       border-radius: 50%;
-      animation: spin 0.8s linear infinite;
+      opacity: 0;
+      animation: ring-expand 3s ease-out infinite;
     }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    @keyframes pulse {
-      0%, 100% { transform: scale(1); }
-      50% { transform: scale(1.05); }
+    #loading .ring:nth-child(1) { animation-delay: 0s; }
+    #loading .ring:nth-child(2) { animation-delay: 1s; }
+    #loading .ring:nth-child(3) { animation-delay: 2s; }
+    @keyframes ring-expand {
+      0%   { transform: scale(0.25); opacity: 0; border-color: rgba(65, 179, 163, 0.9); }
+      15%  { opacity: 1; }
+      100% { transform: scale(1.35); opacity: 0; border-color: rgba(65, 179, 163, 0.03); }
+    }
+
+    /* Radar grid + crosshair + intersection dots as SVG */
+    #loading .radar-svg {
+      position: absolute;
+      width: 240px; height: 240px;
+      overflow: visible;
+    }
+    #loading .grid-circle {
+      fill: none;
+      stroke: rgba(65, 179, 163, 0.28);
+      stroke-width: 1.2;
+    }
+    #loading .crosshair-line {
+      stroke: rgba(65, 179, 163, 0.35);
+      stroke-width: 1;
+      stroke-dasharray: 120;
+      stroke-dashoffset: 120;
+      animation: crosshair-draw 0.8s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    }
+    #loading .crosshair-line.cx-h { animation-delay: 0.2s; }
+    #loading .crosshair-line.cx-v { animation-delay: 0.35s; }
+    @keyframes crosshair-draw {
+      from { stroke-dashoffset: 120; }
+      to   { stroke-dashoffset: 0; }
+    }
+
+    /* Glowing intersection dots */
+    #loading .intersection {
+      fill: #41B3A3;
+      filter: drop-shadow(0 0 4px rgba(65, 179, 163, 0.9));
+      opacity: 0;
+      animation: dot-glow-in 0.4s ease-out forwards;
+    }
+    #loading .intersection:nth-child(3) { animation-delay: 0.5s; }
+    #loading .intersection:nth-child(4) { animation-delay: 0.55s; }
+    #loading .intersection:nth-child(5) { animation-delay: 0.6s; }
+    #loading .intersection:nth-child(6) { animation-delay: 0.65s; }
+    #loading .intersection:nth-child(7) { animation-delay: 0.7s; }
+    #loading .intersection:nth-child(8) { animation-delay: 0.75s; }
+    @keyframes dot-glow-in {
+      from { opacity: 0; transform: scale(0); }
+      to   { opacity: 0.9; transform: scale(1); }
+    }
+    #loading .intersection.pulse {
+      animation: dot-glow-in 0.4s ease-out forwards,
+                 dot-pulse 2s ease-in-out 1s infinite;
+    }
+    @keyframes dot-pulse {
+      0%, 100% { opacity: 0.6; }
+      50%      { opacity: 1; }
+    }
+
+    /* Sweeping radar arc with comet tail */
+    #loading .sweep-wrap {
+      position: absolute;
+      width: 240px; height: 240px;
+      animation: sweep-rotate 2.5s linear infinite;
+    }
+    @keyframes sweep-rotate {
+      from { transform: rotate(0deg); }
+      to   { transform: rotate(360deg); }
+    }
+    #loading .sweep {
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      background: conic-gradient(
+        from 0deg,
+        rgba(65, 179, 163, 0.0) 0deg,
+        rgba(65, 179, 163, 0.0) 240deg,
+        rgba(65, 179, 163, 0.05) 300deg,
+        rgba(65, 179, 163, 0.25) 345deg,
+        rgba(65, 179, 163, 0.7)  358deg,
+        rgba(65, 179, 163, 0.0)  360deg
+      );
+      -webkit-mask-image: radial-gradient(circle, rgba(0,0,0,1) 60%, rgba(0,0,0,0.3) 100%);
+              mask-image: radial-gradient(circle, rgba(0,0,0,1) 60%, rgba(0,0,0,0.3) 100%);
+      filter: drop-shadow(0 0 8px rgba(65, 179, 163, 0.5));
+    }
+    #loading .sweep-edge {
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      background: conic-gradient(
+        from 0deg,
+        transparent 0deg,
+        transparent 355deg,
+        rgba(133, 220, 186, 0.9) 359deg,
+        transparent 360deg
+      );
+    }
+
+    /* Frosted ring around logo */
+    #loading .frosted-ring {
+      position: absolute;
+      width: 105px; height: 105px;
+      border-radius: 50%;
+      z-index: 9;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      -webkit-backdrop-filter: blur(8px);
+              backdrop-filter: blur(8px);
+      box-shadow:
+        0 0 20px rgba(65, 179, 163, 0.25),
+        inset 0 0 12px rgba(255, 255, 255, 0.05);
+      animation: frost-pulse 3s ease-in-out 1s infinite;
+    }
+    @keyframes frost-pulse {
+      0%, 100% { box-shadow: 0 0 20px rgba(65,179,163,0.25), inset 0 0 12px rgba(255,255,255,0.05); }
+      50%      { box-shadow: 0 0 40px rgba(65,179,163,0.5),  inset 0 0 18px rgba(255,255,255,0.1); }
+    }
+
+    /* Logo pin drop */
+    #loading .logo-pin {
+      position: relative;
+      width: 80px; height: 80px;
+      border-radius: 50%;
+      object-fit: contain;
+      z-index: 10;
+      animation: pin-drop 1s cubic-bezier(0.34, 1.56, 0.64, 1) both,
+                 pin-glow 2s ease-in-out 1s infinite;
+      filter: drop-shadow(0 0 20px rgba(65, 179, 163, 0.6));
+    }
+    @keyframes pin-drop {
+      0%   { transform: translateY(-120px) scale(0.3); opacity: 0; }
+      60%  { transform: translateY(8px) scale(1.1); opacity: 1; }
+      80%  { transform: translateY(-4px) scale(0.95); }
+      100% { transform: translateY(0) scale(1); opacity: 1; }
+    }
+    @keyframes pin-glow {
+      0%, 100% { filter: drop-shadow(0 0 20px rgba(65, 179, 163, 0.4)); }
+      50%      { filter: drop-shadow(0 0 35px rgba(65, 179, 163, 0.8)); }
+    }
+
+    /* Ping dots — radar contacts */
+    #loading .ping {
+      position: absolute;
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      opacity: 0;
+      z-index: 8;
+      animation: ping-fade 2.5s ease-out infinite;
+    }
+    #loading .ping::after {
+      content: ''; position: absolute; inset: -4px;
+      border-radius: 50%;
+      border: 1px solid currentColor;
+      opacity: 0.4;
+    }
+    #loading .ping:nth-child(5) { top: 20%; left: 72%; color: #41B3A3; background: #41B3A3; animation-delay: 1.5s; box-shadow: 0 0 8px #41B3A3; }
+    #loading .ping:nth-child(6) { top: 73%; left: 24%; color: #41B3A3; background: #41B3A3; animation-delay: 2.0s; box-shadow: 0 0 8px #41B3A3; }
+    #loading .ping:nth-child(7) { top: 34%; left: 16%; color: #E8A87C; background: #E8A87C; animation-delay: 2.4s; box-shadow: 0 0 8px #E8A87C; }
+    #loading .ping:nth-child(8) { top: 66%; left: 78%; color: #41B3A3; background: #41B3A3; animation-delay: 2.8s; box-shadow: 0 0 8px #41B3A3; }
+    @keyframes ping-fade {
+      0%, 100% { opacity: 0; transform: scale(0.6); }
+      8%       { opacity: 1; transform: scale(1.6); }
+      18%      { opacity: 0.9; transform: scale(1); }
+      55%      { opacity: 0.6; transform: scale(1); }
+      92%      { opacity: 0.05; transform: scale(1); }
+    }
+
+    /* Circular progress ring (SVG) */
+    #loading .progress-ring {
+      position: absolute;
+      width: 240px; height: 240px;
+      z-index: 7;
+      transform: rotate(-90deg);
+      overflow: visible;
+    }
+    #loading .progress-track {
+      fill: none;
+      stroke: rgba(65, 179, 163, 0.12);
+      stroke-width: 2;
+    }
+    #loading .progress-bar {
+      fill: none;
+      stroke: #41B3A3;
+      stroke-width: 2.5;
+      stroke-linecap: round;
+      stroke-dasharray: 219.9;
+      stroke-dashoffset: 219.9;
+      filter: drop-shadow(0 0 6px rgba(65, 179, 163, 0.8));
+      animation: progress-fill 2s ease-in-out 2s forwards;
+    }
+    @keyframes progress-fill {
+      to { stroke-dashoffset: 0; }
+    }
+
+    /* Text block */
+    #loading .text-block {
+      text-align: center;
+      margin-top: 32px;
+      opacity: 0;
+      animation: text-rise 0.8s ease-out 1.2s both;
+    }
+    @keyframes text-rise {
+      from { opacity: 0; transform: translateY(20px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    #loading .app-name {
+      font-size: 30px; font-weight: 800;
+      letter-spacing: 4px;
+      margin-bottom: 6px;
+      color: #ffffff;
+    }
+    #loading .app-name .letter {
+      display: inline-block;
+      transform: translateY(20px);
+      animation: letter-rise 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+    }
+    #loading .app-name .letter:nth-child(1)  { animation-delay: 1.30s; }
+    #loading .app-name .letter:nth-child(2)  { animation-delay: 1.35s; }
+    #loading .app-name .letter:nth-child(3)  { animation-delay: 1.40s; }
+    #loading .app-name .letter:nth-child(4)  { animation-delay: 1.45s; }
+    #loading .app-name .letter:nth-child(5)  { animation-delay: 1.50s; }
+    #loading .app-name .letter:nth-child(6)  { animation-delay: 1.55s; }
+    #loading .app-name .letter:nth-child(7)  { animation-delay: 1.60s; }
+    #loading .app-name .letter:nth-child(8)  { animation-delay: 1.65s; }
+    #loading .app-name .letter:nth-child(9)  { animation-delay: 1.70s; }
+    #loading .app-name .letter:nth-child(10) { animation-delay: 1.75s; }
+    #loading .app-name .letter:nth-child(11) { animation-delay: 1.80s; }
+    #loading .app-name .letter:nth-child(12) { animation-delay: 1.85s; }
+    #loading .app-name .letter:nth-child(13) { animation-delay: 1.90s; }
+    #loading .app-name .letter:nth-child(14) { animation-delay: 1.95s; }
+    @keyframes letter-rise {
+      from { transform: translateY(20px); }
+      to   { transform: translateY(0); }
+    }
+
+    #loading .app-tagline {
+      font-size: 13px;
+      color: rgba(255, 255, 255, 0.55);
+      letter-spacing: 2px;
+    }
+
+    /* Reduce motion accessibility */
+    @media (prefers-reduced-motion: reduce) {
+      #loading .sweep-wrap, #loading .gyro, #loading .ring, #loading .ping,
+      #loading .frosted-ring, #loading .logo-pin, #loading .intersection.pulse {
+        animation: none !important;
+      }
+      #loading .intersection, #loading .crosshair-line,
+      #loading .text-block, #loading .progress-bar {
+        animation-duration: 0.01s !important;
+      }
     }
 
     /* ===== PWA Install Banner (App Store-style card) ===== */
@@ -358,10 +610,74 @@
 <body>
   <!-- Loading Splash (shown while Flutter engine loads) -->
   <div id="loading">
-    <img src="icons/Icon-192.png" alt="ISKSULARS TRACK" class="logo">
-    <div class="app-name">ISKSULARS TRACK</div>
-    <div class="app-tagline">Real-Time Student Leader Locator</div>
-    <div class="spinner"></div>
+    <div class="gyro">
+      <div class="radar-wrap">
+        <!-- Expanding sonar ring pings -->
+        <div class="ring"></div>
+        <div class="ring"></div>
+        <div class="ring"></div>
+
+        <!-- Static radar grid + crosshair + intersection dots as SVG -->
+        <svg class="radar-svg" viewBox="-120 -120 240 240">
+          <!-- Static concentric circles -->
+          <circle class="grid-circle" cx="0" cy="0" r="115" />
+          <circle class="grid-circle" cx="0" cy="0" r="77" />
+          <circle class="grid-circle" cx="0" cy="0" r="38" />
+
+          <!-- Crosshair lines (animated draw-in) -->
+          <line class="crosshair-line cx-h" x1="-115" y1="0" x2="115" y2="0" />
+          <line class="crosshair-line cx-v" x1="0" y1="-115" x2="0" y2="115" />
+
+          <!-- Glowing intersection dots at ring×crosshair crossings -->
+          <circle class="intersection pulse" cx="115" cy="0" r="3" />
+          <circle class="intersection pulse" cx="-115" cy="0" r="3" />
+          <circle class="intersection pulse" cx="0" cy="115" r="3" />
+          <circle class="intersection pulse" cx="0" cy="-115" r="3" />
+          <circle class="intersection pulse" cx="77" cy="0" r="2.5" />
+          <circle class="intersection pulse" cx="-77" cy="0" r="2.5" />
+        </svg>
+
+        <!-- Circular progress ring (SVG, fills around the radar) -->
+        <svg class="progress-ring" viewBox="-40 -40 80 80">
+          <circle class="progress-track" cx="0" cy="0" r="35" />
+          <circle class="progress-bar"   cx="0" cy="0" r="35" />
+        </svg>
+
+        <!-- Sweeping radar arc with comet tail -->
+        <div class="sweep-wrap">
+          <div class="sweep"></div>
+          <div class="sweep-edge"></div>
+        </div>
+
+        <!-- Frosted ring backplate behind the logo -->
+        <div class="frosted-ring"></div>
+
+        <!-- Logo pin (drops in last) -->
+        <img src="icons/isksularstracklogo.png" class="logo-pin" alt="logo">
+
+        <!-- Ping dots (radar contacts) -->
+        <div class="ping"></div>
+        <div class="ping"></div>
+        <div class="ping"></div>
+        <div class="ping"></div>
+      </div>
+    </div>
+
+    <div class="text-block">
+      <div class="app-name" id="appName">ISKSULARS TRACK</div>
+      <div class="app-tagline">Real-Time Campus Locator & Directory</div>
+    </div>
+
+    <!-- Split app name into letters for stagger animation -->
+    <script>
+      (function() {
+        var nameEl = document.getElementById('appName');
+        var name = nameEl.textContent;
+        nameEl.innerHTML = name.split('').map(function(c) {
+          return c === ' ' ? '<span class="letter">&nbsp;</span>' : '<span class="letter">' + c + '</span>';
+        }).join('');
+      })();
+    </script>
   </div>
 
   <!-- PWA Install Prompt Banner (App Store–style card) -->
@@ -563,11 +879,25 @@
 
   <!-- Flutter bootstrap — fade out loading screen when ready -->
   <script>
-    window.addEventListener('flutter-first-frame', function() {
+    var logoLoaded = false;
+    var logoImg = new Image();
+    logoImg.src = 'icons/isksularstracklogo.png';
+    logoImg.onload = function() { logoLoaded = true; };
+
+    function fadeOutLoading() {
       var loading = document.getElementById('loading');
       if (loading) {
         loading.classList.add('fade-out');
         setTimeout(function() { loading.remove(); }, 600);
+      }
+    }
+
+    window.addEventListener('flutter-first-frame', function() {
+      if (logoLoaded) {
+        fadeOutLoading();
+      } else {
+        // Wait for logo to load, then fade out
+        logoImg.onload = fadeOutLoading;
       }
     });
     // Failsafe: if Flutter hasn't rendered in 8 seconds, remove the splash
@@ -580,6 +910,18 @@
         setTimeout(function() { loading.remove(); }, 600);
       }
     }, 8000);
+  </script>
+  <!-- Force fresh JS load: bypass browser cache for flutter_bootstrap.js -->
+  <script>
+    (function() {
+      'use strict';
+      // Bust browser cache on flutter_bootstrap.js only
+      var s = document.querySelector('script[src*="flutter_bootstrap"]');
+      if (s) {
+        var sep = s.src.indexOf('?') === -1 ? '?' : '&';
+        s.src = s.src + sep + '_cb=' + Date.now();
+      }
+    })();
   </script>
   <script src="flutter_bootstrap.js" async></script>
 

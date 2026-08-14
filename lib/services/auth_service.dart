@@ -1,4 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import '../models/user_model.dart';
@@ -10,16 +11,16 @@ class AuthService {
 
   /// Default constructor - uses Firebase instances
   AuthService()
-      : _auth = FirebaseAuth.instance,
-        _firestore = FirebaseFirestore.instance;
+    : _auth = FirebaseAuth.instance,
+      _firestore = FirebaseFirestore.instance;
 
   /// Testable constructor - allows dependency injection
   @visibleForTesting
   AuthService.testable({
     required FirebaseAuth auth,
     required FirebaseFirestore firestore,
-  })  : _auth = auth,
-        _firestore = firestore;
+  }) : _auth = auth,
+       _firestore = firestore;
 
   /// Get current Firebase user
   User? get currentUser => _auth.currentUser;
@@ -35,6 +36,20 @@ class AuthService {
     required String email,
     required String password,
   }) async {
+    // Ensure App Check token is available (required when App Check is registered)
+    try {
+      final appCheckToken = await FirebaseAppCheck.instance.getToken();
+      if (kDebugMode) {
+        debugPrint('🔐 App Check token before sign-in: ${appCheckToken != null ? 'present' : 'null'}');
+      }
+      if (appCheckToken == null && !kDebugMode) {
+        throw 'Security verification failed. Please refresh the page and try again.';
+      }
+    } catch (e) {
+      if (kDebugMode) debugPrint('⚠️ App Check token check failed: $e');
+      if (!kDebugMode) rethrow;
+    }
+
     try {
       if (kDebugMode) debugPrint('Attempting login for: $email');
       final credential = await _auth.signInWithEmailAndPassword(
@@ -42,7 +57,9 @@ class AuthService {
         password: password,
       );
 
-      if (kDebugMode) debugPrint('Firebase Auth successful: uid=${credential.user?.uid}');
+      if (kDebugMode) {
+        debugPrint('Firebase Auth successful: uid=${credential.user?.uid}');
+      }
 
       if (credential.user != null) {
         final firebaseUser = credential.user!;
@@ -51,11 +68,23 @@ class AuthService {
         // (no retry, retry doubles the wait to 30s+ for no benefit on Spark)
         UserModel? userModel;
         try {
-          userModel = await getUserById(firebaseUser.uid).timeout(
-            kIsWeb ? const Duration(seconds: 10) : const Duration(seconds: 5),
+          if (kDebugMode) {
+            debugPrint('📖 Fetching user doc for uid: ${firebaseUser.uid}');
+          }
+          final getUserFuture = getUserById(firebaseUser.uid);
+          if (kDebugMode) {
+            debugPrint('📖 getUserById Future created, awaiting...');
+          }
+          userModel = await getUserFuture.timeout(
+            kIsWeb ? const Duration(seconds: 15) : const Duration(seconds: 5),
           );
+          if (kDebugMode) {
+            debugPrint(
+              '✅ User doc fetched: ${userModel != null ? userModel.fullName : "null"}',
+            );
+          }
         } catch (e) {
-          debugPrint('Error fetching user document: $e');
+          if (kDebugMode) debugPrint('Error fetching user document: $e');
         }
 
         if (userModel == null) {
@@ -65,13 +94,23 @@ class AuthService {
 
         // Check if user is banned / pending approval
         if (!userModel.isActive) {
-          debugPrint('User is banned/inactive');
+          if (kDebugMode) debugPrint('User is banned/inactive');
           await _auth.signOut();
-          final isStaffRole = userModel.role == UserRole.studentLeader ||
+          final isStaffRole =
+              userModel.role == UserRole.studentLeader ||
               userModel.role == UserRole.organizationOfficer;
           throw isStaffRole
               ? 'Your account is pending admin approval. You\'ll be able to log in once approved.'
               : 'Your account has been disabled. Please contact an administrator.';
+        }
+
+        // Enforce email verification for non-admin users
+        // Admins are exempt (may be seeded without a verified email)
+        if (!firebaseUser.emailVerified && userModel.role != UserRole.admin) {
+          if (kDebugMode) debugPrint('Email not verified — blocking login');
+          await _auth.signOut();
+          throw 'Please verify your email before logging in. '
+              'Check your inbox for the verification link, or use the "Resend verification" option on the login screen.';
         }
 
         // Update last login time in background (fire-and-forget, don't block)
@@ -80,18 +119,22 @@ class AuthService {
             .doc(firebaseUser.uid)
             .set({'lastLoginAt': Timestamp.now()}, SetOptions(merge: true))
             .catchError((e) {
-              debugPrint('Error updating last login: $e');
+              if (kDebugMode) debugPrint('Error updating last login: $e');
             });
 
-        if (kDebugMode) debugPrint('Login successful for: ${userModel.fullName}');
+        if (kDebugMode) {
+          debugPrint('Login successful for: ${userModel.fullName}');
+        }
         return userModel;
       }
       return null;
     } on FirebaseAuthException catch (e) {
-      debugPrint('FirebaseAuthException: ${e.code} - ${e.message}');
+      if (kDebugMode) {
+        debugPrint('FirebaseAuthException: ${e.code} - ${e.message}');
+      }
       throw _handleAuthException(e);
     } catch (e) {
-      debugPrint('Unexpected login error: $e');
+      if (kDebugMode) debugPrint('Unexpected login error: $e');
       rethrow;
     }
   }
@@ -113,6 +156,22 @@ class AuthService {
       throw 'Only SKSU email addresses (@sksu.edu.ph) are allowed to register.';
     }
 
+    // Ensure App Check token is available (required when App Check is registered)
+    try {
+      final appCheckToken = await FirebaseAppCheck.instance.getToken();
+      if (kDebugMode) {
+        debugPrint('🔐 App Check token before registration: ${appCheckToken != null ? 'present' : 'null'}');
+      }
+      if (appCheckToken == null && !kDebugMode) {
+        // In production, require a valid token
+        throw 'Security verification failed. Please refresh the page and try again.';
+      }
+    } catch (e) {
+      if (kDebugMode) debugPrint('⚠️ App Check token check failed: $e');
+      // Don't block registration in debug mode — allow fallback
+      if (!kDebugMode) rethrow;
+    }
+
     try {
       final credential = await _auth.createUserWithEmailAndPassword(
         email: email,
@@ -120,7 +179,9 @@ class AuthService {
       );
 
       if (credential.user != null) {
-        final isStaffRole = role == UserRole.studentLeader || role == UserRole.organizationOfficer;
+        final isStaffRole =
+            role == UserRole.studentLeader ||
+            role == UserRole.organizationOfficer;
 
         final user = UserModel(
           id: credential.user!.uid,
@@ -137,16 +198,75 @@ class AuthService {
           isTrackingEnabled: false,
           isActive: !isStaffRole,
           currentStatus: isStaffRole ? 'Available' : null,
+          availabilityStatus: isStaffRole ? AvailabilityStatus.available : null,
+          statusUpdatedAt: isStaffRole ? DateTime.now() : null,
+          statusExpiresAt: isStaffRole
+              ? DateTime.now().add(const Duration(hours: 8))
+              : null,
         );
 
-        // Run Firestore write + email verification in parallel
-        await Future.wait([
-          _firestore
+        // Write user document to Firestore first — if this fails (e.g. rules, timeout),
+        // roll back the Auth account so the user can retry registration cleanly.
+        try {
+          if (kDebugMode) {
+            debugPrint(
+              '📝 Starting Firestore write for uid: ${credential.user!.uid}',
+            );
+          }
+          if (kDebugMode) {
+            debugPrint(
+              '📝 Data to write: ${user.toFirestore(includeDeleteSentinels: false).keys.toList()}',
+            );
+          }
+          final writeFuture = _firestore
               .collection('users')
               .doc(credential.user!.uid)
-              .set(user.toFirestore()),
-          credential.user!.sendEmailVerification(),
-        ], eagerError: false).catchError((_) => []);
+              .set(user.toFirestore(includeDeleteSentinels: false));
+          if (kDebugMode) debugPrint('📝 Write Future created, awaiting...');
+
+          await writeFuture.timeout(
+            const Duration(seconds: 15),
+            onTimeout: () {
+              throw Exception('Firestore write timed out after 15 seconds');
+            },
+          );
+          if (kDebugMode) {
+            debugPrint('✅ Firestore write completed successfully');
+          }
+        } catch (e) {
+          if (kDebugMode) {
+            debugPrint('❌ Firestore write failed during registration: $e');
+          }
+          if (kDebugMode) debugPrint('❌ Error type: ${e.runtimeType}');
+          // Roll back the Auth account to avoid an orphaned login
+          try {
+            await credential.user!.delete();
+            if (kDebugMode) {
+              debugPrint('✅ Auth account rolled back successfully');
+            }
+          } catch (deleteErr) {
+            if (kDebugMode) {
+              debugPrint('⚠️ Could not roll back Auth account: $deleteErr');
+            }
+          }
+          throw 'Registration failed: your profile could not be created. '
+              'This may be due to a network or permissions issue — please contact an administrator. '
+              '(Detail: $e)';
+        }
+
+        // Send email verification (best-effort, don't block registration)
+        try {
+          await credential.user!.sendEmailVerification(
+            ActionCodeSettings(
+              url: 'https://isksulars-track.web.app/__/auth/action',
+              handleCodeInApp: false,
+            ),
+          );
+        } catch (e) {
+          if (kDebugMode) {
+            debugPrint('⚠️ Could not send verification email: $e');
+          }
+        }
 
         return user;
       }
@@ -159,19 +279,27 @@ class AuthService {
   /// Get user by ID (with automatic migration for old documents)
   Future<UserModel?> getUserById(String userId) async {
     try {
+      if (kDebugMode) {
+        debugPrint(
+          '🔍 getUserById: calling _firestore.collection("users").doc("$userId").get()',
+        );
+      }
       final doc = await _firestore.collection('users').doc(userId).get();
+      if (kDebugMode) debugPrint('🔍 getUserById: doc exists = ${doc.exists}');
       if (doc.exists) {
         try {
           return UserModel.fromFirestore(doc);
         } catch (e) {
           // If parsing fails, try to migrate the document
-          debugPrint('Error parsing user document, attempting migration: $e');
+          if (kDebugMode) {
+            debugPrint('Error parsing user document, attempting migration: $e');
+          }
           return await migrateUserDocument(userId);
         }
       }
       return null;
     } catch (e) {
-      debugPrint('Error fetching user: $e');
+      if (kDebugMode) debugPrint('Error fetching user: $e');
       throw 'Error fetching user: $e';
     }
   }
@@ -220,12 +348,16 @@ class AuthService {
       await _firestore
           .collection('users')
           .doc(firebaseUser.uid)
-          .set(user.toFirestore());
+          .set(user.toFirestore(includeDeleteSentinels: false));
 
-      if (kDebugMode) debugPrint('Created user document for legacy user: ${firebaseUser.uid}');
+      if (kDebugMode) {
+        debugPrint(
+          'Created user document for legacy user: ${firebaseUser.uid}',
+        );
+      }
       return user;
     } catch (e) {
-      debugPrint('Error creating legacy user document: $e');
+      if (kDebugMode) debugPrint('Error creating legacy user document: $e');
       return null;
     }
   }
@@ -280,7 +412,7 @@ class AuthService {
       }
       return null;
     } catch (e) {
-      debugPrint('Error migrating user document: $e');
+      if (kDebugMode) debugPrint('Error migrating user document: $e');
       return null;
     }
   }
@@ -298,11 +430,58 @@ class AuthService {
   }
 
   /// Send password reset email
+  /// Resend verification email — signs in briefly, sends, then signs out.
+  /// Used from login screen's "Resend verification" dialog.
+  Future<void> resendVerificationEmail({
+    required String email,
+    required String password,
+  }) async {
+    try {
+      final cred = await _auth.signInWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+      final user = cred.user;
+      if (user == null) throw 'Could not sign in.';
+      if (user.emailVerified) {
+        await _auth.signOut();
+        throw 'Your email is already verified. You can log in now.';
+      }
+      // Check if user is banned — don't allow banned users to get tokens
+      bool isBanned = false;
+      try {
+        final userDoc = await getUserById(user.uid);
+        if (userDoc != null && !userDoc.isActive) {
+          isBanned = true;
+        }
+      } catch (_) {}
+      if (isBanned) {
+        await _auth.signOut();
+        throw 'Your account has been disabled. Please contact an administrator.';
+      }
+      await user.sendEmailVerification(
+        ActionCodeSettings(
+          url: 'https://isksulars-track.web.app/__/auth/action',
+          handleCodeInApp: false,
+        ),
+      );
+      await _auth.signOut();
+    } catch (e) {
+      try {
+        await _auth.signOut();
+      } catch (_) {}
+      rethrow;
+    }
+  }
+
+  /// Send password reset email
   Future<void> sendPasswordResetEmail(String email) async {
     try {
       if (kDebugMode) debugPrint('🔑 Sending password reset email to: $email');
       await _auth.sendPasswordResetEmail(email: email);
-      if (kDebugMode) debugPrint('✅ Password reset email sent successfully to: $email');
+      if (kDebugMode) {
+        debugPrint('✅ Password reset email sent successfully to: $email');
+      }
     } on FirebaseAuthException catch (e) {
       if (kDebugMode) {
         debugPrint(
@@ -311,7 +490,7 @@ class AuthService {
       }
       throw _handleAuthException(e);
     } catch (e) {
-      debugPrint('❌ Password reset unexpected error: $e');
+      if (kDebugMode) debugPrint('❌ Password reset unexpected error: $e');
       rethrow;
     }
   }
@@ -341,11 +520,7 @@ class AuthService {
     final userId = user.uid;
 
     try {
-      // Delete the Firebase Auth account FIRST
-      // (requires recent login — if it fails, data is preserved)
-      await user.delete();
-
-      // Now clean up Firestore data (auth already deleted, so best-effort)
+      // Clean up Firestore data while the user's auth token is still valid.
       try {
         await _firestore.collection('locations').doc(userId).delete();
       } catch (_) {}
@@ -371,10 +546,11 @@ class AuthService {
         }
       } catch (_) {}
 
-      // Delete user document from Firestore
-      try {
-        await _firestore.collection('users').doc(userId).delete();
-      } catch (_) {}
+      await _firestore.collection('users').doc(userId).delete();
+
+      // Delete the Firebase Auth account last. If recent login is required,
+      // the profile remains intact and the user can retry safely.
+      await user.delete();
     } on FirebaseAuthException catch (e) {
       if (e.code == 'requires-recent-login') {
         throw 'requires-recent-login';
@@ -385,7 +561,9 @@ class AuthService {
 
   /// Handle Firebase Auth exceptions
   String _handleAuthException(FirebaseAuthException e) {
-    debugPrint('Firebase Auth Error: code=${e.code}, message=${e.message}');
+    if (kDebugMode) {
+      debugPrint('Firebase Auth Error: code=${e.code}, message=${e.message}');
+    }
     switch (e.code) {
       case 'user-not-found':
         return 'No user found with this email.';

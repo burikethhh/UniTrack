@@ -77,8 +77,8 @@ class HelpSupportScreen extends StatelessWidget {
 
             _buildFAQItem(
               context,
-              'How do I find a faculty member?',
-              'Use the Directory tab to search by name or department. You can also use the Map tab to see faculty locations in real-time.',
+              'How do I find a student leader or officer?',
+              'Use the Directory tab to search by name or department. You can also use the Map tab to see leader locations in real-time.',
             ),
 
             _buildFAQItem(
@@ -89,8 +89,8 @@ class HelpSupportScreen extends StatelessWidget {
 
             _buildFAQItem(
               context,
-              'Why can\'t I see a faculty\'s location?',
-              'Faculty members control their own location visibility. If you can\'t see their location, they may have disabled sharing or are currently off-campus.',
+              'Why can\'t I see a leader\'s location?',
+              'Student leaders and officers control their own location visibility. If you can\'t see their location, they may have disabled sharing or are currently off-campus.',
             ),
 
             _buildFAQItem(
@@ -102,7 +102,7 @@ class HelpSupportScreen extends StatelessWidget {
             _buildFAQItem(
               context,
               'Does the app work offline?',
-              'Yes! ISKSULARS TRACK caches faculty data locally. You can view the directory offline, but real-time locations require an internet connection.',
+              'Yes! ISKSULARS TRACK caches leader data locally. You can view the directory offline, but real-time locations require an internet connection.',
             ),
 
             _buildFAQItem(

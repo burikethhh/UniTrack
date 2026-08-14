@@ -178,4 +178,78 @@ class Validators {
         return 0xFF9E9E9E; // Grey
     }
   }
+
+  /// Validate with max length
+  static String? maxLength(String? value, int max, {String fieldName = 'This field'}) {
+    if (value != null && value.length > max) {
+      return '$fieldName must be at most $max characters';
+    }
+    return null;
+  }
+
+  /// Validate position
+  static String? position(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return 'Please enter your position';
+    }
+    if (value.trim().length > 64) {
+      return 'Position must be at most 64 characters';
+    }
+    return null;
+  }
+
+  /// Validate organization name
+  static String? organization(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return 'Please select an organization';
+    }
+    if (value.trim().length > 128) {
+      return 'Organization must be at most 128 characters';
+    }
+    return null;
+  }
+
+  /// Validate department
+  static String? department(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return 'Please select a department';
+    }
+    if (value.trim().length > 128) {
+      return 'Department must be at most 128 characters';
+    }
+    return null;
+  }
+
+  /// Validate quick message
+  static String? quickMessage(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return null; // Optional
+    }
+    if (value.trim().length > 100) {
+      return 'Message must be at most 100 characters';
+    }
+    return null;
+  }
+
+  /// Validate notification title
+  static String? notificationTitle(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return 'Please enter a title';
+    }
+    if (value.trim().length > 100) {
+      return 'Title must be at most 100 characters';
+    }
+    return null;
+  }
+
+  /// Validate notification message
+  static String? notificationMessage(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return 'Please enter a message';
+    }
+    if (value.trim().length > 500) {
+      return 'Message must be at most 500 characters';
+    }
+    return null;
+  }
 }

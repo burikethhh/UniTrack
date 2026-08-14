@@ -14,7 +14,7 @@ import '../../services/update_service.dart';
 import '../../services/push_notification_service.dart';
 import '../common/privacy_policy_screen.dart';
 import '../common/help_support_screen.dart';
-import '../staff/edit_profile_screen.dart';
+import '../staff_leader/edit_profile_screen.dart';
 
 /// Profile screen for students
 class StudentProfileScreen extends StatelessWidget {
@@ -1189,7 +1189,7 @@ class _NotificationSettingsSheetState
           const SizedBox(height: 8),
           _buildNotificationItem(
             icon: Icons.person_pin_circle,
-            text: 'A faculty member becomes available',
+            text: 'A student leader becomes available',
           ),
           _buildNotificationItem(
             icon: Icons.message,

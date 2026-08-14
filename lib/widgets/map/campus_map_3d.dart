@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/constants/map_constants.dart';
@@ -197,7 +198,9 @@ class CampusMap3DState extends State<CampusMap3D>
         }
       }
     } catch (e) {
-      debugPrint('[CampusMap3D] queryRenderedFeatures error: $e');
+      if (kDebugMode) {
+        debugPrint('[CampusMap3D] queryRenderedFeatures error: $e');
+      }
     }
     // No faculty hit — forward as generic map tap
     widget.onMapTap?.call(coords);
@@ -219,18 +222,20 @@ class CampusMap3DState extends State<CampusMap3D>
       _loadTimedOut = false;
     });
 
-    debugPrint(
-      '[CampusMap3D] Style loaded (gen=$gen). '
-      'faculty=${widget.faculty?.length ?? 0}, '
-      'sources+layers=runtime-added',
-    );
+    if (kDebugMode) {
+      debugPrint(
+        '[CampusMap3D] Style loaded (gen=$gen). '
+        'faculty=${widget.faculty?.length ?? 0}, '
+        'sources+layers=runtime-added',
+      );
+    }
 
     // Add campus boundaries at runtime
     if (widget.showCampusBoundary) {
       try {
         await _addCampusBoundariesRuntime();
       } catch (e) {
-        debugPrint('Error adding campus boundaries: $e');
+        if (kDebugMode) debugPrint('Error adding campus boundaries: $e');
       }
       if (_isDisposed || !mounted || gen != _styleLoadGeneration) return;
     }
@@ -239,7 +244,7 @@ class CampusMap3DState extends State<CampusMap3D>
     try {
       await _addMarkerSourcesAndLayers();
     } catch (e) {
-      debugPrint('Error adding marker layers: $e');
+      if (kDebugMode) debugPrint('Error adding marker layers: $e');
     }
     if (_isDisposed || !mounted || gen != _styleLoadGeneration) return;
 
@@ -251,7 +256,7 @@ class CampusMap3DState extends State<CampusMap3D>
       try {
         await _add3DCampusBuildings();
       } catch (e) {
-        debugPrint('Error adding 3D buildings: $e');
+        if (kDebugMode) debugPrint('Error adding 3D buildings: $e');
       }
       if (_isDisposed || !mounted || gen != _styleLoadGeneration) return;
     }
@@ -260,13 +265,13 @@ class CampusMap3DState extends State<CampusMap3D>
     try {
       await _updateFacultyMarkers();
     } catch (e) {
-      debugPrint('Error updating faculty markers: $e');
+      if (kDebugMode) debugPrint('Error updating faculty markers: $e');
     }
     if (_isDisposed || !mounted || gen != _styleLoadGeneration) return;
     try {
       await _updateUserLocationMarker();
     } catch (e) {
-      debugPrint('Error updating user location: $e');
+      if (kDebugMode) debugPrint('Error updating user location: $e');
     }
     if (_isDisposed || !mounted || gen != _styleLoadGeneration) return;
 
@@ -289,7 +294,7 @@ class CampusMap3DState extends State<CampusMap3D>
         ),
       );
     } catch (e) {
-      debugPrint('Error setting camera: $e');
+      if (kDebugMode) debugPrint('Error setting camera: $e');
     }
   }
 
@@ -347,7 +352,7 @@ class CampusMap3DState extends State<CampusMap3D>
           ),
         );
       } catch (e) {
-        debugPrint('Error adding boundary for $campusId: $e');
+        if (kDebugMode) debugPrint('Error adding boundary for $campusId: $e');
       }
     }
   }
@@ -390,7 +395,9 @@ class CampusMap3DState extends State<CampusMap3D>
           sourceLayer: 'building',
         );
       } catch (e) {
-        debugPrint('OSM vector buildings not available in this style: $e');
+        if (kDebugMode) {
+          debugPrint('OSM vector buildings not available in this style: $e');
+        }
       }
     }
 
@@ -402,7 +409,7 @@ class CampusMap3DState extends State<CampusMap3D>
         MapConstants.campusBuildingsGeoJson,
       );
     } catch (e) {
-      debugPrint('Source sksu-campus-buildings: $e');
+      if (kDebugMode) debugPrint('Source sksu-campus-buildings: $e');
     }
     if (stale()) return;
 
@@ -419,7 +426,7 @@ class CampusMap3DState extends State<CampusMap3D>
         ),
       );
     } catch (e) {
-      debugPrint('Layer sksu-buildings-3d: $e');
+      if (kDebugMode) debugPrint('Layer sksu-buildings-3d: $e');
     }
     if (stale()) return;
 
@@ -434,7 +441,7 @@ class CampusMap3DState extends State<CampusMap3D>
         ),
       );
     } catch (e) {
-      debugPrint('Layer sksu-buildings-outline: $e');
+      if (kDebugMode) debugPrint('Layer sksu-buildings-outline: $e');
     }
     if (stale()) return;
 
@@ -455,7 +462,7 @@ class CampusMap3DState extends State<CampusMap3D>
         minzoom: 17,
       );
     } catch (e) {
-      debugPrint('Layer sksu-buildings-labels: $e');
+      if (kDebugMode) debugPrint('Layer sksu-buildings-labels: $e');
     }
 
     _buildingsAdded = true;
@@ -483,25 +490,25 @@ class CampusMap3DState extends State<CampusMap3D>
     try {
       await ctrl.addGeoJsonSource(_facultySourceId, emptyFc);
     } catch (e) {
-      debugPrint('Source $_facultySourceId: $e');
+      if (kDebugMode) debugPrint('Source $_facultySourceId: $e');
     }
     if (stale()) return;
     try {
       await ctrl.addGeoJsonSource(_selectedSourceId, emptyFc);
     } catch (e) {
-      debugPrint('Source $_selectedSourceId: $e');
+      if (kDebugMode) debugPrint('Source $_selectedSourceId: $e');
     }
     if (stale()) return;
     try {
       await ctrl.addGeoJsonSource(_userLocSourceId, emptyFc);
     } catch (e) {
-      debugPrint('Source $_userLocSourceId: $e');
+      if (kDebugMode) debugPrint('Source $_userLocSourceId: $e');
     }
     if (stale()) return;
     try {
       await ctrl.addGeoJsonSource(_routeSourceId, emptyFc);
     } catch (e) {
-      debugPrint('Source $_routeSourceId: $e');
+      if (kDebugMode) debugPrint('Source $_routeSourceId: $e');
     }
     if (stale()) return;
 
@@ -519,7 +526,7 @@ class CampusMap3DState extends State<CampusMap3D>
         ),
       );
     } catch (e) {
-      debugPrint('Layer $_facultyStrokeLayerId: $e');
+      if (kDebugMode) debugPrint('Layer $_facultyStrokeLayerId: $e');
     }
     if (stale()) return;
     try {
@@ -533,7 +540,7 @@ class CampusMap3DState extends State<CampusMap3D>
         ),
       );
     } catch (e) {
-      debugPrint('Layer $_facultyCircleLayerId: $e');
+      if (kDebugMode) debugPrint('Layer $_facultyCircleLayerId: $e');
     }
     if (stale()) return;
 
@@ -549,7 +556,7 @@ class CampusMap3DState extends State<CampusMap3D>
         ),
       );
     } catch (e) {
-      debugPrint('Layer $_selectedStrokeLayerId: $e');
+      if (kDebugMode) debugPrint('Layer $_selectedStrokeLayerId: $e');
     }
     if (stale()) return;
     try {
@@ -563,7 +570,7 @@ class CampusMap3DState extends State<CampusMap3D>
         ),
       );
     } catch (e) {
-      debugPrint('Layer $_selectedCircleLayerId: $e');
+      if (kDebugMode) debugPrint('Layer $_selectedCircleLayerId: $e');
     }
     if (stale()) return;
 
@@ -579,7 +586,7 @@ class CampusMap3DState extends State<CampusMap3D>
         ),
       );
     } catch (e) {
-      debugPrint('Layer $_userLocGlowLayerId: $e');
+      if (kDebugMode) debugPrint('Layer $_userLocGlowLayerId: $e');
     }
     if (stale()) return;
     try {
@@ -595,7 +602,7 @@ class CampusMap3DState extends State<CampusMap3D>
         ),
       );
     } catch (e) {
-      debugPrint('Layer $_userLocDotLayerId: $e');
+      if (kDebugMode) debugPrint('Layer $_userLocDotLayerId: $e');
     }
     if (stale()) return;
 
@@ -611,7 +618,7 @@ class CampusMap3DState extends State<CampusMap3D>
         ),
       );
     } catch (e) {
-      debugPrint('Layer $_routeLayerId: $e');
+      if (kDebugMode) debugPrint('Layer $_routeLayerId: $e');
     }
   }
 
@@ -629,7 +636,7 @@ class CampusMap3DState extends State<CampusMap3D>
           'type': 'Feature',
           'properties': {
             'id': f.user.id,
-            'color': _getStatusColor(f.user.currentStatus ?? 'offline'),
+            'color': _getStatusColor(f.displayStatus),
           },
           'geometry': {
             'type': 'Point',
@@ -650,7 +657,7 @@ class CampusMap3DState extends State<CampusMap3D>
         'type': 'Feature',
         'properties': {
           'id': sel.user.id,
-          'color': _getStatusColor(sel.user.currentStatus ?? 'offline'),
+          'color': _getStatusColor(sel.displayStatus),
         },
         'geometry': {
           'type': 'Point',
@@ -676,7 +683,9 @@ class CampusMap3DState extends State<CampusMap3D>
         selectedGeoJson,
       );
     } catch (e) {
-      debugPrint('[CampusMap3D] Error updating faculty GeoJSON layers: $e');
+      if (kDebugMode) {
+        debugPrint('[CampusMap3D] Error updating faculty GeoJSON layers: $e');
+      }
     }
   }
 
@@ -708,7 +717,9 @@ class CampusMap3DState extends State<CampusMap3D>
       // Source + layers are baked into the style JSON (see _buildStyle).
       await _mapController!.setGeoJsonSource(_userLocSourceId, geoJson);
     } catch (e) {
-      debugPrint('[CampusMap3D] Error updating user location layer: $e');
+      if (kDebugMode) {
+        debugPrint('[CampusMap3D] Error updating user location layer: $e');
+      }
     }
   }
 
@@ -722,8 +733,16 @@ class CampusMap3DState extends State<CampusMap3D>
       case 'teaching':
         return '#6EB5A0';
       case 'in a meeting':
+      case 'in meeting':
       case 'meeting':
         return '#C38D9E';
+      case 'on break':
+      case 'break time':
+        return '#D4A373';
+      case 'out of office':
+      case 'away':
+      case 'office hours':
+        return '#8D8D8D';
       case 'busy':
       case 'do not disturb':
         return '#E8A87C';
@@ -751,7 +770,7 @@ class CampusMap3DState extends State<CampusMap3D>
       // onStyleLoaded will fire again, set _mapReady = true,
       // and re-add buildings + markers.
     } catch (e) {
-      debugPrint('Error switching style: $e');
+      if (kDebugMode) debugPrint('Error switching style: $e');
     }
   }
 
@@ -930,7 +949,7 @@ class CampusMap3DState extends State<CampusMap3D>
         ),
       );
     } catch (e) {
-      debugPrint('Error showing route: $e');
+      if (kDebugMode) debugPrint('Error showing route: $e');
     }
   }
 

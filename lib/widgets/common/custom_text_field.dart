@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
-import '../../core/theme/app_colors.dart';
 
-/// Custom text field with UniTrack styling
+/// Custom text field with ISKSULARS TRACK styling
 class CustomTextField extends StatelessWidget {
   final TextEditingController? controller;
   final String? label;
@@ -42,6 +41,15 @@ class CustomTextField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Inherit the global inputDecorationTheme (fillColor, borders, labelStyle,
+    // hintStyle) and only override what's widget-specific. Previously this
+    // constructed a fresh InputDecoration that silently bypassed the theme.
+    final theme = Theme.of(context);
+    final textColor =
+        theme.textTheme.bodyLarge?.color ?? theme.colorScheme.onSurface;
+    final iconColor = theme.inputDecorationTheme.prefixIconColor ??
+        theme.colorScheme.onSurface.withValues(alpha: 0.6);
+
     return TextFormField(
       controller: controller,
       obscureText: obscureText,
@@ -54,13 +62,13 @@ class CustomTextField extends StatelessWidget {
       onChanged: onChanged,
       onFieldSubmitted: onSubmitted,
       validator: validator,
-      style: const TextStyle(fontSize: 16, color: AppColors.textPrimary),
+      style: TextStyle(fontSize: 16, color: textColor),
       decoration: InputDecoration(
         labelText: label,
         hintText: hint,
         errorText: errorText,
         prefixIcon: prefixIcon != null
-            ? Icon(prefixIcon, color: AppColors.textSecondary)
+            ? Icon(prefixIcon, color: iconColor)
             : null,
         suffixIcon: suffixIcon,
       ),
@@ -114,7 +122,7 @@ class _PasswordTextFieldState extends State<PasswordTextField> {
       suffixIcon: IconButton(
         icon: Icon(
           _obscureText ? Icons.visibility_off : Icons.visibility,
-          color: AppColors.textSecondary,
+          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
         ),
         onPressed: () {
           setState(() {
