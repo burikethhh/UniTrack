@@ -21,9 +21,11 @@ class EmailVerificationScreen extends StatefulWidget {
 class _EmailVerificationScreenState extends State<EmailVerificationScreen>
     with SingleTickerProviderStateMixin {
   Timer? _pollTimer;
+  Timer? _cooldownTimer;
   bool _isSending = false;
-  bool _emailSent = false;
+  bool _emailSent = true; // Email was already sent during registration
   String? _sendError;
+  int _cooldownSeconds = 60; // Prevent double-send on screen open
   late AnimationController _animController;
   late Animation<double> _fadeIn;
 
@@ -37,7 +39,11 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen>
     _fadeIn = CurvedAnimation(parent: _animController, curve: Curves.easeOut);
     _animController.forward();
 
-    _sendVerificationEmail();
+    // Email was already sent by auth_service during registration.
+    // Start a 60s cooldown so the user can't trigger a duplicate send
+    // immediately (which Firebase blocks with a 400 rate-limit error).
+    _startCooldown();
+
     // Poll every 3 seconds
     _pollTimer = Timer.periodic(const Duration(seconds: 3), (_) async {
       final user = FirebaseAuth.instance.currentUser;
@@ -60,15 +66,47 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen>
     });
   }
 
+  void _startCooldown() {
+    _cooldownTimer?.cancel();
+    setState(() => _cooldownSeconds = 60);
+    _cooldownTimer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (!mounted) { t.cancel(); return; }
+      setState(() {
+        _cooldownSeconds--;
+        if (_cooldownSeconds <= 0) {
+          _cooldownSeconds = 0;
+          t.cancel();
+        }
+      });
+    });
+  }
+
   Future<void> _sendVerificationEmail() async {
+    if (_cooldownSeconds > 0 || _isSending) return;
     final user = FirebaseAuth.instance.currentUser;
     if (user == null || user.emailVerified) return;
 
-    setState(() => _isSending = true);
-    _sendError = null;
+    setState(() {
+      _isSending = true;
+      _sendError = null;
+      _emailSent = false;
+    });
     try {
       await user.sendEmailVerification();
-      if (mounted) setState(() => _emailSent = true);
+      if (mounted) {
+        setState(() => _emailSent = true);
+        _startCooldown();
+      }
+    } on FirebaseAuthException catch (e) {
+      if (mounted) {
+        setState(() {
+          if (e.code == 'too-many-requests') {
+            _sendError = 'Too many attempts. Please wait a minute before trying again.';
+          } else {
+            _sendError = e.message ?? 'Failed to send email. Please try again.';
+          }
+        });
+      }
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -83,6 +121,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen>
   @override
   void dispose() {
     _pollTimer?.cancel();
+    _cooldownTimer?.cancel();
     _animController.dispose();
     super.dispose();
   }
@@ -277,7 +316,9 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen>
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(
-                      onPressed: _isSending ? null : _sendVerificationEmail,
+                      onPressed: (_isSending || _cooldownSeconds > 0)
+                          ? null
+                          : _sendVerificationEmail,
                       icon: _isSending
                           ? const SizedBox(
                               width: 18,
@@ -288,10 +329,21 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen>
                               ),
                             )
                           : const Icon(Icons.send_outlined, size: 18),
-                      label: Text(_emailSent ? 'Resend Email' : 'Send Email'),
+                      label: Text(
+                        _isSending
+                            ? 'Sending...'
+                            : _cooldownSeconds > 0
+                                ? 'Resend in ${_cooldownSeconds}s'
+                                : _emailSent
+                                    ? 'Resend Email'
+                                    : 'Send Email',
+                      ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.primary,
                         foregroundColor: Colors.white,
+                        disabledBackgroundColor:
+                            AppColors.primary.withValues(alpha: 0.45),
+                        disabledForegroundColor: Colors.white70,
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
