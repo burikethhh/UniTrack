@@ -126,23 +126,27 @@ class FacultyProvider extends ChangeNotifier {
   /// Waits for Firebase Auth to be ready, then subscribes to the faculty stream.
   Future<void> _ensureAuthThenSubscribe() async {
     try {
-      final currentUser = FirebaseAuth.instance.currentUser;
-      if (currentUser != null) {
-        // Force token refresh so the Firestore SDK has a valid token attached
-        await currentUser.getIdToken(false);
-        if (kDebugMode) debugPrint('[FacultyProvider] Auth ready, subscribing...');
-      } else {
-        // Wait for auth state to be restored (IndexedDB read on web)
-        if (kDebugMode) debugPrint('[FacultyProvider] Waiting for auth...');
+      var currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) {
+        // Auth state not yet restored from IndexedDB — wait for it
+        if (kDebugMode) debugPrint('[FacultyProvider] Waiting for auth state...');
         await FirebaseAuth.instance
             .authStateChanges()
             .firstWhere((u) => u != null);
-        await FirebaseAuth.instance.currentUser?.getIdToken(false);
-        if (kDebugMode) debugPrint('[FacultyProvider] Auth restored, subscribing...');
+        currentUser = FirebaseAuth.instance.currentUser;
+      }
+      if (currentUser != null) {
+        // Force a FRESH token from the Auth server (true = force refresh).
+        // This guarantees the Firestore SDK has a valid token registered in its
+        // interceptor before the first Firestore request is made.
+        // getIdToken(false) only returns a cached value that may not have
+        // propagated to Firestore yet.
+        await currentUser.getIdToken(true);
+        if (kDebugMode) debugPrint('[FacultyProvider] Auth token refreshed, subscribing...');
       }
     } catch (e) {
       if (kDebugMode) debugPrint('[FacultyProvider] Auth check error: $e');
-      // Continue anyway — the stream error handler will retry
+      // Continue anyway — stream error handler will retry
     }
     _subscribeToFacultyStream();
   }
