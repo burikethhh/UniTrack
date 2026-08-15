@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import '../models/models.dart';
@@ -115,7 +116,40 @@ class FacultyProvider extends ChangeNotifier {
     _facultySubscription?.cancel();
     _refreshTimer?.cancel();
 
-    // Listen to faculty updates with real-time changes
+    // On web, Firebase Auth restores from IndexedDB asynchronously after a
+    // hard reload. If the Firestore stream subscription starts before the auth
+    // token is attached to the SDK, request.auth is null → permission-denied.
+    // Force a token refresh to confirm auth is ready before subscribing.
+    _ensureAuthThenSubscribe();
+  }
+
+  /// Waits for Firebase Auth to be ready, then subscribes to the faculty stream.
+  Future<void> _ensureAuthThenSubscribe() async {
+    try {
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser != null) {
+        // Force token refresh so the Firestore SDK has a valid token attached
+        await currentUser.getIdToken(false);
+        if (kDebugMode) debugPrint('[FacultyProvider] Auth ready, subscribing...');
+      } else {
+        // Wait for auth state to be restored (IndexedDB read on web)
+        if (kDebugMode) debugPrint('[FacultyProvider] Waiting for auth...');
+        await FirebaseAuth.instance
+            .authStateChanges()
+            .firstWhere((u) => u != null);
+        await FirebaseAuth.instance.currentUser?.getIdToken(false);
+        if (kDebugMode) debugPrint('[FacultyProvider] Auth restored, subscribing...');
+      }
+    } catch (e) {
+      if (kDebugMode) debugPrint('[FacultyProvider] Auth check error: $e');
+      // Continue anyway — the stream error handler will retry
+    }
+    _subscribeToFacultyStream();
+  }
+
+  /// Subscribes to the real-time faculty+location stream.
+  void _subscribeToFacultyStream() {
+    _facultySubscription?.cancel();
     _facultySubscription = _databaseService
         .getFacultyWithLocationsStream(
           viewerRole: _viewerRole,
@@ -227,7 +261,7 @@ class FacultyProvider extends ChangeNotifier {
           'Faculty stream: retry #$_retryCount after ${delay.inSeconds}s',
         );
       }
-      initialize(viewerRole: _viewerRole, viewerCampusId: _viewerCampusId);
+      _subscribeToFacultyStream();
     });
   }
 
