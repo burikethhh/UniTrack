@@ -85,10 +85,13 @@ service cloud.firestore {
                       && resource.data.role in ['studentLeader', 'organizationOfficer']
                       && resource.data.isActive == true);
 
-      // LIST: FINAL DIAGNOSTIC — bare minimum
-      // If this fails, request.auth is null when query fires (auth timing race).
-      // If this works, the field conditions were the problem.
-      allow list: if request.auth != null;
+      // LIST (collection queries): any signed-in user can list active leaders/officers.
+      // No get()/exists() calls — streaming queries (.snapshots()) forbid cross-doc reads.
+      // The app always queries: role whereIn [...] AND isActive == true.
+      // Auth timing race is handled in FacultyProvider._ensureAuthThenSubscribe().
+      allow list: if request.auth != null
+                  && resource.data.role in ['studentLeader', 'organizationOfficer']
+                  && resource.data.isActive == true;
 
       // CREATE: self-registration with validation
       allow create: if isOwner(userId)
@@ -154,8 +157,12 @@ service cloud.firestore {
                       && get(/databases/$(database)/documents/users/$(userId)).data.role in ['studentLeader', 'organizationOfficer']
                       && get(/databases/$(database)/documents/users/$(userId)).data.isActive == true);
 
-      // LIST: FINAL DIAGNOSTIC
-      allow list: if request.auth != null;
+      // LIST (collection queries): signed-in users can list within-campus locations.
+      // No get()/exists() calls — streaming queries forbid cross-doc reads.
+      // Campus-specific filtering enforced by the app's own query constraints.
+      allow list: if request.auth != null
+                   && resource.data.isWithinCampus == true
+                   && resource.data.visibilityScope in ['universityWide', 'campusOnly'];
 
       // CREATE/UPDATE: owner only, with coordinate validation
       allow create: if isOwner(userId)
