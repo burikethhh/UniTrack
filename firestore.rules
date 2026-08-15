@@ -78,12 +78,21 @@ service cloud.firestore {
 
     // ── Users collection ──────────────────────────────────────────────
     match /users/{userId} {
-      // READ: own doc, OR staff-active docs, OR admin
-      allow read: if isOwner(userId)
+      // GET (single document): own doc, active leader doc, or admin
+      allow get: if isOwner(userId)
                   || isAdmin()
                   || (isSignedIn()
                       && resource.data.role in ['studentLeader', 'organizationOfficer']
                       && resource.data.isActive == true);
+
+      // LIST (collection queries): any signed-in user can list active leaders.
+      // Avoids cross-document get() calls that Firestore cannot resolve
+      // statically during list query evaluation.
+      // The app always constrains queries to role+isActive, matching rule below.
+      allow list: if isSignedIn()
+                  && (resource.data.role in ['studentLeader', 'organizationOfficer']
+                      && resource.data.isActive == true)
+                  || isAdmin();
 
       // CREATE: self-registration with validation
       allow create: if isOwner(userId)
@@ -136,8 +145,8 @@ service cloud.firestore {
 
     // ── Locations collection ──────────────────────────────────────────
     match /locations/{userId} {
-      // READ: owner, admin, or any signed-in user for ON-CAMPUS staff locations only
-      allow read: if isOwner(userId)
+      // GET (single document): full rule with cross-document checks
+      allow get: if isOwner(userId)
                   || isAdmin()
                   || (isSignedIn()
                        && resource.data.isWithinCampus == true
@@ -148,6 +157,16 @@ service cloud.firestore {
                        && exists(/databases/$(database)/documents/users/$(userId))
                       && get(/databases/$(database)/documents/users/$(userId)).data.role in ['studentLeader', 'organizationOfficer']
                       && get(/databases/$(database)/documents/users/$(userId)).data.isActive == true);
+
+      // LIST (collection queries): allow signed-in users to list within-campus
+      // locations. The app handles campus-specific filtering via query constraints
+      // (locationCampusId == viewerCampusId for campusOnly, no filter for universityWide).
+      // Cross-document get() calls cannot be evaluated during list query evaluation.
+      allow list: if isOwner(userId)
+                  || isAdmin()
+                  || (isSignedIn()
+                       && resource.data.isWithinCampus == true
+                       && resource.data.visibilityScope in ['universityWide', 'campusOnly']);
 
       // CREATE/UPDATE: owner only, with coordinate validation
       allow create: if isOwner(userId)
