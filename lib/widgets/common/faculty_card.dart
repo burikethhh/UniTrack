@@ -16,7 +16,7 @@ class FacultyCard extends StatelessWidget {
   final VoidCallback? onPing;
   final bool showDistance;
   final String? distanceText;
-  final bool showQuickActions; // Enable call/email buttons
+  final bool showQuickActions;
 
   const FacultyCard({
     super.key,
@@ -88,7 +88,7 @@ class FacultyCard extends StatelessWidget {
                       ),
                     const SizedBox(height: 8),
 
-                      // Status row - use Wrap to prevent overflow
+                    // Status row - use Wrap to prevent overflow
                     Wrap(
                       spacing: 6,
                       runSpacing: 4,
@@ -246,7 +246,7 @@ class FacultyCard extends StatelessWidget {
                               icon: Icons.email_outlined,
                               label: 'Email',
                               color: AppColors.primary,
-                              onTap: () => _launchEmail(faculty.user.email),
+                              onTap: () => _launchEmail(context, faculty.user.email),
                             ),
                           if (faculty.user.email.isNotEmpty &&
                               faculty.user.phoneNumber != null)
@@ -257,7 +257,7 @@ class FacultyCard extends StatelessWidget {
                               label: 'Call',
                               color: AppColors.success,
                               onTap: () =>
-                                  _launchPhone(faculty.user.phoneNumber!),
+                                  _launchPhone(context, faculty.user.phoneNumber!),
                             ),
                         ],
                       ),
@@ -440,8 +440,8 @@ class FacultyCard extends StatelessWidget {
     );
   }
 
-  /// Launch email app with web fallback
-  Future<void> _launchEmail(String email) async {
+  /// Launch email app with web fallback and copy feedback
+  Future<void> _launchEmail(BuildContext context, String email) async {
     final Uri emailUri = Uri(scheme: 'mailto', path: email);
     try {
       if (kIsWeb) {
@@ -450,26 +450,70 @@ class FacultyCard extends StatelessWidget {
         await launchUrl(emailUri);
       } else {
         await Clipboard.setData(ClipboardData(text: email));
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Email copied to clipboard: $email'),
+              duration: const Duration(seconds: 2),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
       }
     } catch (_) {
       await Clipboard.setData(ClipboardData(text: email));
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Email copied to clipboard: $email'),
+            duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
     }
   }
 
-  /// Launch phone dialer with web fallback
-  Future<void> _launchPhone(String phone) async {
+  /// Launch phone dialer with web fallback and copy feedback
+  Future<void> _launchPhone(BuildContext context, String phone) async {
     final Uri phoneUri = Uri(scheme: 'tel', path: phone);
     try {
       if (kIsWeb) {
-        // tel: links often don't work on web — copy to clipboard
         await Clipboard.setData(ClipboardData(text: phone));
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Phone number copied to clipboard: $phone'),
+              duration: const Duration(seconds: 2),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
       } else if (await canLaunchUrl(phoneUri)) {
         await launchUrl(phoneUri);
       } else {
         await Clipboard.setData(ClipboardData(text: phone));
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Phone number copied to clipboard: $phone'),
+              duration: const Duration(seconds: 2),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
       }
     } catch (_) {
       await Clipboard.setData(ClipboardData(text: phone));
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Phone number copied to clipboard: $phone'),
+            duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
     }
   }
 }
