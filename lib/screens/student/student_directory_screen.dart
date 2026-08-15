@@ -10,7 +10,7 @@ import '../../models/models.dart';
 import '../../providers/providers.dart';
 import '../../widgets/widgets.dart';
 import 'faculty_detail_screen.dart';
-import 'student_map_screen.dart';
+
 import '../staff_leader/notifications_screen.dart';
 import '../../services/activity_log_service.dart';
 
@@ -584,13 +584,8 @@ class _StudentDirectoryScreenState extends State<StudentDirectoryScreen> {
       },
       onNavigate: faculty.isOnline
           ? () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) =>
-                      StudentMapScreen(initialFacultyId: faculty.user.id),
-                ),
-              );
+              // Seamlessly switch to Map tab without losing bottom navigation
+              context.read<FacultyProvider>().setFocusedFaculty(faculty.user.id);
             }
           : null,
       onPing: faculty.isOnline

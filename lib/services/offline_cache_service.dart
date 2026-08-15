@@ -176,6 +176,9 @@ class OfflineCacheService {
     // Ensure ConnectivityService is monitoring (idempotent — it's a singleton)
     _connectivityService.startMonitoring();
 
+    // Prune stale cache entries in background
+    pruneStaleCache();
+
     // Subscribe to the canonical connectivity stream
     _connectivitySubscription = _connectivityService.connectivityStream.listen((
       isOnline,
@@ -564,7 +567,7 @@ class OfflineCacheService {
   // Web in-memory pending operations
   final List<Map<String, dynamic>> _webPendingOps = [];
 
-  /// Queue a Firestore write operation for later sync
+  /// Queue a Firestore write operation for later sync with de-duplication/coalescing
   /// [collection] — Firestore collection name
   /// [docId] — Document ID (null for auto-generated)
   /// [operation] — 'set', 'update', or 'delete'
@@ -581,8 +584,8 @@ class OfflineCacheService {
         await _executeFirestoreOp(collection, docId, operation, data);
         if (kDebugMode) {
           debugPrint(
-          '✅ Executed operation immediately: $operation on $collection/$docId',
-        );
+            '✅ Executed operation immediately: $operation on $collection/$docId',
+          );
         }
         return;
       } catch (e) {
@@ -590,16 +593,42 @@ class OfflineCacheService {
       }
     }
 
-    final entry = {
-      'collection': collection,
-      'doc_id': docId,
-      'operation': operation,
-      'data': jsonEncode(data),
-      'created_at': DateTime.now().millisecondsSinceEpoch,
-      'retries': 0,
-    };
+    final now = DateTime.now().millisecondsSinceEpoch;
 
     if (kIsWeb) {
+      // Coalesce existing operation for same collection + docId if present
+      if (docId != null) {
+        final existingIndex = _webPendingOps.indexWhere(
+          (op) => op['collection'] == collection && op['doc_id'] == docId,
+        );
+        if (existingIndex != -1) {
+          _webPendingOps[existingIndex] = {
+            'collection': collection,
+            'doc_id': docId,
+            'operation': operation,
+            'data': jsonEncode(data),
+            'created_at': now,
+            'retries': 0,
+          };
+          try {
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.setString('pending_operations', jsonEncode(_webPendingOps));
+          } catch (_) {}
+          if (kDebugMode) {
+            debugPrint('📝 Coalesced existing operation (web): $operation on $collection/$docId');
+          }
+          return;
+        }
+      }
+
+      final entry = {
+        'collection': collection,
+        'doc_id': docId,
+        'operation': operation,
+        'data': jsonEncode(data),
+        'created_at': now,
+        'retries': 0,
+      };
       _webPendingOps.add(entry);
       try {
         final prefs = await SharedPreferences.getInstance();
@@ -610,8 +639,66 @@ class OfflineCacheService {
     }
 
     final db = await database;
+    if (docId != null) {
+      final existing = await db.query(
+        'pending_operations',
+        where: 'collection = ? AND doc_id = ?',
+        whereArgs: [collection, docId],
+        limit: 1,
+      );
+      if (existing.isNotEmpty) {
+        await db.update(
+          'pending_operations',
+          {
+            'operation': operation,
+            'data': jsonEncode(data),
+            'created_at': now,
+            'retries': 0,
+          },
+          where: 'id = ?',
+          whereArgs: [existing.first['id']],
+        );
+        if (kDebugMode) {
+          debugPrint('📝 Coalesced existing operation: $operation on $collection/$docId');
+        }
+        return;
+      }
+    }
+
+    final entry = {
+      'collection': collection,
+      'doc_id': docId,
+      'operation': operation,
+      'data': jsonEncode(data),
+      'created_at': now,
+      'retries': 0,
+    };
     await db.insert('pending_operations', entry);
     if (kDebugMode) debugPrint('📝 Queued operation: $operation on $collection/$docId');
+  }
+
+  /// Prune cached faculty and location entries older than [maxAge]
+  Future<void> pruneStaleCache({Duration maxAge = const Duration(days: 7)}) async {
+    if (kIsWeb) return; // Web uses bounded memory & local storage
+    try {
+      final db = await database;
+      final cutoff = DateTime.now().subtract(maxAge).millisecondsSinceEpoch;
+      final deletedFaculty = await db.delete(
+        'faculty_cache',
+        where: 'cached_at < ?',
+        whereArgs: [cutoff],
+      );
+      final deletedLocations = await db.delete(
+        'location_cache',
+        where: 'cached_at < ?',
+        whereArgs: [cutoff],
+      );
+      if (kDebugMode && (deletedFaculty > 0 || deletedLocations > 0)) {
+        debugPrint('🧹 Pruned stale cache: $deletedFaculty faculty, $deletedLocations locations');
+      }
+    } catch (e) {
+      if (kDebugMode) debugPrint('⚠️ Cache pruning error: $e');
+    }
   }
 
   /// Get count of pending operations

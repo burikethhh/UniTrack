@@ -4,10 +4,12 @@ import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import '../models/models.dart';
 import '../services/database_service.dart';
+import '../services/offline_cache_service.dart';
 
 /// Faculty Provider for student module
 class FacultyProvider extends ChangeNotifier {
   final DatabaseService _databaseService;
+  final OfflineCacheService _offlineCacheService = OfflineCacheService();
 
   FacultyProvider({required DatabaseService databaseService})
     : _databaseService = databaseService;
@@ -116,11 +118,38 @@ class FacultyProvider extends ChangeNotifier {
     _facultySubscription?.cancel();
     _refreshTimer?.cancel();
 
+    // Hydrate immediately from offline cache for instant UI rendering
+    _loadCachedFaculty();
+
     // On web, Firebase Auth restores from IndexedDB asynchronously after a
     // hard reload. If the Firestore stream subscription starts before the auth
     // token is attached to the SDK, request.auth is null → permission-denied.
     // Force a token refresh to confirm auth is ready before subscribing.
     _ensureAuthThenSubscribe();
+  }
+
+  /// Load cached faculty from offline storage
+  Future<void> _loadCachedFaculty() async {
+    try {
+      final cachedUsers = await _offlineCacheService.getCachedFaculty();
+      if (cachedUsers.isNotEmpty && _allFaculty.isEmpty) {
+        final cachedLocations = await _offlineCacheService.getAllCachedLocations();
+        _allFaculty = cachedUsers.map((user) {
+          final loc = cachedLocations[user.id];
+          return FacultyWithLocation(user: user, location: loc);
+        }).toList();
+        _applyFilters();
+        if (_isLoading) {
+          _isLoading = false;
+        }
+        notifyListeners();
+        if (kDebugMode) {
+          debugPrint('📦 Hydrated ${_allFaculty.length} faculty from offline cache');
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) debugPrint('⚠️ Error hydrating from offline cache: $e');
+    }
   }
 
   /// Waits for Firebase Auth to be ready, then subscribes to the faculty stream.
@@ -168,17 +197,19 @@ class FacultyProvider extends ChangeNotifier {
                 '[FacultyProvider] Stream: '
                 'total=${faculty.length}, withLocation=$withLoc, online=$online',
               );
-              for (final f in faculty) {
-                debugPrint(
-                  '  ${f.user.fullName} (${f.user.role}): '
-                  'loc=${f.location != null}, '
-                  'tracking=${f.user.isTrackingEnabled}, '
-                  'stale=${f.isLocationStale}, '
-                  'online=${f.isOnline}',
-                );
-              }
             }
             _allFaculty = faculty;
+
+            // Background offline cache update
+            try {
+              _offlineCacheService.cacheFacultyList(faculty.map((f) => f.user).toList());
+              final locs = <String, LocationModel>{
+                for (final f in faculty) if (f.location != null) f.user.id: f.location!,
+              };
+              if (locs.isNotEmpty) {
+                _offlineCacheService.cacheLocations(locs);
+              }
+            } catch (_) {}
 
             // ── Faculty-arrived detection ──
             final currentOnlineIds = faculty
@@ -215,6 +246,9 @@ class FacultyProvider extends ChangeNotifier {
             if (kDebugMode) debugPrint('[FacultyProvider] Stream ERROR: $e');
             _error = e.toString();
             _isLoading = false;
+            if (_allFaculty.isEmpty) {
+              _loadCachedFaculty();
+            }
             notifyListeners();
             // Auto-retry with exponential backoff
             _scheduleRetry();

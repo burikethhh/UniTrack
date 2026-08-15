@@ -8,7 +8,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'notification_service.dart' show notificationNavigatorKey;
 import '../screens/student/faculty_detail_screen.dart';
-import '../screens/student/student_map_screen.dart';
+
 import '../screens/staff_leader/notifications_screen.dart';
 
 /// Background message handler - must be top-level function
@@ -278,11 +278,9 @@ class PushNotificationService {
       case 'locationUpdate':
         // A tracked user's location changed — open the student map so the
         // viewer sees the new marker. The Map tab is index 1 in
-        // StudentHomeScreen's IndexedStack; we can't switch tabs from here
-        // but we can push the map screen directly.
-        navigator.push(MaterialPageRoute(
-          builder: (_) => const StudentMapScreen(),
-        ));
+        // StudentHomeScreen's IndexedStack. We pop to the home screen.
+        // If we want to focus the specific user, we'd set the focused provider.
+        navigator.popUntil((route) => route.isFirst);
         break;
 
       case 'statusChange':
