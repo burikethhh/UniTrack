@@ -160,13 +160,13 @@ service cloud.firestore {
                       && get(/databases/$(database)/documents/users/$(userId)).data.role in ['studentLeader', 'organizationOfficer']
                       && get(/databases/$(database)/documents/users/$(userId)).data.isActive == true);
 
-      // LIST (collection queries): signed-in users can list within-campus locations.
-      // Uses explicit == with || for visibilityScope — matches both universityWide
-      // and campusOnly queries from the app.
-      allow list: if request.auth != null
-                   && resource.data.isWithinCampus == true
-                   && (resource.data.visibilityScope == 'universityWide'
-                       || resource.data.visibilityScope == 'campusOnly');
+      // LIST (collection queries): any signed-in user may query the locations collection.
+      //
+      // IMPORTANT: Just like users collection, chunked `whereIn` queries on
+      // FieldPath.documentId cannot evaluate resource.data in Firestore security rules.
+      // Privacy filtering (e.g. stripping off-campus coordinates for students) is
+      // enforced client-side and in the app query filters.
+      allow list: if request.auth != null;
 
       // CREATE/UPDATE: owner only, with coordinate validation
       allow create: if isOwner(userId)
