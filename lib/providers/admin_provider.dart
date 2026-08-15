@@ -207,6 +207,7 @@ class AdminProvider extends ChangeNotifier {
   }
 
   /// Load statistics
+  /// Load statistics (parallelized for maximum speed)
   Future<void> loadStatistics() async {
     try {
       final now = DateTime.now();
@@ -214,50 +215,47 @@ class AdminProvider extends ChangeNotifier {
       final weekStart = todayStart.subtract(const Duration(days: 7));
       final monthStart = DateTime(now.year, now.month, 1);
 
-      // Use Firestore aggregation count queries for accurate stats
-      // (avoid relying on _allUsers which may only contain the first page)
+      // Execute all aggregation count queries and recent activity in parallel
+      final results = await Future.wait([
+        _firestore.collection('users').count().get(), // 0: totalUsers
+        _firestore.collection('users').where('role', isEqualTo: 'student').count().get(), // 1: students
+        _firestore.collection('users').where('role', isEqualTo: 'studentLeader').count().get(), // 2: studentLeaders
+        _firestore.collection('users').where('role', isEqualTo: 'organizationOfficer').count().get(), // 3: orgOfficers
+        _firestore.collection('users').where('role', isEqualTo: 'admin').count().get(), // 4: admins
+        _firestore.collection('users').where('isActive', isEqualTo: false).count().get(), // 5: banned
+        _firestore.collection('users').where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(monthStart)).count().get(), // 6: newThisMonth
+        _firestore.collection('users').where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(weekStart)).count().get(), // 7: newThisWeek
+        _firestore.collection('users').where('lastLoginAt', isGreaterThanOrEqualTo: Timestamp.fromDate(todayStart)).count().get(), // 8: activeToday
+        _firestore.collection('locations').count().get(), // 9: onlineNow
+        _firestore.collection('activity_logs').orderBy('timestamp', descending: true).limit(20).get(), // 10: activitySnapshot
+        _firestore.collection('notifications').count().get(), // 11: totalNotif
+        _firestore.collection('notifications').where('pushStatus', isEqualTo: 'sent').count().get(), // 12: sentNotif
+        _firestore.collection('notifications').where('pushStatus', isEqualTo: 'delivered').count().get(), // 13: deliveredNotif
+        _firestore.collection('notifications').where('pushStatus', isEqualTo: 'opened').count().get(), // 14: openedNotif
+      ]);
 
-      final totalUsersResult = await _firestore
-          .collection('users').count().get();
-      final totalAllUsers = totalUsersResult.count ?? 0;
+      final totalAllUsers = (results[0] as AggregateQuerySnapshot).count ?? 0;
+      final students = (results[1] as AggregateQuerySnapshot).count ?? 0;
+      final studentLeaders = (results[2] as AggregateQuerySnapshot).count ?? 0;
+      final orgOfficers = (results[3] as AggregateQuerySnapshot).count ?? 0;
+      final admins = (results[4] as AggregateQuerySnapshot).count ?? 0;
+      final banned = (results[5] as AggregateQuerySnapshot).count ?? 0;
+      final newThisMonth = (results[6] as AggregateQuerySnapshot).count ?? 0;
+      final newThisWeek = (results[7] as AggregateQuerySnapshot).count ?? 0;
+      final activeToday = (results[8] as AggregateQuerySnapshot).count ?? 0;
+      final onlineNow = (results[9] as AggregateQuerySnapshot).count ?? 0;
 
-      Future<int> countWhere(String field, {Object? isEqualTo}) async {
-        final result = await _firestore
-            .collection('users')
-            .where(field, isEqualTo: isEqualTo)
-            .count()
-            .get();
-        return result.count ?? 0;
-      }
+      final activitySnapshot = results[10] as QuerySnapshot;
+      final recentActivity = activitySnapshot.docs
+          .map((doc) => ActivityLog.fromFirestore(doc))
+          .toList();
 
-      final students = await countWhere('role', isEqualTo: 'student');
-      final studentLeaders = await countWhere('role', isEqualTo: 'studentLeader');
-      final orgOfficers = await countWhere('role', isEqualTo: 'organizationOfficer');
-      final admins = await countWhere('role', isEqualTo: 'admin');
-      final banned = await countWhere('isActive', isEqualTo: false);
+      final totalNotifications = (results[11] as AggregateQuerySnapshot).count ?? 0;
+      final sentNotifications = (results[12] as AggregateQuerySnapshot).count ?? 0;
+      final deliveredNotifications = (results[13] as AggregateQuerySnapshot).count ?? 0;
+      final openedNotifications = (results[14] as AggregateQuerySnapshot).count ?? 0;
 
-      final newThisMonth = await _firestore
-          .collection('users')
-          .where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(monthStart))
-          .count()
-          .get()
-          .then((r) => r.count ?? 0);
-
-      final newThisWeek = await _firestore
-          .collection('users')
-          .where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(weekStart))
-          .count()
-          .get()
-          .then((r) => r.count ?? 0);
-
-      final activeToday = await _firestore
-          .collection('users')
-          .where('lastLoginAt', isGreaterThanOrEqualTo: Timestamp.fromDate(todayStart))
-          .count()
-          .get()
-          .then((r) => r.count ?? 0);
-
-      // Per-campus and per-department use loaded data as approximation
+      // Per-campus and per-department approximation from loaded batch
       final byDepartment = <String, int>{};
       final byCampus = <String, int>{};
       for (final user in _allUsers) {
@@ -265,53 +263,6 @@ class AdminProvider extends ChangeNotifier {
         byDepartment[dept] = (byDepartment[dept] ?? 0) + 1;
         byCampus[user.campusId] = (byCampus[user.campusId] ?? 0) + 1;
       }
-
-      // Get online count from locations using aggregation (avoid downloading all docs)
-      // Count ALL location docs — leaders/officers outside campus boundaries are still online
-      final onlineCountResult = await _firestore
-          .collection('locations')
-          .count()
-          .get();
-      final onlineNow = onlineCountResult.count ?? 0;
-
-      // Load recent activity
-      final activitySnapshot = await _firestore
-          .collection('activity_logs')
-          .orderBy('timestamp', descending: true)
-          .limit(20)
-          .get();
-
-      final recentActivity = activitySnapshot.docs
-          .map((doc) => ActivityLog.fromFirestore(doc))
-          .toList();
-
-      // Notification analytics — server-side count queries to avoid downloading all docs
-      final totalNotifResult = await _firestore
-          .collection('notifications')
-          .count()
-          .get();
-      final totalNotifications = totalNotifResult.count ?? 0;
-
-      final sentNotifResult = await _firestore
-          .collection('notifications')
-          .where('pushStatus', isEqualTo: 'sent')
-          .count()
-          .get();
-      final sentNotifications = sentNotifResult.count ?? 0;
-
-      final deliveredNotifResult = await _firestore
-          .collection('notifications')
-          .where('pushStatus', isEqualTo: 'delivered')
-          .count()
-          .get();
-      final deliveredNotifications = deliveredNotifResult.count ?? 0;
-
-      final openedNotifResult = await _firestore
-          .collection('notifications')
-          .where('pushStatus', isEqualTo: 'opened')
-          .count()
-          .get();
-      final openedNotifications = openedNotifResult.count ?? 0;
 
       final deliveryRate = totalNotifications > 0
           ? (sentNotifications / totalNotifications * 100)

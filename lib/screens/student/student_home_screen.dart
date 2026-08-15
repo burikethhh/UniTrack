@@ -19,46 +19,11 @@ class StudentHomeScreen extends StatefulWidget {
 
 class _StudentHomeScreenState extends State<StudentHomeScreen> {
   int _currentIndex = 0;
-
-  late final List<Widget> _screens;
-  late final List<NavigationDestination> _destinations;
+  bool _lastIsStaff = false;
 
   @override
   void initState() {
     super.initState();
-    final authProvider = context.read<AuthProvider>();
-    final isStaff = authProvider.user?.isStaff ?? false;
-
-    _screens = [
-      const StudentDirectoryScreen(),
-      const StudentMapScreen(),
-      if (isStaff) const TrackingDashboardScreen(),
-      const StudentProfileScreen(),
-    ];
-
-    _destinations = [
-      const NavigationDestination(
-        icon: Icon(Icons.people_outline),
-        selectedIcon: Icon(Icons.people),
-        label: 'Directory',
-      ),
-      const NavigationDestination(
-        icon: Icon(Icons.map_outlined),
-        selectedIcon: Icon(Icons.map),
-        label: 'Map',
-      ),
-      if (isStaff)
-        const NavigationDestination(
-          icon: Icon(Icons.location_on_outlined),
-          selectedIcon: Icon(Icons.location_on),
-          label: 'Tracking',
-        ),
-      const NavigationDestination(
-        icon: Icon(Icons.person_outline),
-        selectedIcon: Icon(Icons.person),
-        label: 'Profile',
-      ),
-    ];
 
     // Initialize faculty provider
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -101,25 +66,88 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
     }
   }
 
+  List<Widget> _getScreens(bool isStaff) {
+    return [
+      const StudentDirectoryScreen(),
+      const StudentMapScreen(),
+      if (isStaff) const TrackingDashboardScreen(),
+      const StudentProfileScreen(),
+    ];
+  }
+
+  List<NavigationDestination> _getDestinations(bool isStaff) {
+    return [
+      const NavigationDestination(
+        icon: Icon(Icons.people_outline),
+        selectedIcon: Icon(Icons.people),
+        label: 'Directory',
+      ),
+      const NavigationDestination(
+        icon: Icon(Icons.map_outlined),
+        selectedIcon: Icon(Icons.map),
+        label: 'Map',
+      ),
+      if (isStaff)
+        const NavigationDestination(
+          icon: Icon(Icons.location_on_outlined),
+          selectedIcon: Icon(Icons.location_on),
+          label: 'Tracking',
+        ),
+      const NavigationDestination(
+        icon: Icon(Icons.person_outline),
+        selectedIcon: Icon(Icons.person),
+        label: 'Profile',
+      ),
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
+    final authProvider = context.watch<AuthProvider>();
+    final isStaff = authProvider.user?.isStaff ?? false;
+
+    // If staff status just changed to true, ensure LocationProvider is initialized
+    if (isStaff != _lastIsStaff) {
+      _lastIsStaff = isStaff;
+      if (isStaff && authProvider.user != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            context.read<LocationProvider>().initialize(
+              authProvider.user!.id,
+              campusId: authProvider.user!.campusId,
+            );
+          }
+        });
+      }
+    }
+
+    final screens = _getScreens(isStaff);
+    if (_currentIndex >= screens.length) {
+      _currentIndex = (screens.length - 1).clamp(0, screens.length - 1);
+    }
+
     // Use responsive builder to adapt layout
     return ResponsiveBuilder(
       builder: (context, screenSize, deviceType) {
         // On desktop/tablet, use navigation rail/drawer
         if (deviceType != DeviceType.mobile) {
-          return _buildAdaptiveLayout(context, deviceType);
+          return _buildAdaptiveLayout(context, deviceType, screens, isStaff);
         }
 
         // On mobile, use traditional bottom navigation
-        return _buildMobileLayout(context);
+        return _buildMobileLayout(context, screens, isStaff);
       },
     );
   }
 
-  Widget _buildMobileLayout(BuildContext context) {
+  Widget _buildMobileLayout(
+    BuildContext context,
+    List<Widget> screens,
+    bool isStaff,
+  ) {
+    final destinations = _getDestinations(isStaff);
     return Scaffold(
-      body: IndexedStack(index: _currentIndex, children: _screens),
+      body: IndexedStack(index: _currentIndex, children: screens),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           boxShadow: [
@@ -131,22 +159,24 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
           ],
         ),
         child: NavigationBar(
-          selectedIndex: _currentIndex,
+          selectedIndex: _currentIndex.clamp(0, destinations.length - 1),
           onDestinationSelected: (index) {
             setState(() {
               _currentIndex = index;
             });
           },
-          destinations: _destinations,
+          destinations: destinations,
         ),
       ),
     );
   }
 
-  Widget _buildAdaptiveLayout(BuildContext context, DeviceType deviceType) {
-    final authProvider = context.read<AuthProvider>();
-    final isStaff = authProvider.user?.isStaff ?? false;
-
+  Widget _buildAdaptiveLayout(
+    BuildContext context,
+    DeviceType deviceType,
+    List<Widget> screens,
+    bool isStaff,
+  ) {
     final destinations = [
       NavigationRailDestination(
         icon: const Icon(Icons.people_outline),
@@ -176,10 +206,10 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
         children: [
           // Navigation rail for tablet, extended drawer for desktop
           if (deviceType == DeviceType.desktop)
-            _buildNavigationDrawer()
+            _buildNavigationDrawer(isStaff)
           else
             NavigationRail(
-              selectedIndex: _currentIndex,
+              selectedIndex: _currentIndex.clamp(0, destinations.length - 1),
               onDestinationSelected: (index) {
                 setState(() {
                   _currentIndex = index;
@@ -194,17 +224,14 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
 
           // Main content
           Expanded(
-            child: IndexedStack(index: _currentIndex, children: _screens),
+            child: IndexedStack(index: _currentIndex, children: screens),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildNavigationDrawer() {
-    final authProvider = context.read<AuthProvider>();
-    final isStaff = authProvider.user?.isStaff ?? false;
-
+  Widget _buildNavigationDrawer(bool isStaff) {
     final items = [
       (Icons.people_outline, Icons.people, 'Directory'),
       (Icons.map_outlined, Icons.map, 'Map'),
