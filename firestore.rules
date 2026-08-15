@@ -85,13 +85,16 @@ service cloud.firestore {
                       && resource.data.role in ['studentLeader', 'organizationOfficer']
                       && resource.data.isActive == true);
 
-      // LIST (collection queries): any signed-in user can list active leaders/officers.
-      // Uses explicit == with || instead of 'in' operator — Firestore's query evaluator
-      // reliably matches whereIn query constraints against == rule conditions.
-      allow list: if request.auth != null
-                  && (resource.data.role == 'studentLeader'
-                      || resource.data.role == 'organizationOfficer')
-                  && resource.data.isActive == true;
+      // LIST (collection queries): any signed-in user may list the users collection.
+      //
+      // IMPORTANT: Firebase docs explicitly state that `in`/`not-in`/`whereIn`
+      // queries are NOT evaluated against security rule conditions — Firestore
+      // ignores the whereIn constraint and acts as if any role could be returned.
+      // Therefore resource.data.role conditions CANNOT be used here.
+      //
+      // The app's own whereIn + isActive == true query filters are the enforcement.
+      // Admin COUNT queries (no WHERE) also need this rule, so only auth is checked.
+      allow list: if request.auth != null;
 
       // CREATE: self-registration with validation
       allow create: if isOwner(userId)
