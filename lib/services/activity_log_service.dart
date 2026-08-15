@@ -16,11 +16,20 @@ class ActivityLogService {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
 
+    // Clamp string lengths to comply with Firestore security rule limits
+    final safeAction = action.length > 50 ? action.substring(0, 50) : action;
+    final safeDetails = (details != null && details.length > 200)
+        ? details.substring(0, 200)
+        : (details ?? '');
+    final safeTarget = (targetId != null && targetId.length > 100)
+        ? targetId.substring(0, 100)
+        : (targetId ?? '');
+
     final _ = _firestore.collection('activity_logs').add({
       'actorId': uid,
-      'action': action,
-      'targetId': targetId ?? '',
-      'details': details ?? '',
+      'action': safeAction,
+      'targetId': safeTarget,
+      'details': safeDetails,
       'timestamp': FieldValue.serverTimestamp(),
     }).catchError((e) {
       if (kDebugMode) debugPrint('ActivityLog error: $e');

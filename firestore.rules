@@ -120,7 +120,8 @@ service cloud.firestore {
                           'isActive', 'currentStatus', 'notificationPreferences',
                           'photoUrl', 'phoneNumber', 'officeHours', 'searchName',
                           'quickMessage', 'availabilityStatus', 'customStatusMessage',
-                          'statusUpdatedAt', 'statusExpiresAt'
+                          'statusUpdatedAt', 'statusExpiresAt',
+                          'fcmTokens', 'lastTokenUpdate'
                         ]);
 
       // UPDATE: owner (limited fields) OR admin
@@ -131,7 +132,8 @@ service cloud.firestore {
                           'officeHours', 'notificationPreferences', 'searchName',
                           'quickMessage', 'currentStatus', 'availabilityStatus',
                           'customStatusMessage', 'statusUpdatedAt', 'statusExpiresAt',
-                          'isTrackingEnabled', 'lastLoginAt'
+                          'isTrackingEnabled', 'lastLoginAt',
+                          'fcmTokens', 'lastTokenUpdate'
                         ])
                         && isValidName(request.resource.data.firstName)
                         && isValidName(request.resource.data.lastName)
